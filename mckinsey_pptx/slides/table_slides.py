@@ -53,6 +53,85 @@ def _fill(cell, rgb):
     cell.fill.fore_color.rgb = rgb
 
 
+def draw_table(slide, theme: Theme, left, top, table_w, avail_h, *,
+               columns: Sequence[str], rows: Sequence[Sequence],
+               col_widths: Optional[Sequence[float]] = None,
+               highlight_rows: Sequence[int] = (), highlight_col: Optional[int] = None,
+               first_col_bold: bool = True, numeric_align: str = "center",
+               font_size: Optional[int] = None, total_row: bool = False) -> float:
+    """Native table inside a box; returns its height. `total_row` styles the
+    last row as a dark total line."""
+    pal, typo = theme.palette, theme.typography
+    size = font_size or (typo.body_size + 2 if len(rows) <= 7 else typo.body_size)
+    n_cols = max(len(columns), 1)
+    n_rows = len(rows) + 1
+    if col_widths is None:
+        col_widths = _auto_widths(columns, rows, n_cols)
+    total = float(sum(col_widths))
+    widths_in = [table_w * w / total for w in col_widths]
+    # never squeeze a column below ~0.85" (numbers, short labels)
+    short = [i for i, w in enumerate(widths_in) if w < 0.85]
+    if short and len(short) < n_cols:
+        spare = sum(0.85 - widths_in[i] for i in short)
+        rest = [i for i in range(n_cols) if i not in short]
+        rest_total = sum(widths_in[i] for i in rest)
+        for i in short:
+            widths_in[i] = 0.85
+        for i in rest:
+            widths_in[i] -= spare * widths_in[i] / rest_total
+
+    # Row height: share the available height so the table fills its box.
+    avail = avail_h
+    row_h = min(0.9, max(0.32, avail / n_rows))
+    table_h = row_h * n_rows
+    gf = slide.shapes.add_table(n_rows, n_cols, Inches(left), Inches(top),
+                                Inches(table_w), Inches(table_h))
+    table = gf.table
+    # Drop the default PowerPoint table style banding; we colour explicitly.
+    tbl_pr = gf._element.graphic.graphicData.tbl.tblPr
+    tbl_pr.set("firstRow", "1")
+    tbl_pr.set("bandRow", "0")
+    for ci, w in enumerate(widths_in):
+        table.columns[ci].width = Emu(int(Inches(w)))
+    for ri in range(n_rows):
+        table.rows[ri].height = Emu(int(Inches(row_h)))
+
+    def is_num(v):
+        return bool(re.fullmatch(r"[\s<>≈~+\-−$€£¥]*[\d.,]+\s*[%xMBK]?\s*", plain(v)))
+
+    for ci, label in enumerate(columns):
+        cell = table.cell(0, ci)
+        _fill(cell, pal.bright_blue if highlight_col == ci else pal.deep_navy)
+        _write_cell(cell, label, size=size, color=pal.white, family=typo.family, theme=theme,
+                    bold=True, align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
+
+    hl = set(highlight_rows)
+    last = len(rows)
+    for ri, row in enumerate(rows, start=1):
+        for ci in range(n_cols):
+            val = row[ci] if ci < len(row) else ""
+            cell = table.cell(ri, ci)
+            is_total = total_row and ri == last
+            if is_total:
+                _fill(cell, pal.deep_navy)
+            elif (ri - 1) in hl:
+                _fill(cell, theme.palette.light_gray)
+            elif highlight_col == ci:
+                _fill(cell, theme.palette.soft_gray)
+            else:
+                _fill(cell, pal.white if ri % 2 else pal.soft_gray)
+            align = PP_ALIGN.LEFT
+            if ci > 0 and numeric_align == "center" and is_num(val):
+                align = PP_ALIGN.CENTER
+            _write_cell(cell, val, size=size,
+                        color=pal.white if is_total else pal.text_dark,
+                        family=typo.family, theme=theme,
+                        bold=(ci == 0 and first_col_bold) or (ri - 1) in hl or is_total,
+                        align=align)
+
+    return table_h
+
+
 def add_data_table(prs, *,
                    title: str = "[Data table / Insert action title]",
                    columns: Sequence[str],
@@ -100,66 +179,11 @@ def add_data_table(prs, *,
     gap = 0.35 if has_panel else 0
     table_w = width - panel_w - gap
 
-    n_cols = max(len(columns), 1)
-    n_rows = len(rows) + 1
-    if col_widths is None:
-        col_widths = _auto_widths(columns, rows, n_cols)
-    total = float(sum(col_widths))
-    widths_in = [table_w * w / total for w in col_widths]
-    # never squeeze a column below ~0.85" (numbers, short labels)
-    short = [i for i, w in enumerate(widths_in) if w < 0.85]
-    if short and len(short) < n_cols:
-        spare = sum(0.85 - widths_in[i] for i in short)
-        rest = [i for i in range(n_cols) if i not in short]
-        rest_total = sum(widths_in[i] for i in rest)
-        for i in short:
-            widths_in[i] = 0.85
-        for i in rest:
-            widths_in[i] -= spare * widths_in[i] / rest_total
-
-    # Row height: share the body height so the table fills the slide.
-    avail = bottom - top
-    row_h = min(0.9, max(0.32, avail / n_rows))
-    table_h = row_h * n_rows
-    gf = slide.shapes.add_table(n_rows, n_cols, Inches(left), Inches(top),
-                                Inches(table_w), Inches(table_h))
-    table = gf.table
-    # Drop the default PowerPoint table style banding; we colour explicitly.
-    tbl_pr = gf._element.graphic.graphicData.tbl.tblPr
-    tbl_pr.set("firstRow", "1")
-    tbl_pr.set("bandRow", "0")
-    for ci, w in enumerate(widths_in):
-        table.columns[ci].width = Emu(int(Inches(w)))
-    for ri in range(n_rows):
-        table.rows[ri].height = Emu(int(Inches(row_h)))
-
-    def is_num(v):
-        return bool(re.fullmatch(r"[\s<>≈~+\-−$€£¥]*[\d.,]+\s*[%xMBK]?\s*", plain(v)))
-
-    for ci, label in enumerate(columns):
-        cell = table.cell(0, ci)
-        _fill(cell, pal.bright_blue if highlight_col == ci else pal.deep_navy)
-        _write_cell(cell, label, size=size, color=pal.white, family=typo.family, theme=theme,
-                    bold=True, align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
-
-    hl = set(highlight_rows)
-    for ri, row in enumerate(rows, start=1):
-        for ci in range(n_cols):
-            val = row[ci] if ci < len(row) else ""
-            cell = table.cell(ri, ci)
-            if (ri - 1) in hl:
-                _fill(cell, theme.palette.light_gray)
-            elif highlight_col == ci:
-                _fill(cell, theme.palette.soft_gray)
-            else:
-                _fill(cell, pal.white if ri % 2 else pal.soft_gray)
-            align = PP_ALIGN.LEFT
-            if ci > 0 and numeric_align == "center" and is_num(val):
-                align = PP_ALIGN.CENTER
-            _write_cell(cell, val, size=size, color=pal.text_dark,
-                        family=typo.family, theme=theme,
-                        bold=(ci == 0 and first_col_bold) or (ri - 1) in hl,
-                        align=align)
+    table_h = draw_table(slide, theme, left, top, table_w, bottom - top,
+                         columns=columns, rows=rows, col_widths=col_widths,
+                         highlight_rows=highlight_rows, highlight_col=highlight_col,
+                         first_col_bold=first_col_bold, numeric_align=numeric_align,
+                         font_size=size)
 
     if has_panel:
         add_insight_panel(slide, theme, left + table_w + gap, top, panel_w,

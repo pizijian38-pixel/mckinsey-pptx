@@ -491,7 +491,7 @@ A. 能，就是**普通的 PowerPoint 文件**。用 PowerPoint / WPS / Keynote 
 
 ---
 
-## 能做哪些幻灯片？（51 个模板）
+## 能做哪些幻灯片？（55 个模板 + 复合版式）
 
 Claude 会自动挑选，你也可以直接指定。
 
@@ -549,6 +549,12 @@ Claude 会自动挑选，你也可以直接指定。
 - **路线图** `roadmap`：多条工作流 × 时间段，带里程碑
 - **时间线** `timeline`：3–7 个按时间排列的事件
 - **2×2 矩阵** `matrix_2x2`：影响 × 难度、可能性 × 严重度等两维度排序
+- **方案概览** `option_profiles`：2–4 个方案 / 产品 / 供应商并列，同样的维度（定位、关键数字、优劣势）
+- **决策矩阵** `decision_matrix`：标准 × 权重 × 方案，原始分 + 加权分，每行最高分标金色，加权总分
+- **风险登记** `risk_register`：风险卡片 + 等级标签（高 / 中 / 低）+ 应对措施
+- **复合版式** `composite`：在一页里自由组合"流程图、指标表、大数字、卡片、优劣势、编号清单、分阶段路线、图表、表格"，
+  做出咨询公司式的"方案详解页"（左边商业模式和数字，右边 Why / How / 优劣势，底部结论）
+- 每页都可以加 `kicker`（标题上方的小字定位标签），并列页面用 `group` 标记，保证版式一致
 - 文字中可以用 `**加粗**`、`{red|标红}`、`{green|标绿}` 强调关键词，内置 88 个商务图标
 - **品牌配色**：说"用品牌色 #103B8C"即可，整套配色会自动换成你的品牌色
 
@@ -699,7 +705,7 @@ python -m mckinsey_pptx.cli specs.json -o deck.pptx --section-marker "Strategy r
 ### 冒烟测试
 
 ```bash
-python tests/smoke/run.py            # 构建 4 个不同场景的 PPT 并逐个检查
+python tests/smoke/run.py            # 构建 5 个不同场景的 PPT 并逐个检查
 python tests/smoke/run.py --render   # 同时渲染预览图（需要 LibreOffice）
 ```
 
@@ -750,7 +756,7 @@ axlabs-mckinsey-pptx/
 │   └── slides/                            # 40 个模板（按类别分文件）
 ├── scripts/
 │   └── deck_check.py                      # 把 PPT 和源文件对照检查
-├── tests/smoke/                           # 多场景冒烟测试（财务回顾 / 项目汇报 / 中文战略 / 现场路演）
+├── tests/smoke/                           # 多场景冒烟测试（财务回顾 / 项目汇报 / 中文战略 / 现场路演 / 方案评估）
 ├── examples/
 │   ├── demo.py                            # 英文示例
 │   ├── demo_chinese.py                    # 中文示例

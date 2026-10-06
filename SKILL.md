@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 51 templates (card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, tier ladders, org charts, issue trees). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
+description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 55 templates and a composite layout (option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -106,6 +106,27 @@ the deck's content.
   fact, and never invent a source attribution.
 - Language: the language the user writes in, unless they ask otherwise.
 
+### The user's request is a spec too (both modes)
+
+1. **Prescribed structure is binding.** If the request fixes the slide
+   count, the order, or what each slide must contain ("slide 6: rationale,
+   roadmap, risk & mitigation"; "each option: why, how, advantages,
+   disadvantages"), every named element becomes a **visible, labelled
+   block** on that slide, in that order. Don't drop, merge or rename
+   elements; if space is tight, shorten each block rather than losing one.
+2. **Constraints on a slide are binding.** "No preference yet", "neutral",
+   "don't recommend", "facts only" → on that slide no `highlight_col` /
+   `highlight_rows`, no favouring tones (green for one option), no
+   evaluative insight; label the bottom bar neutrally ("Preliminary view").
+3. **Thinking tasks come before layout.** When the request asks you to
+   verify, stress-test, challenge, correct, complement or decide (not only to
+   lay out), do that work in the plan first: list the questions the audience
+   will ask (e.g. "what if utilisation is 12 h, not 16 h?"), answer each from
+   the source, and record what you changed and why. The deck then shows the
+   corrected position. You may complement the source when asked to — but
+   flag every addition in "Inferences added", show how derived numbers are
+   computed, and never present an addition as sourced fact.
+
 ---
 
 ## Step 1 — Understand the material and the use
@@ -137,8 +158,11 @@ invent template names or argument shapes.
 Before writing any build code, write `output/<slug>_plan.md` — a table with
 one row per slide:
 
-| # | Source section | Message (action title) | Template | Source data used | Inferences added |
-|---|---|---|---|---|---|
+| # | Source section | Required elements (from the request) | Message (action title) | Template | Source data used | Inferences added |
+|---|---|---|---|---|---|---|
+
+"Required elements" copies what the user asked that slide to contain
+(or "—"); after building, tick each one off against the rendered slide.
 
 "Inferences added" lists every supporting point or insight that is a
 consequence you drew rather than a sentence from the source — so the user
@@ -177,6 +201,9 @@ keep the source's section name as the `section_marker` or subtitle if useful.
   - If you can't write an insight that adds something beyond the title, leave
     `insight` out. Not every slide needs one; objectives, roadmaps and
     reference tables often don't.
+- **Name the bottom bar for its role** (`insight_label=`): "Bottom line",
+  "Verdict", "Implication", "What it takes", "Preliminary view", "Decision
+  needed" — not "Key insight" on every slide.
 - **Emphasis:** in the rich templates mark the 1–3 things the reader must
   see per card or panel — key numbers in `**bold**`, problems / declines in
   `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
@@ -189,13 +216,19 @@ keep the source's section name as the `section_marker` or subtitle if useful.
 
 **Data → template rules:**
 
-Default to the **rich templates** (41–51); they use larger type, fit text to
+Default to the **rich templates** (41–55); they use larger type, fit text to
 the space, support emphasis and icons, and produce editable tables and
-charts. Use the older templates (1–40) for what they uniquely cover.
+charts. Use the older templates (1–40) for what they uniquely cover. When no
+single template fits a slide that mixes content types, build it with
+`composite` regions instead of forcing it into one template.
 
 | Content | Template |
 |---|---|
-| **Numeric** table / series (by period or category) | `chart`: `line` = trend, `column` / `bar` = compare or rank, `grouped_column` = two periods side by side, `stacked_column` = composition, `doughnut` = share of one total. `highlight` the focus item, add an `insight`. Full `data_table` on a following slide only if the chart can't show every value |
+| **Scores, ratings or rankings against criteria** (weighted evaluation, vendor / option scoring, maturity ratings) | **table, not a chart**: `decision_matrix` (weights, raw + weighted scores, best per row, totals); plain ratings → `data_table` |
+| 2–4 options / products / scenarios side by side, each with the same facets (summary, key numbers, pros, cons) | `option_profiles` |
+| One option / initiative / product in depth (how it works + numbers + why / how / pros / cons + verdict) | `composite` (e.g. `flow` + `kv_table` on the left, 2×2 `cards` on the right) |
+| Risks with severity, owner or mitigation | `risk_register` |
+| **Numeric** series where *magnitude or trend* is the point (by period or category) | `chart`: `line` = trend, `column` / `bar` = compare or rank, `grouped_column` = two periods side by side, `stacked_column` = composition, `doughnut` = share of one total. `highlight` the focus item, add an `insight`. Full `data_table` on a following slide only if the chart can't show every value |
 | Change between two totals, explained by drivers (bridge, variance, price-volume-mix) | `waterfall` |
 | KPIs with target vs. actual and status | `scorecard` |
 | Headline numbers / targets (2–4) | `card_grid` with `value` per card |
@@ -219,6 +252,7 @@ for a type of deck, start from the matching spine and adapt it:
 | Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
 | Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `data_table` → recommendation `card_grid` → `roadmap` |
 | Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
+| Options evaluation / proposal | `option_profiles` (neutral) → one `composite` per option (`group="options"`, same regions each time) → `decision_matrix` → recommendation `card_grid` + `roadmap` → `risk_register` |
 | Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
 | Operations / process improvement | baseline `chart` → root causes `issue_tree` / `card_grid` → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
 | Board / steering update | one-page summary → `scorecard` → decisions needed → appendix tables |
@@ -227,8 +261,18 @@ for a type of deck, start from the matching spine and adapt it:
 These are starting points, not rules: in source mode the source's own
 structure always wins.
 
-**Vary the layouts.** At most **three** slides in a row with the same
-template (a `swot` counts as a `card_grid`; `card_rows` is a different layout). If the source has numeric
+**Parallel slides look alike.** When consecutive slides cover parallel items
+(option 1 / 2 / 3, product A / B / C, region by region, one slide per
+workstream), give them **the same template and the same block order**, and
+pass the same `group=` to each (`b.add(..., group="options")`). Readers
+compare them side by side; a different layout for one of them reads as a
+different kind of content. Inside the shared frame, swap a block only when
+that item lacks the data (e.g. no unit economics for one option → a
+priority list in the same position).
+
+**Vary the layouts** across different kinds of content. At most **three**
+slides in a row with the same template unless they share a `group` (a
+`swot` counts as a `card_grid`; `card_rows` is a different layout). If the source has numeric
 series, the deck must contain at least one `chart`. When a run gets long,
 re-express one slide differently — e.g. targets as `card_grid` values, a
 list of drivers as a `chart` of their sizes, a profile or option set as a
@@ -238,6 +282,10 @@ list of drivers as a `chart` of their sizes, a profile or option set as a
 - Titles must fit on **one line** (the underline sits right below it):
   ≤ ~75 characters English, ≤ ~34 Chinese characters. Put the rest of the
   message in the subtitle or the key insight.
+- `kicker=` puts a small label above the title that says where the slide
+  sits in the argument ("Option 2 | Outsource to 3PL", "Recommendation (1/2)
+  | Roadmap"). Use it on every content slide of a structured deck; keep it
+  under ~60 characters.
 - `default_section_marker` / `section_marker` is a short label in a small
   top-right box: ≤ 20 characters ("Reignite 2026", "Market review").
 - `cover_slide`: `client` and `date` are one short line each (e.g. "Group 8",
@@ -311,7 +359,9 @@ The checker reports:
      explanatory words are fine; new facts, features, places or behaviours
      are not.
 6. **Layout variety** → more than three slides of the same template in a
-   row, or no chart although the source has numbers → re-express a slide.
+   row (outside a `group`), a mostly numeric table shown with no chart in
+   the deck, or a `group` whose slides use different templates → fix the
+   layout (parallel slides share one template; other runs get re-expressed).
 7. **Small body text (< 12pt)** → shorten the longest bullets, drop the
    subtitle or the insight bar, or split the slide. The build also prints
    `[mckinsey_pptx] WARNING ... text fitted at Npt` — treat it the same way.

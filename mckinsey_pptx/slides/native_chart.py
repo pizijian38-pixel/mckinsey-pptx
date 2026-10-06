@@ -30,57 +30,19 @@ _TYPES = {
 _DEFAULT_SERIES_TONES = ("navy", "blue", "mid_blue", "light_blue", "amber", "gray")
 
 
-def add_native_chart(prs, *,
-                     title: str = "[Chart / Insert action title]",
-                     chart_type: str = "column",
-                     categories: Sequence,
-                     series: Sequence[Dict],
-                     subtitle: Optional[str] = None,
-                     number_format: str = "General",
-                     show_values: bool = True,
-                     highlight: Optional[Dict] = None,
-                     insight: Optional[str] = None,
-                     insight_bullets: Sequence[str] = (),
-                     insight_title: str = "Key insight",
-                     y_max: Optional[float] = None,
-                     page_number=None, section_marker=None,
-                     source=None, footnote=None,
-                     theme: Theme = DEFAULT_THEME):
-    """chart_type: column | grouped_column | stacked_column | stacked_column_100
-                   | bar | stacked_bar | line | pie | doughnut
-    series: [{"name": str, "values": [num], "tone"?: str}]
-    highlight: {"series": name} -> that series in red, others muted (line/bar);
-               {"point": index} -> that category's bar in red (single series).
-    number_format: Excel format for value labels, e.g. '0.0', '0"%"', '#,##0'.
-    """
-    slide = blank_slide(prs)
-    add_chrome(slide, title=title, theme=theme, page_number=page_number,
-               section_marker=section_marker, source=source, footnote=footnote)
-    pal, typo, layout = theme.palette, theme.typography, theme.layout
-    left = layout.margin_left_in
-    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
-    top = layout.body_top_in + 0.05
-    bottom = layout.footer_top_in - 0.25
-
-    if subtitle:
-        tb = add_textbox(slide, left, top, width, 0.35)
-        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
-                        bold=True, color=pal.text_dark, family=typo.family,
-                        first=True)
-        top += 0.45
-
-    has_panel = bool(insight or insight_bullets)
-    panel_w = 3.9 if has_panel else 0
-    gap = 0.35 if has_panel else 0
-    chart_w = width - panel_w - gap
-
+def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
+               categories: Sequence, series: Sequence[Dict],
+               number_format: str = "General", show_values: bool = True,
+               highlight: Optional[Dict] = None, y_max: Optional[float] = None):
+    """Native chart inside a box (see add_native_chart for the arguments)."""
+    pal, typo = theme.palette, theme.typography
     data = CategoryChartData()
     data.categories = [str(c) for c in categories]
     for s in series:
         data.add_series(s["name"], [None if v is None else float(v) for v in s["values"]])
     xl_type = _TYPES[chart_type]
-    gf = slide.shapes.add_chart(xl_type, Inches(left), Inches(top),
-                                Inches(chart_w), Inches(bottom - top), data)
+    gf = slide.shapes.add_chart(xl_type, Inches(x), Inches(y),
+                                Inches(w), Inches(h), data)
     chart = gf.chart
     chart.has_title = False          # the slide title / subtitle carry it
     chart.font.size = Pt(12)
@@ -178,6 +140,58 @@ def add_native_chart(prs, *,
             dl.font.color.rgb = pal.white
         else:
             dl.position = XL_LABEL_POSITION.OUTSIDE_END
+
+    return gf
+
+
+def add_native_chart(prs, *,
+                     title: str = "[Chart / Insert action title]",
+                     chart_type: str = "column",
+                     categories: Sequence,
+                     series: Sequence[Dict],
+                     subtitle: Optional[str] = None,
+                     number_format: str = "General",
+                     show_values: bool = True,
+                     highlight: Optional[Dict] = None,
+                     insight: Optional[str] = None,
+                     insight_bullets: Sequence[str] = (),
+                     insight_title: str = "Key insight",
+                     y_max: Optional[float] = None,
+                     page_number=None, section_marker=None,
+                     source=None, footnote=None,
+                     theme: Theme = DEFAULT_THEME):
+    """chart_type: column | grouped_column | stacked_column | stacked_column_100
+                   | bar | stacked_bar | line | pie | doughnut
+    series: [{"name": str, "values": [num], "tone"?: str}]
+    highlight: {"series": name} -> that series in red, others muted (line/bar);
+               {"point": index} -> that category's bar in red (single series).
+    number_format: Excel format for value labels, e.g. '0.0', '0"%"', '#,##0'.
+    """
+    slide = blank_slide(prs)
+    add_chrome(slide, title=title, theme=theme, page_number=page_number,
+               section_marker=section_marker, source=source, footnote=footnote)
+    pal, typo, layout = theme.palette, theme.typography, theme.layout
+    left = layout.margin_left_in
+    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+    top = layout.body_top_in + 0.05
+    bottom = layout.footer_top_in - 0.25
+
+    if subtitle:
+        tb = add_textbox(slide, left, top, width, 0.35)
+        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
+                        bold=True, color=pal.text_dark, family=typo.family,
+                        first=True)
+        top += 0.45
+
+    has_panel = bool(insight or insight_bullets)
+    panel_w = 3.9 if has_panel else 0
+    gap = 0.35 if has_panel else 0
+    chart_w = width - panel_w - gap
+
+    draw_chart(slide, theme, left, top, chart_w, bottom - top,
+               chart_type=chart_type, categories=categories, series=series,
+               number_format=number_format, show_values=show_values,
+               highlight=highlight, y_max=y_max)
 
     if has_panel:
         add_insight_panel(slide, theme, left + chart_w + gap, top, panel_w,

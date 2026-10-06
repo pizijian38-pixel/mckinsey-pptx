@@ -8,7 +8,8 @@ Reports, per deck:
   3. Text slides that say little (advisory, source mode)  -> add source detail
   4. Leftover template placeholders ([...], xx, Lorem)    -> unfinished
   5. Claims / quoted terms / vocabulary not in the sources -> possible invention
-  6. Same template many slides in a row, or no chart      -> monotonous layout
+  6. Same template many slides in a row, no chart, or a parallel group
+     (group=) whose slides use different templates          -> layout issues
   7. Body text below 12pt                                  -> hard to read
   8. Footer "Source:" misuse (caption as source, wrong language)
   9. Insight bullets that only restate a table row
@@ -144,6 +145,8 @@ def _norm(n: str) -> str:
     n = n.replace(",", "").replace("−", "-").lstrip("+-")
     if "." in n:
         n = n.rstrip("0").rstrip(".")
+    if n.isdigit():
+        n = n.lstrip("0") or "0"           # "01" (item numbering) == "1"
     return n
 
 
@@ -169,7 +172,7 @@ def fill_ratio(slide, slide_w, slide_h) -> float:
 # Claim types the skill forbids adding, by category (regex, case-insensitive).
 # A match is flagged only when the matched phrase is absent from the sources.
 RISK_PATTERNS = {
-    "superlative / ranking": r"#\s?1\b|\bno\.?\s?1\b|\bnumber[- ]one\b|\bfastest[- ]?\w*"
+    "superlative / ranking": r"#\s?1\b|\bno\.?\s?1\b|\bnumber[- ]one\b|\bfastest(?:-\w+)?"
                              r"|\blargest\b|\bmarket[- ]lead\w*|\bindustry[- ]lead\w*"
                              r"|\bbest[- ]in[- ]class\b|\bfirst[- ]ever\b|\bunmatched\b"
                              r"|\bunrivall?ed\b|\bworld[- ]class\b",
@@ -298,9 +301,33 @@ _TEXT_TEMPLATES = {"card_grid", "card_rows", "swot", "executive_summary",
                    "overview_areas", "two_column_compare", "pros_cons"}
 
 
-def template_of(slide):
+def _record(slide):
     name = slide._element.cSld.get("name") or ""
-    return name[3:] if name.startswith("mp:") else None
+    if not name.startswith("mp:"):
+        return None, None
+    tpl, _, group = name[3:].partition("|")
+    return tpl, (group or None)
+
+
+def template_of(slide):
+    return _record(slide)[0]
+
+
+def group_of(slide):
+    return _record(slide)[1]
+
+
+def numeric_share(slide) -> float:
+    """Share of non-header table cells that are numbers (0 if no table)."""
+    cells = []
+    for sh in _iter_shapes(slide.shapes):
+        if getattr(sh, "has_table", False) and sh.has_table:
+            for r in list(sh.table.rows)[1:]:
+                for c in list(r.cells)[1:]:
+                    t = c.text.strip()
+                    if t:
+                        cells.append(bool(re.fullmatch(r"[\s<>~≈+\-−$€£¥]*[\d.,]+\s*[%xMBK]?\s*", t)))
+    return sum(cells) / len(cells) if cells else 0.0
 
 
 def has_chart(slide) -> bool:
@@ -378,7 +405,7 @@ def main(argv=None) -> int:
     deck_nums_all: set[str] = set()
     sparse, leftovers, invented = [], [], []
     risky, quoted_new, novel, small, src_bad, restates = [], [], [], [], [], []
-    templates = []
+    templates, groups = [], []
     for i, slide in enumerate(prs.slides, start=1):
         text = slide_text(slide)
         nums = numbers(text)
@@ -414,6 +441,7 @@ def main(argv=None) -> int:
         if issues:
             src_bad.append((i, issues))
         templates.append(template_of(slide))
+        groups.append(group_of(slide))
         hits = {m.group(0) for line in text.splitlines()
                 for m in [PLACEHOLDER.search(line.strip())] if m}
         if hits:
@@ -478,23 +506,42 @@ def main(argv=None) -> int:
     if not known:
         print("  (deck has no template records — built outside PresentationBuilder)")
     else:
-        run_t, run_n, start, runs = None, 0, 0, []
-        for i, t in enumerate(templates + [None], start=1):
+        # a run = consecutive slides of one template family that are NOT one
+        # declared parallel group (groups are meant to look alike)
+        runs = []
+        run_key, run_n, start = None, 0, 0
+        for i, (t, g) in enumerate(list(zip(templates, groups)) + [(None, None)], start=1):
             fam = _FAMILY.get(t, t)
-            if fam is not None and fam == run_t:
+            key = None if fam is None else (fam, g)
+            if key is not None and key == run_key:
                 run_n += 1
             else:
-                if run_t and run_n > 3:
-                    runs.append((run_t, start, start + run_n - 1))
-                run_t, run_n, start = fam, 1, i
+                if run_key and run_n > 3 and run_key[1] is None:
+                    runs.append((run_key[0], start, start + run_n - 1))
+                run_key, run_n, start = key, 1, i
         for t, a, b in runs:
             flagged = True
-            print(f"  slides {a}-{b}: {b - a + 1} x {t} in a row (max 3) — re-express one")
+            print(f"  slides {a}-{b}: {b - a + 1} x {t} in a row (max 3) — re-express one, "
+                  "or mark parallel slides with group=")
+        mixed = {}
+        for i, (t, g) in enumerate(zip(templates, groups), start=1):
+            if g:
+                mixed.setdefault(g, []).append((i, t))
+        for g, members in mixed.items():
+            if len({_FAMILY.get(t, t) for _, t in members}) > 1:
+                flagged = True
+                desc = ", ".join(f"{i} ({t})" for i, t in members)
+                print(f"  group '{g}' mixes templates: slides {desc} — parallel slides "
+                      "should share one layout")
         n_charts = sum(has_chart(s) for s in prs.slides)
-        if args.source and len(src_nums) >= 10 and n_charts == 0:
+        numeric_tables = [i for i, s_ in enumerate(prs.slides, start=1)
+                          if template_of(s_) in ("data_table", None) and numeric_share(s_) >= 0.5]
+        if n_charts == 0 and numeric_tables:
             flagged = True
-            print("  no chart, although the sources contain numeric data — chart the numeric tables")
-        if not runs and not (args.source and len(src_nums) >= 10 and n_charts == 0):
+            print(f"  no chart, but slide(s) {', '.join(map(str, numeric_tables))} show a mostly "
+                  "numeric table — chart the series (scores / ratings may stay tables)")
+        bad_groups = [g for g, m in mixed.items() if len({_FAMILY.get(t, t) for _, t in m}) > 1]
+        if not runs and not bad_groups and not (n_charts == 0 and numeric_tables):
             print(f"  ok ({n_charts} chart slide(s))")
 
     print("\n[7] Small body text (< 12pt):")

@@ -20,7 +20,8 @@ from .slides import (
     trends_slides, org_charts, timeline_slides, summary_slide,
     structure_slides, comparison_slides, extra_charts, process_extras,
     table_slides, card_slides, native_chart, ladder_slides,
-    finance_slides, plan_slides, matrix_slides,
+    finance_slides, plan_slides, matrix_slides, composite_slides,
+    evaluation_slides,
 )
 
 
@@ -88,6 +89,11 @@ _REGISTRY = {
     "timeline": plan_slides.add_timeline,
     "matrix_2x2": matrix_slides.add_matrix_2x2,
     "matrix": matrix_slides.add_matrix_2x2,
+    "composite": composite_slides.add_composite,
+    "option_profiles": evaluation_slides.add_option_profiles,
+    "decision_matrix": evaluation_slides.add_decision_matrix,
+    "scoring_matrix": evaluation_slides.add_decision_matrix,
+    "risk_register": evaluation_slides.add_risk_register,
     "price_ladder": ladder_slides.add_tier_ladder,
 
     # Summary
@@ -226,6 +232,23 @@ def infer_slide_type(spec: Dict[str, Any]) -> str:
     raise ValueError(f"Cannot infer slide type from spec keys: {list(spec.keys())}")
 
 
+# Templates without the standard title band (no kicker above a title).
+_FULL_BLEED = {"cover_slide", "dark_navy_summary", "section_divider", "quote_slide"}
+
+
+def add_kicker(slide, text, theme):
+    """Small letter-spaced label above the slide title ("OPTION 1 | LEASING")."""
+    from .base import add_textbox, write_paragraph
+    from .components import letter_space
+    layout, pal = theme.layout, theme.palette
+    tb = add_textbox(slide, layout.margin_left_in, 0.16,
+                     layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+                     - layout.section_marker_w_in - 0.3, 0.26)
+    p = write_paragraph(tb.text_frame, str(text).upper(), size=10, bold=True,
+                        color=pal.mid_blue, family=theme.typography.family, first=True)
+    letter_space(p, 200)
+
+
 def template_name(fn) -> str:
     """Canonical template name for a registry callable (aliases collapse)."""
     canon = {v: k for k, v in reversed(list(_REGISTRY.items()))}
@@ -257,10 +280,16 @@ class PresentationBuilder:
                 and "section_marker" not in kwargs):
             kwargs["section_marker"] = self.default_section_marker
         kwargs.setdefault("theme", self.theme)
+        kicker = kwargs.pop("kicker", None)
+        group = kwargs.pop("group", None)
         out = fn(self.prs, **kwargs)
-        # Record the template on the slide (<p:cSld name>) so
-        # scripts/deck_check.py can check layout variety.
-        self.prs.slides[-1]._element.cSld.set("name", "mp:" + template_name(fn))
+        slide = self.prs.slides[-1]
+        name = template_name(fn)
+        if kicker and name not in _FULL_BLEED:
+            add_kicker(slide, kicker, kwargs["theme"])
+        # Record template (+ parallel group) on the slide (<p:cSld name>) so
+        # scripts/deck_check.py can check layout variety and consistency.
+        slide._element.cSld.set("name", "mp:" + name + (f"|{group}" if group else ""))
         return out
 
     # Adaptive add (type optional)

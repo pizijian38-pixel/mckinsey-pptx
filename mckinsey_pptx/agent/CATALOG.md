@@ -985,10 +985,11 @@ b.add("tier_ladder", title="Three service tiers move customers up the value curv
 
 ---
 
-## Rich text, tones and icons (templates 41–51)
+## Rich text, tones and icons (templates 41–55)
 
 - `**bold**` → bold; `{red|text}` → bold in that tone (`navy`, `blue`,
-  `mid_blue`, `light_blue`, `red`, `green`, `amber`, `gray`). Use red for
+  `mid_blue`, `light_blue`, `red`, `green`, `amber`, `gray`, `gold` = neutral
+  emphasis such as best-in-row). Use red for
   problems / declines, green for growth / targets, sparingly (1–3 spans per
   card). Older templates (1–40) print the markup literally.
 - Bundled icons (white on a tone circle): `alert`, `arrow_right`, `arrows`, `atom`, `award`, `bag`, `book`, `bot`, `box`, `building`, `calculator`, `calendar`, `cart`, `chart`, `check`, `clipboard`, `clock`, `coins`, `compass`, `cpu`, `cross`, `crown`, `database`, `dna`, `droplet`, `eye`, `factory`, `file`, `filter`, `flag`, `gem`, `globe`, `handshake`, `heart`, `home`, `info`, `key`, `lab`, `layers`, `leaf`, `lightbulb`, `line_chart`, `link`, `lock`, `mail`, `map`, `medal`, `megaphone`, `message`, `microscope`, `money`, `moon`, `package`, `palette`, `pen`, `percent`, `phone`, `pie`, `pill`, `price`, `puzzle`, `question`, `refresh`, `rocket`, `scale`, `search`, `settings`, `share`, `shield`, `smile`, `sparkles`, `star`, `stethoscope`, `store`, `sun`, `target`, `team`, `thumbs_up`, `tooth`, `trend_down`, `trend_up`, `trophy`, `truck`, `user`, `users`, `video`, `wallet`, `zap`.
@@ -1130,11 +1131,148 @@ b.add("matrix_2x2", title="Automate high-volume, rule-based processes first",
 
 ---
 
+## 52. Composite — regions of components (`composite`)
+
+**Category:** Layout — build your own slide from parts
+**Use when:** One slide must show several kinds of content together — the
+typical consulting "deep dive": how it works (flow) + the numbers (key
+values) + why / how / pros / cons (cards) + a verdict. Use it for an
+option, initiative, product, market or business-model page. Prefer a
+dedicated template when one fits the whole slide.
+**Required inputs:**
+- `columns: list` — each column is a region (dict) or a list of regions
+  stacked top to bottom. Each region: `{"type": <component>, "heading"?: str,
+  "weight"?: float (height share in its column), "panel"?: bool, ...args}`
+**Optional inputs:** `widths: list[float]` (column width shares), `subtitle`,
+`insight`, `insight_label`
+**Components** (region `type` → arguments):
+- `flow` — `steps: [{title, body?, tone?}]`, `highlight: int`, `caption: str`
+  (value chain, business model, operating model, process)
+- `kv_table` — `rows: [[label, value], ...]` or `[{label, value, tone?, total?}]`
+  (unit economics, key facts, assumptions)
+- `metrics` — `items: [{value, label, tone?}]` (2–4 big numbers)
+- `cards` — `cards: [...]` as in `card_grid`, `columns: int`
+- `pros_cons` — `pros: [str]`, `cons: [str]`, `labels`, `layout: stacked | columns`
+- `list` — `items: [{title, body?, tone?}]` numbered (priorities, steps, criteria)
+- `phases` — `phases: [{name, period?, goal?, bullets?, tone?}]` (compact roadmap)
+- `bullets` — `items: [str]`; `text` — `text: str | [str]`
+- `chart` — same arguments as `chart` (`chart_type`, `categories`, `series`, ...)
+- `table` — same arguments as `data_table` (`columns`, `rows`, ...)
+**Example:**
+```python
+b.add("composite", kicker="Option 2 | Outsource to a 3PL partner", group="options",
+      title="A 3PL partner cuts capex to zero but adds $0.40 per order",
+      columns=[
+        [{"type": "flow", "heading": "Operating model", "highlight": 1,
+          "steps": [{"title": "Retailer", "body": "Owns stock"},
+                    {"title": "3PL partner", "body": "Runs 4 DCs"},
+                    {"title": "Customer", "body": "Next-day delivery"}],
+          "caption": "Fee per order; 3-year volume commitment"},
+         {"type": "kv_table", "heading": "Cost per order (base case)",
+          "rows": [["Pick, pack & ship", "$4.10"], ["Transport", "$2.30"],
+                   {"label": "Total (in-house $6.20)", "value": "$6.60", "tone": "red", "total": True}]}],
+        [{"type": "cards", "columns": 2, "cards": [
+            {"title": "Why", "icon": "lightbulb", "bullets": ["Capex freed for stores"]},
+            {"title": "How", "icon": "settings", "bullets": ["3-year contract, 98% SLA"]},
+            {"title": "Advantages", "icon": "check", "tone": "green", "bullets": ["$0 capex"]},
+            {"title": "Disadvantages", "icon": "cross", "tone": "red", "bullets": ["+$0.40 per order"]}]}]],
+      widths=[1.15, 1], insight="Worth it only below 2M orders a year", insight_label="Verdict")
+```
+
+---
+
+## 53. Option profiles (`option_profiles`)
+
+**Category:** Evaluation — options side by side
+**Use when:** Introducing 2–4 options, products, vendors, scenarios or
+markets with the **same facets** (name, tagline, one-line summary, 1–3 key
+numbers, pros, cons). Neutral by default — use it for "here are the
+options" before any recommendation.
+**Required inputs:** `options: [{name, tagline?, summary?, icon?, metrics?: [{value, label, tone?}], pros?, cons?}]`
+**Optional inputs:** `recommended: int` (only after the evaluation has been
+shown), `insight`, `insight_label` (default "Preliminary view"),
+`pros_label`, `cons_label`, `subtitle`
+**Notes:** pros / cons switch to side-by-side inside each card when stacked
+text would drop below 12pt; keep 2–3 short items each.
+**Example:**
+```python
+b.add("option_profiles", title="Three ways to meet 2026 volume; each trades capex for control",
+      options=[{"name": "Build own DCs", "tagline": "Full control", "icon": "building",
+                "metrics": [{"value": "$180M", "label": "capex"}],
+                "pros": ["Lowest unit cost at scale"], "cons": ["24 months to open"]},
+               {"name": "Outsource to 3PL", "tagline": "Zero capex", "icon": "truck",
+                "metrics": [{"value": "$0", "label": "capex"}],
+                "pros": ["Live in 6 months"], "cons": ["+$0.40 per order"]}],
+      insight="No option wins on every dimension; the scorecard follows")
+```
+
+---
+
+## 54. Decision matrix — weighted scoring (`decision_matrix`, alias `scoring_matrix`)
+
+**Category:** Evaluation — criteria × weights × options
+**Use when:** Options scored against weighted criteria (vendor selection,
+strategic option scoring, site selection, investment prioritisation).
+Shows raw score and weighted score, highlights the best score per row in
+gold, and adds a weighted-total row. A table, never a chart.
+**Required inputs:** `options: [str]`, `criteria: [{name, weight (25 | 0.25 | "25%"), scores: [num per option]}]`
+**Optional inputs:** `recommended: int` (tints that column), `show_weighted`,
+`highlight_best`, `decimals`, `scale_note`, `insight`, `insight_bullets`,
+`insight_title` (default "What drives the result")
+**Rule:** totals are computed from the given scores × weights — report them
+as derived; if the user changed scores, say which and why.
+**Example:**
+```python
+b.add("decision_matrix", title="The hybrid model scores highest overall",
+      options=["Build own", "3PL", "Hybrid"],
+      criteria=[{"name": "Capital efficiency", "weight": 40, "scores": [1, 5, 3]},
+                {"name": "Unit cost", "weight": 35, "scores": [5, 2, 4]},
+                {"name": "Time to capacity", "weight": 25, "scores": [1, 5, 4]}],
+      scale_note="1 = poor, 5 = excellent; weighted score in brackets")
+```
+
+---
+
+## 55. Risk register (`risk_register`)
+
+**Category:** Evaluation — risks and mitigations
+**Use when:** 2–6 risks, each with a severity (high / medium / low /
+critical), a one-line description and mitigations (and optionally an owner).
+**Required inputs:** `risks: [{title, severity, description?, mitigations?: [str], owner?}]`
+**Optional inputs:** `columns`, `mitigation_label`, `insight`, `insight_label`, `subtitle`
+**Example:**
+```python
+b.add("risk_register", title="Two high risks need owners before approval",
+      risks=[{"title": "Partner service failure", "severity": "high",
+              "description": "Peak-season misses hit NPS",
+              "mitigations": ["SLA with penalties", "Dual-source two regions"], "owner": "COO"},
+             {"title": "Contract lock-in", "severity": "low",
+              "mitigations": ["Break clause after 18 months"]}])
+```
+
+---
+
+## Slide-level options (every template)
+
+- `kicker="Option 1 | Leasing model"` — small letter-spaced label above the
+  title (section / position in the argument). Not drawn on cover, divider
+  and full-bleed slides.
+- `group="options"` — marks parallel slides (one per option / product /
+  region). They should use the same template; the checker treats a group as
+  one series instead of flagging it as repetition.
+- `insight_label=` — name the bottom bar for its role ("Verdict",
+  "Bottom line", "Preliminary view", "Decision needed").
+
+---
+
 # Choosing between similar templates
 
 Quick decision rules to avoid common confusions:
 
-- **New decks default to the rich templates (41–51):** structured points →
+- **Options / evaluation decks:** options overview → `option_profiles`;
+  one slide per option → `composite` (same regions for every option,
+  `group="options"`); scoring → `decision_matrix`; risks → `risk_register`.
+- **New decks default to the rich templates (41–55):** structured points →
   `card_grid` / `card_rows`; tables → `data_table`; numbers → `chart`;
   bridges → `waterfall`; KPIs vs. target → `scorecard`; plans → `roadmap`
   / `timeline`; 2×2 → `matrix_2x2`; SWOT → `swot`; tiers → `tier_ladder`.

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.dml.color import RGBColor
 from pptx.util import Inches
 
 from .base import add_oval, add_rect, add_textbox, set_run, write_paragraph
@@ -33,6 +34,8 @@ def tone_rgb(theme: Theme, tone: Optional[str]):
         "mid_blue": pal.mid_blue, "light_blue": pal.light_blue,
         "red": pal.status_red, "green": pal.status_green,
         "amber": pal.status_amber, "gray": pal.footer_gray,
+        # neutral emphasis (best score, highlight without good/bad meaning)
+        "gold": RGBColor(0xA6, 0x7C, 0x1B),
     }.get(tone, pal.deep_navy)
 
 

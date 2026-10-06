@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Sequence
 
 TONE_NAMES = ("navy", "blue", "mid_blue", "light_blue", "red", "green",
-              "amber", "gray")
+              "amber", "gray", "gold")
 
 
 def plain(text) -> str:

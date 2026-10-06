@@ -39,60 +39,16 @@ def _card_paras(card: Dict):
     return paras
 
 
-def add_card_grid(prs, *,
-                  title: str = "[Card grid / Insert action title]",
-                  cards: Sequence[Dict],
-                  subtitle: Optional[str] = None,
-                  intro: Optional[str] = None,
-                  insight: Optional[str] = None,
-                  insight_label: Optional[str] = "Key insight",
-                  columns: Optional[int] = None,
-                  page_number=None, section_marker=None,
-                  source=None, footnote=None,
-                  theme: Theme = DEFAULT_THEME):
-    """cards: [{"title": str, "body"?: str, "bullets"?: [str], "icon"?: str,
-                "tone"?: str, "value"?: str}]
-    - icon: a bundled icon name (see CATALOG) or 1-2 characters ("1", "A").
-    - tone: navy | blue | mid_blue | light_blue | red | green | amber | gray.
-    - value: big number shown at the top of the card (KPI / target cards).
-    Strings accept **bold** and {tone|coloured} markup.
-    """
-    slide = blank_slide(prs)
-    add_chrome(slide, title=title, theme=theme, page_number=page_number,
-               section_marker=section_marker, source=source, footnote=footnote)
-    pal, typo, layout = theme.palette, theme.typography, theme.layout
-    left = layout.margin_left_in
-    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
-    top = layout.body_top_in + 0.05
-    bottom = layout.footer_top_in - 0.25
-
-    if subtitle:
-        tb = add_textbox(slide, left, top, width, 0.35)
-        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
-                        bold=True, color=pal.text_dark, family=typo.family,
-                        first=True)
-        top += 0.45
-    if intro:
-        h = 0.75
-        add_rect(slide, left, top, width, h, fill=pal.deep_navy)
-        size = fit_size([intro], width - 0.6, h - 0.15, max_size=16, min_size=11)
-        tb = add_textbox(slide, left + 0.3, top, width - 0.6, h,
-                         anchor=MSO_ANCHOR.MIDDLE)
-        write_rich_paragraph(tb.text_frame, intro, size=size, theme=theme,
-                             color=pal.white, first=True)
-        top += h + GAP
-    if insight:
-        h = 0.7
-        add_callout_bar(slide, theme, left, bottom - h, width, h, insight,
-                        label=insight_label)
-        bottom -= h + GAP
-
+def draw_cards(slide, theme: Theme, left, top, width, height, cards: Sequence[Dict], *,
+               columns: Optional[int] = None, where: str = "", max_size: int = 18):
+    """Card grid inside a box (the body of card_grid; also a composite region)."""
+    pal = theme.palette
     n = max(len(cards), 1)
     has_values = any(c.get("value") for c in cards)
     cols = columns or _auto_columns(n, has_values)
     rows = -(-n // cols)
     card_w = (width - GAP * (cols - 1)) / cols
-    card_h = (bottom - top - GAP * (rows - 1)) / rows
+    card_h = (height - GAP * (rows - 1)) / rows
 
     icon_d = 0.5 if card_h >= 1.6 else 0.38
     has_icons = any(c.get("icon") for c in cards)
@@ -108,10 +64,10 @@ def add_card_grid(prs, *,
         head_h = max(head_h, icon_d if has_icons and not has_values else 0)
         avail = card_h - 2 * PAD - head_h - value_h - 0.12
         sizes.append(fit_size(_card_paras(c) or [" "], body_w, max(avail, 0.3),
-                              max_size=18, min_size=10, para_gap_pt=5,
+                              max_size=max_size, min_size=10, para_gap_pt=5,
                               indent_in=0.25))
     body_size = min(sizes) if sizes else 14
-    warn_small("card_grid", title, body_size,
+    warn_small("card_grid", where, body_size,
                "Shorten the longest card's bullets, drop the subtitle or the "
                "insight bar, or split the slide.")
     head_size = min(body_size + 2, 20)
@@ -122,7 +78,7 @@ def add_card_grid(prs, *,
         longest = max(words, key=len)
         head_size = min(head_size, fit_one_line(longest, hw_, head_size, 11, bold=True))
     if columns and card_w < 2.6 and not has_values:
-        warn_small("card_grid", title, 0,
+        warn_small("card_grid", where, 0,
                    f"columns={columns} makes cards {card_w:.1f}\" wide — text cards "
                    "read better in the default layout (4 cards -> 2x2); drop columns=.")
 
@@ -194,6 +150,58 @@ def add_card_grid(prs, *,
                                      theme=theme, bullet=True, first=first,
                                      space_before=0 if first else 5)
                 first = False
+
+
+def add_card_grid(prs, *,
+                  title: str = "[Card grid / Insert action title]",
+                  cards: Sequence[Dict],
+                  subtitle: Optional[str] = None,
+                  intro: Optional[str] = None,
+                  insight: Optional[str] = None,
+                  insight_label: Optional[str] = "Key insight",
+                  columns: Optional[int] = None,
+                  page_number=None, section_marker=None,
+                  source=None, footnote=None,
+                  theme: Theme = DEFAULT_THEME):
+    """cards: [{"title": str, "body"?: str, "bullets"?: [str], "icon"?: str,
+                "tone"?: str, "value"?: str}]
+    - icon: a bundled icon name (see CATALOG) or 1-2 characters ("1", "A").
+    - tone: navy | blue | mid_blue | light_blue | red | green | amber | gray.
+    - value: big number shown at the top of the card (KPI / target cards).
+    Strings accept **bold** and {tone|coloured} markup.
+    """
+    slide = blank_slide(prs)
+    add_chrome(slide, title=title, theme=theme, page_number=page_number,
+               section_marker=section_marker, source=source, footnote=footnote)
+    pal, typo, layout = theme.palette, theme.typography, theme.layout
+    left = layout.margin_left_in
+    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+    top = layout.body_top_in + 0.05
+    bottom = layout.footer_top_in - 0.25
+
+    if subtitle:
+        tb = add_textbox(slide, left, top, width, 0.35)
+        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
+                        bold=True, color=pal.text_dark, family=typo.family,
+                        first=True)
+        top += 0.45
+    if intro:
+        h = 0.75
+        add_rect(slide, left, top, width, h, fill=pal.deep_navy)
+        size = fit_size([intro], width - 0.6, h - 0.15, max_size=16, min_size=11)
+        tb = add_textbox(slide, left + 0.3, top, width - 0.6, h,
+                         anchor=MSO_ANCHOR.MIDDLE)
+        write_rich_paragraph(tb.text_frame, intro, size=size, theme=theme,
+                             color=pal.white, first=True)
+        top += h + GAP
+    if insight:
+        h = 0.7
+        add_callout_bar(slide, theme, left, bottom - h, width, h, insight,
+                        label=insight_label)
+        bottom -= h + GAP
+
+    draw_cards(slide, theme, left, top, width, bottom - top, cards,
+               columns=columns, where=title)
     return slide
 
 
