@@ -2,23 +2,22 @@
 
 Use it for source tables that don't fit a specialised template (market share
 by year, strengths × impact, tier × price × channel, legacy vs. new ...).
-Cells accept light markup: **bold** spans are rendered bold.
+Cells accept **bold** and {tone|coloured} markup.
 """
 from __future__ import annotations
 import re
 from typing import Optional, Sequence
 
-from pptx.util import Inches, Pt, Emu
+from pptx.util import Inches, Emu
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
-from ..base import (add_chrome, add_rect, add_textbox, blank_slide, set_run,
-                    write_paragraph, write_rich)
+from ..base import add_chrome, add_textbox, blank_slide, write_paragraph
+from ..design import add_insight_panel, add_rich_runs
 from ..theme import Theme, DEFAULT_THEME
 
-_BOLD = re.compile(r"(\*\*.+?\*\*)")
 
 
-def _write_cell(cell, text, *, size, color, family, bold=False,
+def _write_cell(cell, text, *, size, color, family, theme, bold=False,
                 align=PP_ALIGN.LEFT):
     tf = cell.text_frame
     tf.word_wrap = True
@@ -29,13 +28,8 @@ def _write_cell(cell, text, *, size, color, family, bold=False,
     for li, line in enumerate(lines):
         p = tf.paragraphs[0] if li == 0 else tf.add_paragraph()
         p.alignment = align
-        for part in _BOLD.split(line):
-            if not part:
-                continue
-            is_bold = part.startswith("**") and part.endswith("**")
-            run = p.add_run()
-            set_run(run, part[2:-2] if is_bold else part, size=size,
-                    bold=bold or is_bold, color=color, family=family)
+        add_rich_runs(p, line, size=size, color=color, family=family,
+                      theme=theme, bold=bold)
 
 
 def _fill(cell, rgb):
@@ -119,7 +113,7 @@ def add_data_table(prs, *,
     for ci, label in enumerate(columns):
         cell = table.cell(0, ci)
         _fill(cell, pal.bright_blue if highlight_col == ci else pal.deep_navy)
-        _write_cell(cell, label, size=size, color=pal.white, family=typo.family,
+        _write_cell(cell, label, size=size, color=pal.white, family=typo.family, theme=theme,
                     bold=True, align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
 
     hl = set(highlight_rows)
@@ -137,22 +131,12 @@ def add_data_table(prs, *,
             if ci > 0 and numeric_align == "center" and is_num(val):
                 align = PP_ALIGN.CENTER
             _write_cell(cell, val, size=size, color=pal.text_dark,
-                        family=typo.family,
+                        family=typo.family, theme=theme,
                         bold=(ci == 0 and first_col_bold) or (ri - 1) in hl,
                         align=align)
 
     if has_panel:
-        px = left + table_w + gap
-        add_rect(slide, px, top, panel_w, table_h, fill=pal.soft_gray)
-        tb = add_textbox(slide, px + 0.25, top + 0.25, panel_w - 0.5,
-                         table_h - 0.5)
-        write_paragraph(tb.text_frame, insight_title, size=size,
-                        bold=True, color=pal.mid_blue, family=typo.family,
-                        first=True, space_after=8)
-        if insight:
-            write_rich(tb.text_frame, insight, size=size, bold=True,
-                       color=pal.text_dark, family=typo.family, space_after=8)
-        for b in insight_bullets:
-            write_rich(tb.text_frame, b, size=size, color=pal.text_dark,
-                       family=typo.family, bullet=True, space_before=6)
+        add_insight_panel(slide, theme, left + table_w + gap, top, panel_w,
+                          table_h, title=insight_title, text=insight,
+                          bullets=insight_bullets)
     return slide

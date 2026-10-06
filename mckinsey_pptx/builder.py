@@ -19,7 +19,7 @@ from .slides import (
     executive_summary, assessment_table, bubble_chart, column_chart,
     trends_slides, org_charts, timeline_slides, summary_slide,
     structure_slides, comparison_slides, extra_charts, process_extras,
-    table_slides,
+    table_slides, card_slides, native_chart, ladder_slides,
 )
 
 
@@ -71,6 +71,15 @@ _REGISTRY = {
     # Generic table
     "data_table": table_slides.add_data_table,
     "table": table_slides.add_data_table,
+
+    # Rich layouts
+    "card_grid": card_slides.add_card_grid,
+    "cards": card_slides.add_card_grid,
+    "swot": card_slides.add_swot,
+    "chart": native_chart.add_native_chart,
+    "native_chart": native_chart.add_native_chart,
+    "tier_ladder": ladder_slides.add_tier_ladder,
+    "price_ladder": ladder_slides.add_tier_ladder,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,

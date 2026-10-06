@@ -190,9 +190,15 @@ def add_title(slide, text, theme: Theme = DEFAULT_THEME, *, with_underline=True)
     width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
     tb = add_textbox(slide, layout.margin_left_in, layout.title_top_in,
                      width, layout.title_height_in)
-    write_paragraph(tb.text_frame, text, size=typo.title_size, bold=True,
+    # Long titles step down (to 18pt) to stay on one line above the underline.
+    from .metrics import fit_one_line
+    # keep clear of the section-marker box in the top-right corner
+    fit_w = width - layout.section_marker_w_in - 0.2
+    size = fit_one_line(text, fit_w, typo.title_size, min(18, typo.title_size),
+                        bold=True)
+    write_paragraph(tb.text_frame, text, size=size, bold=True,
                     color=pal.text_dark, family=typo.family, first=True)
-    # Auto-shrink long titles so they don't push through the underline.
+    # PowerPoint auto-shrink as a second line of defence.
     enable_text_shrink(tb.text_frame)
     if with_underline:
         add_line(slide, layout.margin_left_in, layout.title_underline_top_in,

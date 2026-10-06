@@ -854,9 +854,147 @@ b.add("data_table",
 
 ---
 
+## 42. Card grid (`card_grid`, alias `cards`) — preferred for structured content
+
+**Category:** Layout — 2–8 cards
+**Use when:** A slide has 2–8 parallel items, each with a header and 1–4
+supporting points: executive-summary blocks (reality / problem / shift /
+north star), weaknesses, channel shifts, persona aspects, distribution
+moves, campaign pillars, product formats, competitor counter-positions.
+Also KPI / objective cards via `value`. Text is fitted to the space (up to
+18pt) and cards shrink to their content, so short content doesn't leave
+empty boxes. Preferred over `executive_summary_takeaways`,
+`three_trends_*`, `five_key_areas` and `kpi_dashboard` for new decks.
+**Don't use when:** The content is a table (use `data_table`) or numbers to
+chart (use `chart`).
+**Required inputs:**
+- `cards: list[{title, body?, bullets?, icon?, tone?, value?}]`
+  - `icon`: a bundled icon name (list below) or 1–2 characters (`"1"`, `"A"`)
+  - `tone`: `navy` | `blue` | `mid_blue` | `light_blue` | `red` (problem / risk)
+    | `green` (opportunity / target met) | `amber` (watch) | `gray`
+  - `value`: big number at the top of the card (objectives, KPIs)
+**Optional inputs:**
+- `intro: str` — dark banner above the cards (the slide's key message)
+- `insight: str`, `insight_label: str` — highlighted bar below the cards
+- `subtitle: str`, `columns: int` (auto: 2→2, 3→3, 4→2×2 or 1×4 for value
+  cards, 5–6→3, 7–8→4)
+**Example:**
+```python
+b.add("card_grid", title="The turnaround moment: from cavity protector to premium leader",
+      cards=[
+        {"title": "Current reality", "icon": "chart",
+         "bullets": ["Market share **8.5%**, trailing YNBY", "Ranked behind YNBY and Darlie"]},
+        {"title": "The problem", "icon": "alert", "tone": "red",
+         "bullets": ["{red|Brand aging} and a middle-income trap"]},
+        {"title": "Strategic shift", "icon": "rocket", "tone": "blue", "bullets": ["..."]},
+        {"title": "2026 North Star", "icon": "star", "tone": "green", "bullets": ["..."]},
+      ],
+      insight="Regaining Top 3 means winning premium functions and new channels")
+
+b.add("card_grid", title="2026 objectives: back to Top 3",
+      cards=[{"value": "10.0%", "title": "Market share", "tone": "green",
+              "body": "Regain **2.0 pt** to return to Top 3"}, ...])
+```
+
+---
+
+## 43. SWOT (`swot`)
+
+**Category:** Framework — 2×2
+**Use when:** Strengths / weaknesses / opportunities / threats. Fixed colours
+and icons (S blue, W red, O green, T amber).
+**Required inputs:** any of `strengths`, `weaknesses`, `opportunities`,
+`threats: list[str]` (an empty quadrant shows "—"; never invent items to fill it)
+**Optional inputs:** `labels` (4 headers, e.g. Chinese), `insight`, `subtitle`
+**Example:**
+```python
+b.add("swot", title="Strong foundations, but trust and channel gaps",
+      strengths=["P&G brand equity", "Localized R&D"],
+      weaknesses=["Past advertising penalties", "Slow decision-making"],
+      opportunities=["CSAR 2023 regulatory resilience"],
+      threats=["YNBY dominance in gum health"])
+```
+
+---
+
+## 44. Native chart with insight (`chart`, alias `native_chart`) — preferred for data
+
+**Category:** Chart — editable PowerPoint chart
+**Use when:** Any numeric series the user may want to edit later. Real
+PowerPoint chart ("Edit Data" works), with an optional key-insight panel.
+Preferred over the shape-drawn chart templates (`column_*`, `line_chart`,
+`grouped_column_chart`, `stacked_column_chart`) for new decks.
+**Required inputs:**
+- `chart_type`: `column` | `grouped_column` | `stacked_column` |
+  `stacked_column_100` | `bar` | `stacked_bar` | `line` | `pie` | `doughnut`
+- `categories: list`, `series: list[{name, values, tone?}]`
+**Optional inputs:**
+- `highlight`: `{"series": "Crest"}` (that series red, others gray — line/bar)
+  or `{"point": 2}` (that bar red — single series)
+- `number_format`: label format, e.g. `'0.0'`, `'0"%"'`, `'#,##0'`
+- `insight: str`, `insight_bullets: list[str]`, `insight_title: str`
+- `subtitle: str` (put the unit here: "Market share, %"), `show_values`, `y_max`
+- Line charts with 3+ series label only the highlighted / toned series.
+**Example:**
+```python
+b.add("chart", chart_type="line", title="Crest slipped from 8.8% to 8.0% while LSL overtook it",
+      subtitle="Market share by key players, %", categories=["2022", "2023", "2024", "2025 Est"],
+      series=[{"name": "YNBY", "values": [24.4, 24.6, 25.1, 25.0]},
+              {"name": "LSL", "values": [7.3, 8.0, 8.6, 9.0], "tone": "amber"},
+              {"name": "Crest", "values": [8.8, 8.9, 8.5, 8.0]}],
+      highlight={"series": "Crest"}, number_format="0.0",
+      insight="Local players gain share with clear functional claims",
+      insight_bullets=["Crest **8.8% → 8.0%**", "LSL **7.3% → 9.0%**"])
+```
+
+---
+
+## 45. Tier ladder (`tier_ladder`, alias `price_ladder`)
+
+**Category:** Framework — ascending tiers
+**Use when:** 2–5 tiers that step up: price architecture (base → core →
+halo), portfolio tiers, maturity levels, service levels.
+**Required inputs:**
+- `tiers` (lowest first): `[{name, value?, lines?, label?, details?, tone?}]`
+  - `value`: big text, e.g. `"35-55 RMB"`; `lines`: bold lines (products);
+    `label` + `details`: a captioned list (e.g. "Target channel")
+**Optional inputs:** `insight`, `subtitle`
+**Example:**
+```python
+b.add("tier_ladder", title='Pricing: raise the floor and escape the "Mushy Middle"',
+      tiers=[{"name": "Defensive Base", "value": "12-18 RMB", "lines": ["Legacy 3D White"],
+              "label": "Target channel", "details": ["Pinduoduo"]},
+             {"name": "Functional Core", "value": "35-55 RMB", "lines": ["Heat Sense"],
+              "label": "Target channel", "details": ["Tmall, JD, O2O"]},
+             {"name": "Prestige Halo", "value": "60-120 RMB", "lines": ["Resurfacing White Pump"],
+              "label": "Target channel", "details": ["Douyin, Sephora"]}],
+      insight="Core and halo tiers carry the premium shift")
+```
+
+---
+
+## Rich text, tones and icons (templates 41–45)
+
+- `**bold**` → bold; `{red|text}` → bold in that tone (`navy`, `blue`,
+  `mid_blue`, `light_blue`, `red`, `green`, `amber`, `gray`). Use red for
+  problems / declines, green for growth / targets, sparingly (1–3 spans per
+  card). Older templates (1–40) print the markup literally.
+- Bundled icons (white on a tone circle): `alert`, `arrow_right`, `arrows`, `atom`, `award`, `bag`, `book`, `bot`, `box`, `building`, `calculator`, `calendar`, `cart`, `chart`, `check`, `clipboard`, `clock`, `coins`, `compass`, `cpu`, `cross`, `crown`, `database`, `dna`, `droplet`, `eye`, `factory`, `file`, `filter`, `flag`, `gem`, `globe`, `handshake`, `heart`, `home`, `info`, `key`, `lab`, `layers`, `leaf`, `lightbulb`, `line_chart`, `link`, `lock`, `mail`, `map`, `medal`, `megaphone`, `message`, `microscope`, `money`, `moon`, `package`, `palette`, `pen`, `percent`, `phone`, `pie`, `pill`, `price`, `puzzle`, `question`, `refresh`, `rocket`, `scale`, `search`, `settings`, `share`, `shield`, `smile`, `sparkles`, `star`, `stethoscope`, `store`, `sun`, `target`, `team`, `thumbs_up`, `tooth`, `trend_down`, `trend_up`, `trophy`, `truck`, `user`, `users`, `video`, `wallet`, `zap`.
+  Unknown names fall back to the first letter and print a warning.
+- Brand colours: `make_brand_theme("0B4DA2", accent="E4002B")` re-colours the
+  navy / blue family; combine with Chinese via
+  `make_brand_theme("0B4DA2", base=make_zh_theme("公司"))`.
+
+---
+
 # Choosing between similar templates
 
 Quick decision rules to avoid common confusions:
+
+- **New decks default to the rich templates (41–45):** structured points →
+  `card_grid`; tables → `data_table`; numbers → `chart`; SWOT → `swot`;
+  tiers → `tier_ladder`. Use templates 1–40 for what these don't cover
+  (matrices, org charts, roadmaps, issue trees, cover/dividers).
 
 - **Deck structure:** First page → `cover_slide`; chapter break → `section_divider`;
   table of contents → `agenda`.

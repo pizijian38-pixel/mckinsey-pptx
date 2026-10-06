@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds McKinsey-style consulting slide decks as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 41 templates (executive summary, data table, KPI dashboard, BCG matrix, prioritization matrix, historic+forecast charts, roadmap, Gantt, org chart, issue tree). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint, especially consulting-style business reviews, marketing or strategy plans, or turning an outline document into a deck — e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "build a McKinsey deck from this outline", "맥킨지 슬라이드 만들어줘".
+description: Builds McKinsey-style consulting slide decks as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 45 templates (card grids, data tables, native charts, SWOT, price ladders, executive summary, KPI dashboard, BCG matrix, prioritization matrix, historic+forecast charts, roadmap, Gantt, org chart, issue tree). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint, especially consulting-style business reviews, marketing or strategy plans, or turning an outline document into a deck — e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "build a McKinsey deck from this outline", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -142,28 +142,44 @@ keep the source's section name as the `section_marker` or subtitle if useful.
   thin.
 - Every analysis slide (market, competition, segments, channels, SWOT)
   carries a **key insight**: one sentence on what the data means for the
-  decision. Templates with a takeaway / insight slot: `data_table`
-  (`insight`), chart templates (`takeaways`), `executive_summary_takeaways`
-  (`final_conclusion`).
+  decision. Every rich template has an `insight` slot (`card_grid`, `chart`,
+  `data_table`, `swot`, `tier_ladder`); older chart templates use
+  `takeaways`.
+- **Emphasis:** in the rich templates mark the 1–3 things the reader must
+  see per card or panel — key numbers in `**bold**`, problems / declines in
+  `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
+- **Icons:** give each `card_grid` card an `icon` that matches its meaning
+  (names in CATALOG, e.g. `alert` for problems, `users` for audiences,
+  `trend_up` for growth, `store` for retail, `phone` for e-commerce,
+  `lab` for science). Use `tone` for meaning, not decoration.
 - Use the source's numbers inside the text ("from 8.8% in 2022 to 8.0% in
   2025"), not vague words ("declined slightly").
 
 **Data → template rules:**
 
+Default to the **rich templates** (41–45: `data_table`, `card_grid`,
+`swot`, `chart`, `tier_ladder`); they use larger type, fit text to the
+space, support emphasis and icons, and produce editable tables and charts.
+Use the older templates for what they uniquely cover.
+
 | Source content | Template |
 |---|---|
-| Any table (text or numbers) | `data_table` — all rows and columns, `highlight_rows` for "us", `insight` for the takeaway |
-| One metric over time | `column_simple_growth`; with forecast → `column_historic_forecast` |
-| 2–4 entities over time | `line_chart` (and the full table in `data_table` if there are more entities) |
-| Shares by category, two periods | `grouped_column_chart` |
-| Parts of a whole | `stacked_column_chart` |
-| Target KPIs (2–8) | `kpi_dashboard` — delta only if the source gives a baseline |
-| Legacy vs. new / as-is vs. to-be | `two_column_compare`, or `data_table` if the source is a table |
+| Any table (text or numbers) | `data_table` — all rows and columns, `highlight_rows` for "us", `insight` |
+| Numbers over time / by category | `chart` (`line`, `column`, `grouped_column`, `stacked_column`, `bar`) with `highlight` + `insight`; > 6 series → `data_table` too |
+| Share of a total (one period) | `chart` `doughnut` / `pie`, or `stacked_column_100` for several periods |
+| Executive summary (3–4 blocks) | `card_grid` with icons, `insight` = the bottom line |
+| 2–8 parallel points with detail (weaknesses, channels, personas, moves, pillars, formats) | `card_grid` |
+| Targets / objectives / KPIs | `card_grid` with `value` per card (delta only if the source gives a baseline) |
+| SWOT or any S/W/O/T subset | `swot` |
+| Price tiers, portfolio tiers, maturity levels | `tier_ladder` |
+| Legacy vs. new / as-is vs. to-be | `data_table` (if a table) or `two_column_compare` |
 | Options × features (text) | `data_table` with `highlight_col` — never Harvey balls without source ratings |
-| Strengths / weaknesses / SWOT | `data_table` (factor × impact) or `pros_cons` (S+O vs. W+T) |
-| Audience persona (profile, psychographics, pain points, behaviour) | `executive_summary_takeaways` — one section per aspect |
-| 3 / 5 / 7 parallel items with detail | `three_trends_*` / `five_key_areas` / `overview_areas` |
+| Prioritization, BCG, issue tree, org chart | `prioritization_matrix`, `growth_share`, `issue_tree`, `org_chart` |
 | Phases / roadmap | `phases_chevron_3`, `phases_table_4`, `waves_timeline_4`, `gantt_timeline` |
+| Single bold statement / divider | `dark_navy_summary`, `section_divider` |
+
+Vary the layouts: don't put more than three `card_grid` slides in a row —
+alternate with charts and tables where the source allows.
 
 **Layout / overflow rules:**
 - Titles must fit on **one line** (the underline sits right below it):
@@ -183,8 +199,8 @@ keep the source's section name as the `section_marker` or subtitle if useful.
 - Templates default to `source="xx"` / `footnote="1. xx"`. Always pass
   `source=` (a real cited source, or `""`) and `footnote=""`.
 - `prioritization_matrix`: pass `description=` and `legend=(green, amber, red)`.
-- `**bold**` markup works only in `data_table` cells and its insight panel;
-  everywhere else it prints the asterisks.
+- `**bold**` / `{tone|…}` markup works only in the rich templates (41–45);
+  older templates print it literally.
 - `three_trends_icons` / `five_key_areas` / `three_trends_table`: labels
   render as-is — write `"Cost leadership"`, not `"[Cost leadership]"`.
 
@@ -300,6 +316,15 @@ KO = replace(DEFAULT_THEME,
 
 **English:** `PresentationBuilder()` with the default theme; set attribution
 with `replace(DEFAULT_THEME, copyright_text="ⓒ 2026 Acme", brand_text="Acme")`.
+
+**Brand colours:** when the user names a brand colour or the brand has an
+obvious one, re-colour the deck (semantic red / green / amber stay):
+
+```python
+from mckinsey_pptx import make_brand_theme, make_zh_theme
+theme = make_brand_theme("0B4DA2", accent="E4002B")                 # English deck
+theme = make_brand_theme("0B4DA2", base=make_zh_theme("某某公司"))   # Chinese deck
+```
 
 `copyright_text` = footer on content slides; `brand_text` = bottom-right mark
 on `dark_navy_summary`; `source_label` = prefix of the footer source line.

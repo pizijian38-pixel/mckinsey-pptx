@@ -102,3 +102,31 @@ def make_zh_theme(company: Optional[str] = None, *,
 
 
 ZH_THEME = make_zh_theme()
+
+
+def _mix(hex_a: str, hex_b: str, t: float) -> RGBColor:
+    a, b = rgb(hex_a), rgb(hex_b)
+    return RGBColor(*(round(a[i] + (b[i] - a[i]) * t) for i in range(3)))
+
+
+def make_brand_theme(primary: str, accent: Optional[str] = None, *,
+                     base: Theme = DEFAULT_THEME) -> Theme:
+    """Re-colour the deck from a brand colour (hex, e.g. "0B4DA2").
+
+    `primary` replaces the navy family (headers, titles bands, dark slides);
+    `accent` (default: a lighter tint of primary) replaces the bright blue
+    used for highlights. Semantic red / green / amber stay as they are.
+    Combine with make_zh_theme by passing its result as `base`.
+    """
+    p = primary.lstrip("#")
+    acc = (accent or "").lstrip("#")
+    pal = replace(
+        base.palette,
+        deep_navy=_mix(p, "000000", 0.15),
+        dark_navy=rgb(p),
+        mid_blue=_mix(p, "FFFFFF", 0.18),
+        # accent must carry white text (table highlight headers, tiers)
+        bright_blue=rgb(acc) if acc else _mix(p, "FFFFFF", 0.3),
+        light_blue=_mix(acc or p, "FFFFFF", 0.6),
+    )
+    return replace(base, palette=pal)

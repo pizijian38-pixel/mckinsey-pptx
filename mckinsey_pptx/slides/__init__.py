@@ -12,6 +12,9 @@ from . import (
     extra_charts,
     process_extras,
     table_slides,
+    card_slides,
+    native_chart,
+    ladder_slides,
 )
 
 __all__ = [
@@ -28,4 +31,7 @@ __all__ = [
     "extra_charts",
     "process_extras",
     "table_slides",
+    "card_slides",
+    "native_chart",
+    "ladder_slides",
 ]
