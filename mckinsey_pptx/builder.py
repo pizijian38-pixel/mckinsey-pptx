@@ -13,12 +13,15 @@ If `type` is missing, `infer_slide_type` chooses based on the payload shape.
 from __future__ import annotations
 from typing import Sequence, Optional, Dict, Any, Iterable, List
 
-from .base import init_presentation
+from .base import init_presentation, apply_east_asian_font
 from .theme import Theme, DEFAULT_THEME
 from .slides import (
     executive_summary, assessment_table, bubble_chart, column_chart,
     trends_slides, org_charts, timeline_slides, summary_slide,
     structure_slides, comparison_slides, extra_charts, process_extras,
+    table_slides, card_slides, native_chart, ladder_slides,
+    finance_slides, plan_slides, matrix_slides, composite_slides,
+    evaluation_slides,
 )
 
 
@@ -66,6 +69,32 @@ _REGISTRY = {
     "gantt_timeline": timeline_slides.add_gantt_timeline,
     "overview_areas": timeline_slides.add_overview_areas,
     "process_activities": timeline_slides.add_process_activities,
+
+    # Generic table
+    "data_table": table_slides.add_data_table,
+    "table": table_slides.add_data_table,
+
+    # Rich layouts
+    "card_grid": card_slides.add_card_grid,
+    "cards": card_slides.add_card_grid,
+    "swot": card_slides.add_swot,
+    "card_rows": card_slides.add_card_rows,
+    "chart": native_chart.add_native_chart,
+    "native_chart": native_chart.add_native_chart,
+    "tier_ladder": ladder_slides.add_tier_ladder,
+    "waterfall": finance_slides.add_waterfall,
+    "bridge": finance_slides.add_waterfall,
+    "scorecard": finance_slides.add_scorecard,
+    "roadmap": plan_slides.add_roadmap,
+    "timeline": plan_slides.add_timeline,
+    "matrix_2x2": matrix_slides.add_matrix_2x2,
+    "matrix": matrix_slides.add_matrix_2x2,
+    "composite": composite_slides.add_composite,
+    "option_profiles": evaluation_slides.add_option_profiles,
+    "decision_matrix": evaluation_slides.add_decision_matrix,
+    "scoring_matrix": evaluation_slides.add_decision_matrix,
+    "risk_register": evaluation_slides.add_risk_register,
+    "price_ladder": ladder_slides.add_tier_ladder,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,
@@ -203,6 +232,29 @@ def infer_slide_type(spec: Dict[str, Any]) -> str:
     raise ValueError(f"Cannot infer slide type from spec keys: {list(spec.keys())}")
 
 
+# Templates without the standard title band (no kicker above a title).
+_FULL_BLEED = {"cover_slide", "dark_navy_summary", "section_divider", "quote_slide"}
+
+
+def add_kicker(slide, text, theme):
+    """Small letter-spaced label above the slide title ("OPTION 1 | LEASING")."""
+    from .base import add_textbox, write_paragraph
+    from .components import letter_space
+    layout, pal = theme.layout, theme.palette
+    tb = add_textbox(slide, layout.margin_left_in, 0.16,
+                     layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+                     - layout.section_marker_w_in - 0.3, 0.26)
+    p = write_paragraph(tb.text_frame, str(text).upper(), size=10, bold=True,
+                        color=pal.mid_blue, family=theme.typography.family, first=True)
+    letter_space(p, 200)
+
+
+def template_name(fn) -> str:
+    """Canonical template name for a registry callable (aliases collapse)."""
+    canon = {v: k for k, v in reversed(list(_REGISTRY.items()))}
+    return canon.get(fn, fn.__name__)
+
+
 class PresentationBuilder:
     """Compose a full deck of McKinsey-style slides."""
 
@@ -228,7 +280,17 @@ class PresentationBuilder:
                 and "section_marker" not in kwargs):
             kwargs["section_marker"] = self.default_section_marker
         kwargs.setdefault("theme", self.theme)
-        return fn(self.prs, **kwargs)
+        kicker = kwargs.pop("kicker", None)
+        group = kwargs.pop("group", None)
+        out = fn(self.prs, **kwargs)
+        slide = self.prs.slides[-1]
+        name = template_name(fn)
+        if kicker and name not in _FULL_BLEED:
+            add_kicker(slide, kicker, kwargs["theme"])
+        # Record template (+ parallel group) on the slide (<p:cSld name>) so
+        # scripts/deck_check.py can check layout variety and consistency.
+        slide._element.cSld.set("name", "mp:" + name + (f"|{group}" if group else ""))
+        return out
 
     # Adaptive add (type optional)
     def add_spec(self, spec: Dict[str, Any]):
@@ -240,6 +302,9 @@ class PresentationBuilder:
         return [self.add_spec(s) for s in specs]
 
     def save(self, path: str):
+        ea = self.theme.typography.east_asian_family
+        if ea:
+            apply_east_asian_font(self.prs, ea)
         self.prs.save(path)
         return path
 

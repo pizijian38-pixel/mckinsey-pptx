@@ -1,5 +1,6 @@
 """Common slide primitives: title, underline, footer, section marker, text/shape helpers."""
 from __future__ import annotations
+import re
 from typing import Optional, Iterable
 
 from pptx.util import Inches, Pt, Emu
@@ -78,6 +79,26 @@ def write_paragraph(tf, text, *, size, bold=False, italic=False, color=None,
         _set_bullet(p, color)
     else:
         _clear_bullet(p)
+    return p
+
+
+_BOLD_SPAN = re.compile(r"(\*\*.+?\*\*)")
+
+
+def write_rich(tf, text, *, size, bold=False, color=None, family="Arial",
+               align=PP_ALIGN.LEFT, space_before=None, space_after=None,
+               bullet=False, first=False):
+    """Like write_paragraph, but `**spans**` inside `text` are rendered bold."""
+    p = write_paragraph(tf, "", size=size, bold=bold, color=color,
+                        family=family, align=align, space_before=space_before,
+                        space_after=space_after, bullet=bullet, first=first)
+    p.runs[0]._r.getparent().remove(p.runs[0]._r)
+    for part in _BOLD_SPAN.split(str(text)):
+        if not part:
+            continue
+        is_bold = part.startswith("**") and part.endswith("**")
+        set_run(p.add_run(), part[2:-2] if is_bold else part, size=size,
+                bold=bold or is_bold, color=color, family=family)
     return p
 
 
@@ -169,9 +190,15 @@ def add_title(slide, text, theme: Theme = DEFAULT_THEME, *, with_underline=True)
     width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
     tb = add_textbox(slide, layout.margin_left_in, layout.title_top_in,
                      width, layout.title_height_in)
-    write_paragraph(tb.text_frame, text, size=typo.title_size, bold=True,
+    # Long titles step down (to 18pt) to stay on one line above the underline.
+    from .metrics import fit_one_line
+    # keep clear of the section-marker box in the top-right corner
+    fit_w = width - layout.section_marker_w_in - 0.2
+    size = fit_one_line(text, fit_w, typo.title_size, min(18, typo.title_size),
+                        bold=True)
+    write_paragraph(tb.text_frame, text, size=size, bold=True,
                     color=pal.text_dark, family=typo.family, first=True)
-    # Auto-shrink long titles so they don't push through the underline.
+    # PowerPoint auto-shrink as a second line of defence.
     enable_text_shrink(tb.text_frame)
     if with_underline:
         add_line(slide, layout.margin_left_in, layout.title_underline_top_in,
@@ -209,15 +236,21 @@ def add_section_marker(slide, label, theme: Theme = DEFAULT_THEME):
     layout = theme.layout
     pal = theme.palette
     typo = theme.typography
+    from .metrics import fit_one_line, text_width_pt
     w = layout.section_marker_w_in
     h = layout.section_marker_h_in
+    # One line: shrink to 8pt, then widen the box (up to 3") if still too long.
+    size = fit_one_line(label, w - 0.1, typo.small_size, 8)
+    need = text_width_pt(label, size) / 72 / 0.95 + 0.12
+    if need > w:
+        w = min(3.0, need)
     left = layout.slide_width_in - layout.margin_right_in - w
     top = 0.18
     add_rect(slide, left, top, w, h, fill=None, line=pal.placeholder_gray,
              line_width=0.5)
     tb = add_textbox(slide, left + 0.05, top, w - 0.1, h,
                      anchor=MSO_ANCHOR.MIDDLE)
-    write_paragraph(tb.text_frame, label, size=typo.small_size,
+    write_paragraph(tb.text_frame, label, size=size,
                     color=pal.footer_gray, family=typo.family,
                     align=PP_ALIGN.RIGHT, first=True)
 
@@ -246,7 +279,7 @@ def add_footer(slide, theme: Theme = DEFAULT_THEME, *, page_number=None,
         y += 0.18
     if source:
         tb = add_textbox(slide, layout.margin_left_in, y, width / 2, 0.18)
-        write_paragraph(tb.text_frame, f"Source: {source}",
+        write_paragraph(tb.text_frame, f"{theme.source_label}{source}",
                         size=typo.footer_size, color=pal.text_dark,
                         family=typo.family, first=True)
 
@@ -254,13 +287,52 @@ def add_footer(slide, theme: Theme = DEFAULT_THEME, *, page_number=None,
     right_w = 4.0
     right_left = layout.slide_width_in - layout.margin_right_in - right_w
     cp = copyright_text if copyright_text is not None else theme.copyright_text
-    parts = [cp]
+    parts = [cp] if cp else []
     if page_number is not None:
-        parts.append(f"   {page_number}")
+        parts.append(f"   {page_number}" if cp else str(page_number))
     tb = add_textbox(slide, right_left, foot_y + 0.1, right_w, 0.2)
     write_paragraph(tb.text_frame, "".join(parts),
                     size=typo.footer_size, color=pal.footer_gray,
                     family=typo.family, align=PP_ALIGN.RIGHT, first=True)
+
+
+# Children of <a:rPr> that must come after <a:ea> (CT_TextCharacterProperties).
+_AFTER_EA = tuple(qn(t) for t in ("a:cs", "a:sym", "a:hlinkClick",
+                                  "a:hlinkMouseOver", "a:rtl", "a:extLst"))
+
+
+def _set_ea(rpr, typeface):
+    ea = rpr.find(qn("a:ea"))
+    if ea is None:
+        ea = etree.Element(qn("a:ea"))
+        latin = rpr.find(qn("a:latin"))
+        nxt = next((c for c in rpr if c.tag in _AFTER_EA), None)
+        if latin is not None:
+            latin.addnext(ea)
+        elif nxt is not None:
+            nxt.addprevious(ea)
+        else:
+            rpr.append(ea)
+    ea.set("typeface", typeface)
+
+
+def apply_east_asian_font(prs, typeface: str):
+    """Set the East Asian (CJK) typeface on every text run in the deck.
+
+    Templates set fonts via `font.name`, which only writes <a:latin>; Chinese
+    glyphs would then fall back to PowerPoint's default CJK font. Running this
+    once before save covers every template without touching each one.
+    """
+    tags = {qn("a:rPr"), qn("a:endParaRPr"), qn("a:defRPr")}
+    for slide in prs.slides:
+        for el in slide.element.iter(*tags):
+            _set_ea(el, typeface)
+        # Runs without an rPr inherit the default; give them one.
+        for r in slide.element.iter(qn("a:r")):
+            if r.find(qn("a:rPr")) is None:
+                rpr = etree.Element(qn("a:rPr"))
+                r.insert(0, rpr)
+                _set_ea(rpr, typeface)
 
 
 def init_presentation(theme: Theme = DEFAULT_THEME):

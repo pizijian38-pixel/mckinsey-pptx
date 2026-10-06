@@ -15,7 +15,7 @@ def add_dark_navy_summary(prs, *,
                           body: str,
                           eyebrow: Optional[str] = None,
                           page_number: Optional[int] = None,
-                          corner_text: str = "McKinsey & Company",
+                          corner_text: Optional[str] = None,
                           theme: Theme = DEFAULT_THEME,
                           # full-bleed style — these are accepted but unused
                           section_marker=None,
@@ -60,40 +60,37 @@ def add_dark_navy_summary(prs, *,
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
 
-    # Detect leading [Bracket]: prefix and bold it
+    # A leading "[Label]: " prefix becomes a coloured label (brackets dropped).
+    label, rest = None, body
     if body.startswith("[") and "]:" in body:
-        end = body.index("]:") + 1
-        prefix = body[:end + 1]  # includes the colon (no, end+1 is past ']')
-        # Re-extract precisely: prefix is "[xxx]:"
-        prefix = body[:body.index("]:") + 2]
-        rest = body[len(prefix):]
+        label = body[1:body.index("]:")].strip()
+        rest = body[body.index("]:") + 2:].lstrip()
+    elif body.startswith("[") and "]：" in body:
+        label = body[1:body.index("]：")].strip()
+        rest = body[body.index("]：") + 2:].lstrip()
+    if label:
         r1 = p.add_run()
-        r1.text = prefix
+        r1.text = label + ("：" if any("\u4e00" <= c <= "\u9fff" for c in label) else ": ")
         r1.font.size = Pt(typo.title_size + 2)
         r1.font.bold = True
-        r1.font.color.rgb = pal.white
+        r1.font.color.rgb = pal.light_blue
         r1.font.name = typo.family
-        r2 = p.add_run()
-        r2.text = rest
-        r2.font.size = Pt(typo.title_size + 2)
-        r2.font.bold = True
-        r2.font.color.rgb = pal.white
-        r2.font.name = typo.family
-    else:
-        r = p.add_run()
-        r.text = body
-        r.font.size = Pt(typo.title_size + 2)
-        r.font.bold = True
-        r.font.color.rgb = pal.white
-        r.font.name = typo.family
+    r = p.add_run()
+    r.text = rest
+    r.font.size = Pt(typo.title_size + 2)
+    r.font.bold = True
+    r.font.color.rgb = pal.white
+    r.font.name = typo.family
 
     # Corner mark (bottom right)
     cw = 3.5
     tb = add_textbox(slide, layout.slide_width_in - layout.margin_right_in - cw,
                      layout.slide_height_in - 0.4, cw, 0.25)
+    if corner_text is None:
+        corner_text = theme.brand_text
     parts = corner_text
     if page_number is not None:
-        parts = f"{corner_text}    {page_number}"
+        parts = f"{corner_text}    {page_number}" if corner_text else str(page_number)
     write_paragraph(tb.text_frame, parts, size=typo.footer_size,
                     color=pal.placeholder_gray, family=typo.family,
                     align=PP_ALIGN.RIGHT, first=True)

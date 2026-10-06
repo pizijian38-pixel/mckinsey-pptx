@@ -372,8 +372,11 @@ def add_prioritization_matrix(prs, *,
                               items: Sequence[Dict],
                               page_number=None, section_marker=None,
                               source="xx", footnote="1. xx",
+                              description: str = "[Description]",
+                              legend: Sequence[str] = ("[Insert status/group]",) * 3,
                               theme: Theme = DEFAULT_THEME):
-    """items: [{"name", "x_band": 0|1|2 (Low/Med/High), "y_band": 0|1|2 (Long/Med/Short), "status": green|amber|red}]"""
+    """items: [{"name", "x_band": 0|1|2 (Low/Med/High), "y_band": 0|1|2 (Long/Med/Short), "status": green|amber|red}]
+    legend: labels for the green / amber / red status dots, in that order."""
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, page_number=page_number,
                section_marker=section_marker, source=source, footnote=footnote)
@@ -381,16 +384,12 @@ def add_prioritization_matrix(prs, *,
 
     # Description left
     tb = add_textbox(slide, 0.45, 1.5, 4, 0.3)
-    write_paragraph(tb.text_frame, "[Description]",
+    write_paragraph(tb.text_frame, description,
                     size=typo.section_title_size, bold=True,
                     color=pal.text_dark, family=typo.family, first=True)
 
     # Legend top
-    leg_items = [
-        ("green", "Insert status/group"),
-        ("amber", "Insert status/group"),
-        ("red", "Insert status/group"),
-    ]
+    leg_items = list(zip(("green", "amber", "red"), legend))
     leg_x = 5.4
     leg_y = 1.5
     color_map = {
@@ -403,7 +402,7 @@ def add_prioritization_matrix(prs, *,
         add_oval(slide, leg_x, leg_y, d, d, fill=color_map[k])
         tb = add_textbox(slide, leg_x + d + 0.08, leg_y - 0.02, 2.5, 0.32,
                          anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, f"= [{label}]",
+        write_paragraph(tb.text_frame, f"= {label}",
                         size=typo.chart_label_size, color=pal.text_dark,
                         family=typo.family, first=True)
         leg_x += 2.5

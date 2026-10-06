@@ -77,7 +77,7 @@ as a full-bleed deep navy slide with bold white text.
 - `body: str` — the headline. If it starts with `"[Label]: "`, the label is bolded.
 **Optional inputs:**
 - `eyebrow: str` — small text in the top-right (e.g. report name).
-- `corner_text: str` — bottom-right brand mark, defaults to "McKinsey & Company".
+- `corner_text: str` — bottom-right brand mark, defaults to the theme's `brand_text` (blank by default).
 **Example:**
 ```python
 b.add("dark_navy_summary",
@@ -192,6 +192,8 @@ per item. Top-right cell is highlighted.
 **Optional inputs:**
 - `ox, oy: float (0-1)` — within-cell offset for tighter layout
 - `d: float` — bubble diameter override
+- `description: str` — bold label above the matrix (top-left)
+- `legend: (str, str, str)` — labels for the green / amber / red dots
 **Example:**
 ```python
 b.add("prioritization_matrix",
@@ -813,9 +815,469 @@ b.add("kpi_dashboard",
 
 ---
 
+## 41. Data table (`data_table`, alias `table`)
+
+**Category:** Table — any rows × columns
+**Use when:** The source has a table (P&L by region, option × criteria,
+risk × owner × status, feature × competitor) or any grid of text /
+numbers that no specialised template fits. Native PowerPoint table, so the
+user can edit it. Optional Key-insight panel on the right.
+**Don't use when:** The data is a single series that reads better as a chart
+(use a column/line chart), or cells are ratings (use `comparison_table`).
+Never force a text table into `comparison_table` Harvey balls.
+**Required inputs:**
+- `columns: list[str]` — header labels
+- `rows: list[list[str | number]]` — body rows, same order as the source
+**Optional inputs:**
+- `subtitle: str` — bold label above the table (e.g. "Market share, %")
+- `col_widths: list[float]` — relative column widths (default: first column wider)
+- `highlight_rows: list[int]` — 0-based body rows to tint + bold (e.g. "us")
+- `highlight_col: int` — column to tint (e.g. the proposed option)
+- `insight: str`, `insight_bullets: list[str]`, `insight_title: str` — right panel
+- `font_size: int` — default 14 for ≤ 7 rows, else 12
+- Cells, `insight` and `insight_bullets` accept `**bold**` spans (this
+  template only — other templates print the asterisks literally).
+Numeric tables (numbers by year / category) go to `chart` first; use
+`data_table` for text tables or as the full-detail companion of a chart.
+Insight bullets synthesise (≤ 3) — don't restate each row.
+**Example:**
+```python
+# Finance — quarterly results by region (text + numbers table)
+b.add("data_table",
+      title="EMEA margin fell 3 pts as freight costs doubled",
+      subtitle="Q3 results by region",
+      columns=["Region", "Revenue ($M)", "Gross margin", "Main driver"],
+      rows=[["North America", "412", "38%", "Price increase held"],
+            ["EMEA", "268", "{red|31%}", "Freight cost +104%"],
+            ["APAC", "190", "41%", "Mix shift to services"]],
+      highlight_rows=[1],
+      insight="Freight explains almost all of the EMEA margin gap",
+      insight_bullets=["EMEA is the only region below 35%", "APAC margin rose with services mix"],
+      source="Company management accounts")
+```
+
+---
+
+## 42. Card grid (`card_grid`, alias `cards`) — preferred for structured content
+
+**Category:** Layout — 2–8 cards
+**Use when:** A slide has 2–8 parallel items, each with a header and 1–4
+supporting points: executive-summary blocks (situation / problem / answer /
+ask), workstream status, initiatives, risks, drivers, principles, options,
+customer segments, capabilities.
+Also KPI / objective cards via `value`. Text is fitted to the space (up to
+18pt) and cards shrink to their content, so short content doesn't leave
+empty boxes. Preferred over `executive_summary_takeaways`,
+`three_trends_*`, `five_key_areas` and `kpi_dashboard` for new decks.
+**Don't use when:** The content is a table (use `data_table`) or numbers to
+chart (use `chart`).
+**Required inputs:**
+- `cards: list[{title, body?, bullets?, icon?, tone?, value?}]`
+  - `icon`: a bundled icon name (list below) or 1–2 characters (`"1"`, `"A"`)
+  - `tone`: `navy` | `blue` | `mid_blue` | `light_blue` | `red` (problem / risk)
+    | `green` (opportunity / target met) | `amber` (watch) | `gray`
+  - `value`: big number at the top of the card (objectives, KPIs)
+**Optional inputs:**
+- `intro: str` — dark banner above the cards (the slide's key message)
+- `insight: str`, `insight_label: str` — highlighted bar below the cards
+- `subtitle: str`, `columns: int` (auto: 2→2, 3→3, 4→2×2 or 1×4 for value
+  cards, 5–6→3, 7–8→4)
+**Example:**
+```python
+# Project status — four workstreams
+b.add("card_grid", title="Two of four workstreams are behind plan",
+      cards=[
+        {"title": "Data migration", "icon": "database", "tone": "red",
+         "bullets": ["{red|3 weeks late}: legacy schema gaps", "Recovery plan due 15 May"]},
+        {"title": "Process redesign", "icon": "settings", "tone": "green",
+         "bullets": ["On track — 6 of 8 processes signed off"]},
+        {"title": "Training", "icon": "users", "tone": "amber",
+         "bullets": ["Trainer hiring 2 weeks behind"]},
+        {"title": "Go-live readiness", "icon": "check", "tone": "green",
+         "bullets": ["Cut-over plan approved"]},
+      ],
+      insight="Go-live date holds only if migration recovers by end of May")
+
+# Targets as value cards
+b.add("card_grid", title="2025 targets: grow revenue while cutting cost to serve",
+      cards=[{"value": "+12%", "title": "Revenue", "tone": "green", "body": "Driven by renewals and upsell"},
+             {"value": "-8%", "title": "Cost to serve", "tone": "blue", "body": "Self-service and automation"},
+             {"value": "95%", "title": "On-time delivery", "tone": "navy", "body": "Up from **91%**"}])
+```
+
+---
+
+## 43. SWOT (`swot`)
+
+**Category:** Framework — 2×2
+**Use when:** Strengths / weaknesses / opportunities / threats. Fixed colours
+and icons (S blue, W red, O green, T amber).
+**Required inputs:** any of `strengths`, `weaknesses`, `opportunities`,
+`threats: list[str]` (an empty quadrant shows "—"; never invent items to fill it)
+**Optional inputs:** `labels` (4 headers, e.g. Chinese), `insight`, `subtitle`
+**Example:**
+```python
+# Market entry assessment
+b.add("swot", title="Strong product fit, but no local sales channel yet",
+      strengths=["Product rated best-in-class by pilot customers", "Cost base 20% below incumbents"],
+      weaknesses=["No local sales team", "Brand unknown in the region"],
+      opportunities=["Regulation opens public tenders from 2026"],
+      threats=["Two incumbents bundling at discount"])
+```
+
+---
+
+## 44. Native chart with insight (`chart`, alias `native_chart`) — preferred for data
+
+**Category:** Chart — editable PowerPoint chart
+**Use when:** Any numeric series the user may want to edit later. Real
+PowerPoint chart ("Edit Data" works), with an optional key-insight panel.
+Preferred over the shape-drawn chart templates (`column_*`, `line_chart`,
+`grouped_column_chart`, `stacked_column_chart`) for new decks.
+**Required inputs:**
+- `chart_type`: `column` | `grouped_column` | `stacked_column` |
+  `stacked_column_100` | `bar` | `stacked_bar` | `line` | `pie` | `doughnut`
+- `categories: list`, `series: list[{name, values, tone?}]`
+**Optional inputs:**
+- `highlight`: `{"series": "Services"}` (that series red, others gray — line/bar)
+  or `{"point": 2}` (that bar red — single series)
+- `number_format`: label format, e.g. `'0.0'`, `'0"%"'`, `'#,##0'`
+- `insight: str`, `insight_bullets: list[str]`, `insight_title: str`
+- `subtitle: str` (put the unit here: "Market share, %"), `show_values`, `y_max`
+- Line charts with 3+ series label only the highlighted / toned series.
+**Example:**
+```python
+# Revenue trend with the focus segment highlighted
+b.add("chart", chart_type="line", title="Services overtook hardware as the largest revenue line",
+      subtitle="Revenue by segment, $M", categories=["2021", "2022", "2023", "2024"],
+      series=[{"name": "Hardware", "values": [520, 505, 480, 455]},
+              {"name": "Software", "values": [210, 240, 275, 300]},
+              {"name": "Services", "values": [380, 430, 470, 515]}],
+      highlight={"series": "Services"}, number_format="#,##0",
+      insight="Services grew 36% while hardware declined every year",
+      insight_bullets=["Services **380 → 515**", "Hardware {red|520 → 455}"])
+```
+
+---
+
+## 45. Tier ladder (`tier_ladder`, alias `price_ladder`)
+
+**Category:** Framework — ascending tiers
+**Use when:** 2–5 tiers that step up: price or service tiers, capability
+maturity levels, portfolio tiers, escalation levels.
+**Required inputs:**
+- `tiers` (lowest first): `[{name, value?, lines?, label?, details?, tone?}]`
+  - `value`: big text, e.g. `"$45 / user"`; `lines`: bold lines (what's included);
+    `label` + `details`: a captioned list (e.g. "Target channel")
+**Optional inputs:** `insight`, `subtitle`
+**Example:**
+```python
+# Service tiers (works the same for price tiers, maturity levels, SLAs)
+b.add("tier_ladder", title="Three service tiers move customers up the value curve",
+      tiers=[{"name": "Basic", "value": "$20 / user", "lines": ["Core features"],
+              "label": "Support", "details": ["Email, 48h"]},
+             {"name": "Professional", "value": "$45 / user", "lines": ["Analytics, integrations"],
+              "label": "Support", "details": ["Chat, 8h"]},
+             {"name": "Enterprise", "value": "Custom", "lines": ["SSO, dedicated environment"],
+              "label": "Support", "details": ["Named manager, 1h"]}],
+      insight="Most upgrades happen when customers need integrations")
+```
+
+---
+
+## Rich text, tones and icons (templates 41–55)
+
+- `**bold**` → bold; `{red|text}` → bold in that tone (`navy`, `blue`,
+  `mid_blue`, `light_blue`, `red`, `green`, `amber`, `gray`, `gold` = neutral
+  emphasis such as best-in-row). Use red for
+  problems / declines, green for growth / targets, sparingly (1–3 spans per
+  card). Older templates (1–40) print the markup literally.
+- Bundled icons (white on a tone circle): `alert`, `arrow_right`, `arrows`, `atom`, `award`, `bag`, `book`, `bot`, `box`, `building`, `calculator`, `calendar`, `cart`, `chart`, `check`, `clipboard`, `clock`, `coins`, `compass`, `cpu`, `cross`, `crown`, `database`, `dna`, `droplet`, `eye`, `factory`, `file`, `filter`, `flag`, `gem`, `globe`, `handshake`, `heart`, `home`, `info`, `key`, `lab`, `layers`, `leaf`, `lightbulb`, `line_chart`, `link`, `lock`, `mail`, `map`, `medal`, `megaphone`, `message`, `microscope`, `money`, `moon`, `package`, `palette`, `pen`, `percent`, `phone`, `pie`, `pill`, `price`, `puzzle`, `question`, `refresh`, `rocket`, `scale`, `search`, `settings`, `share`, `shield`, `smile`, `sparkles`, `star`, `stethoscope`, `store`, `sun`, `target`, `team`, `thumbs_up`, `tooth`, `trend_down`, `trend_up`, `trophy`, `truck`, `user`, `users`, `video`, `wallet`, `zap`.
+  Unknown names fall back to the first letter and print a warning.
+- Theme: `make_theme(company, lang="en"|"zh"|"ko"|"ja", brand="0B4DA2",
+  accent=None)` sets slide language (CJK font + footer "Source:" label),
+  attribution and brand colours in one call.
+
+---
+
+## 46. Card rows (`card_rows`)
+
+**Category:** Layout — horizontal list
+**Use when:** 2–6 items that each need a sentence or two (decisions needed,
+risks and mitigations, principles, recommendations). Icon + header on the
+left, text on the right. Same item shape as `card_grid`; use it to vary the
+layout when several card slides would otherwise follow each other.
+**Required inputs:** `rows: list[{title, body?, bullets?, icon?, tone?, value?}]`
+**Optional inputs:** `subtitle`, `insight`, `label_width` (default 3.4")
+**Example:**
+```python
+b.add("card_rows", title="Four decisions are needed from the steering committee",
+      rows=[{"title": "Approve budget", "icon": "money", "body": "Release **$2.4M** phase-2 budget"},
+            {"title": "Confirm go-live", "icon": "calendar", "body": "Hold **1 Oct** or move to January"},
+            {"title": "Accept risk", "icon": "alert", "tone": "red", "body": "{red|3-week slip} in migration"}])
+```
+
+---
+
+## 47. Waterfall / bridge (`waterfall`, alias `bridge`)
+
+**Category:** Chart — bridge from start to end value (native, editable)
+**Use when:** Explaining a change between two totals by its drivers:
+revenue / EBIT / cost / cash / headcount bridges, budget vs. actual
+variance, price-volume-mix. Increases green, decreases red, totals navy.
+**Required inputs:** `steps: list[{label, value, total?}]` — `total=True` for
+start / subtotal / end bars (drawn from zero); other values are deltas.
+**Optional inputs:** `subtitle` (put the unit here), `number_format`,
+`insight`, `insight_bullets`
+**Rule:** only use deltas the source gives; start + deltas must equal the end total.
+**Example:**
+```python
+b.add("waterfall", title="EBIT fell $14M as freight and wages outweighed price",
+      subtitle="EBIT bridge, $M",
+      steps=[{"label": "2023", "value": 120, "total": True}, {"label": "Price", "value": 18},
+             {"label": "Volume", "value": 6}, {"label": "Freight", "value": -22},
+             {"label": "Wages", "value": -11}, {"label": "FX", "value": -5},
+             {"label": "2024", "value": 106, "total": True}],
+      insight="Cost inflation (-38) more than offset commercial gains (+24)")
+```
+
+---
+
+## 48. Scorecard — target vs. actual (`scorecard`)
+
+**Category:** Performance — KPI status
+**Use when:** 3–8 KPIs with target, actual and a status (QBR, project
+health, OKR review, operating review). Status pill: `green` / `amber` /
+`red` (or "on track" / "at risk" / "off track").
+**Required inputs:** `metrics: list[{metric, target, actual, status, status_label?, comment?}]`
+**Optional inputs:** `columns` (header labels, e.g. Chinese), `subtitle`
+**Rule:** show values as given; don't compute variances the source doesn't state.
+**Example:**
+```python
+b.add("scorecard", title="Four of six KPIs on track; churn and NPS need action",
+      metrics=[{"metric": "Revenue growth", "target": "+10%", "actual": "+12%", "status": "green"},
+               {"metric": "Customer churn", "target": "<5%", "actual": "7.2%", "status": "red",
+                "comment": "Two large accounts lost"}])
+```
+
+---
+
+## 49. Roadmap — workstreams × periods (`roadmap`)
+
+**Category:** Plan — bars on a time grid
+**Use when:** A plan with several workstreams over months / quarters /
+years, with milestones (programme plan, product roadmap, transformation
+plan, implementation plan).
+**Required inputs:**
+- `periods: list[str]` — e.g. `["Q1", "Q2", "Q3", "Q4"]`
+- `lanes: list[{name, items: [{label, start, end, tone?}]}]` — `start` / `end`
+  are 0-based period indices; the bar runs from the start of `start` to the
+  end of `end` (`start=1, end=2` = Q2–Q3); add `.5` to begin mid-period.
+  Overlapping items in one lane stack automatically.
+**Optional inputs:** `milestones: [{label, at, tone?}]` (`at` = position on the
+axis: 2 = boundary between period 2 and 3), `subtitle`, `insight`
+**Example:**
+```python
+b.add("roadmap", title="ERP rollout completes in Q4 with two go-live waves",
+      periods=["Q1", "Q2", "Q3", "Q4"],
+      lanes=[{"name": "Design", "items": [{"label": "Process design", "start": 0, "end": 0}]},
+             {"name": "Build", "items": [{"label": "Configuration", "start": 1, "end": 2},
+                                          {"label": "Data migration", "start": 1, "end": 2, "tone": "amber"}]},
+             {"name": "Deploy", "items": [{"label": "Go-live", "start": 3, "end": 3, "tone": "green"}]}],
+      milestones=[{"label": "Design sign-off", "at": 1}, {"label": "Go-live", "at": 4, "tone": "green"}])
+```
+
+---
+
+## 50. Timeline (`timeline`)
+
+**Category:** Plan — dated events
+**Use when:** 3–7 dated events in sequence (history, launch plan, regulatory
+calendar, deal timeline). Text alternates above and below the line.
+**Required inputs:** `events: list[{date, title, body?, tone?}]`
+**Optional inputs:** `subtitle`, `insight`
+**Example:**
+```python
+b.add("timeline", title="From pilot to national rollout in 18 months",
+      events=[{"date": "Jan 2024", "title": "Pilot", "body": "3 stores"},
+              {"date": "Oct 2024", "title": "Wave 1", "body": "40 stores"},
+              {"date": "Jun 2025", "title": "National", "body": "All 310 stores", "tone": "green"}])
+```
+
+---
+
+## 51. 2×2 matrix (`matrix_2x2`, alias `matrix`)
+
+**Category:** Framework — two dimensions, four quadrants
+**Use when:** Sorting options, initiatives, customers or risks on two
+dimensions (impact × effort, likelihood × severity, attractiveness ×
+ability to win, value × complexity). Quadrants with item lists, and/or
+plotted points.
+**Required inputs:** `x_label`, `y_label`, and `quadrants` (order: top-left,
+top-right, bottom-left, bottom-right: `[{title, items?, tone?}]`) and/or
+`points: [{label, x: 0-1, y: 0-1, tone?}]`
+**Optional inputs:** `x_ends`, `y_ends` (default Low / High), `highlight`
+(quadrant index to tint), `subtitle`, `insight`
+**Example:**
+```python
+b.add("matrix_2x2", title="Automate high-volume, rule-based processes first",
+      x_label="Process volume", y_label="Rule-based",
+      quadrants=[{"title": "Standardise first", "items": ["Vendor onboarding"]},
+                 {"title": "Automate now", "tone": "green", "items": ["Invoice matching", "Expense audit"]},
+                 {"title": "Leave as is", "tone": "gray", "items": ["Board reporting"]},
+                 {"title": "Assist with tools", "items": ["Credit decisions"]}],
+      highlight=1)
+```
+
+---
+
+## 52. Composite — regions of components (`composite`)
+
+**Category:** Layout — build your own slide from parts
+**Use when:** One slide must show several kinds of content together — the
+typical consulting "deep dive": how it works (flow) + the numbers (key
+values) + why / how / pros / cons (cards) + a verdict. Use it for an
+option, initiative, product, market or business-model page. Prefer a
+dedicated template when one fits the whole slide.
+**Required inputs:**
+- `columns: list` — each column is a region (dict) or a list of regions
+  stacked top to bottom. Each region: `{"type": <component>, "heading"?: str,
+  "weight"?: float (height share in its column), "panel"?: bool, ...args}`
+**Optional inputs:** `widths: list[float]` (column width shares), `subtitle`,
+`insight`, `insight_label`
+**Components** (region `type` → arguments):
+- `flow` — `steps: [{title, body?, tone?}]`, `highlight: int`, `caption: str`
+  (value chain, business model, operating model, process)
+- `kv_table` — `rows: [[label, value], ...]` or `[{label, value, tone?, total?}]`
+  (unit economics, key facts, assumptions)
+- `metrics` — `items: [{value, label, tone?}]` (2–4 big numbers)
+- `cards` — `cards: [...]` as in `card_grid`, `columns: int`
+- `pros_cons` — `pros: [str]`, `cons: [str]`, `labels`, `layout: stacked | columns`
+- `list` — `items: [{title, body?, tone?}]` numbered (priorities, steps, criteria)
+- `phases` — `phases: [{name, period?, goal?, bullets?, tone?}]` (compact roadmap)
+- `bullets` — `items: [str]`; `text` — `text: str | [str]`
+- `chart` — same arguments as `chart` (`chart_type`, `categories`, `series`, ...)
+- `table` — same arguments as `data_table` (`columns`, `rows`, ...)
+**Example:**
+```python
+b.add("composite", kicker="Option 2 | Outsource to a 3PL partner", group="options",
+      title="A 3PL partner cuts capex to zero but adds $0.40 per order",
+      columns=[
+        [{"type": "flow", "heading": "Operating model", "highlight": 1,
+          "steps": [{"title": "Retailer", "body": "Owns stock"},
+                    {"title": "3PL partner", "body": "Runs 4 DCs"},
+                    {"title": "Customer", "body": "Next-day delivery"}],
+          "caption": "Fee per order; 3-year volume commitment"},
+         {"type": "kv_table", "heading": "Cost per order (base case)",
+          "rows": [["Pick, pack & ship", "$4.10"], ["Transport", "$2.30"],
+                   {"label": "Total (in-house $6.20)", "value": "$6.60", "tone": "red", "total": True}]}],
+        [{"type": "cards", "columns": 2, "cards": [
+            {"title": "Why", "icon": "lightbulb", "bullets": ["Capex freed for stores"]},
+            {"title": "How", "icon": "settings", "bullets": ["3-year contract, 98% SLA"]},
+            {"title": "Advantages", "icon": "check", "tone": "green", "bullets": ["$0 capex"]},
+            {"title": "Disadvantages", "icon": "cross", "tone": "red", "bullets": ["+$0.40 per order"]}]}]],
+      widths=[1.15, 1], insight="Worth it only below 2M orders a year", insight_label="Verdict")
+```
+
+---
+
+## 53. Option profiles (`option_profiles`)
+
+**Category:** Evaluation — options side by side
+**Use when:** Introducing 2–4 options, products, vendors, scenarios or
+markets with the **same facets** (name, tagline, one-line summary, 1–3 key
+numbers, pros, cons). Neutral by default — use it for "here are the
+options" before any recommendation.
+**Required inputs:** `options: [{name, tagline?, summary?, icon?, metrics?: [{value, label, tone?}], pros?, cons?}]`
+**Optional inputs:** `recommended: int` (only after the evaluation has been
+shown), `insight`, `insight_label` (default "Preliminary view"),
+`pros_label`, `cons_label`, `subtitle`
+**Notes:** pros / cons switch to side-by-side inside each card when stacked
+text would drop below 12pt; keep 2–3 short items each.
+**Example:**
+```python
+b.add("option_profiles", title="Three ways to meet 2026 volume; each trades capex for control",
+      options=[{"name": "Build own DCs", "tagline": "Full control", "icon": "building",
+                "metrics": [{"value": "$180M", "label": "capex"}],
+                "pros": ["Lowest unit cost at scale"], "cons": ["24 months to open"]},
+               {"name": "Outsource to 3PL", "tagline": "Zero capex", "icon": "truck",
+                "metrics": [{"value": "$0", "label": "capex"}],
+                "pros": ["Live in 6 months"], "cons": ["+$0.40 per order"]}],
+      insight="No option wins on every dimension; the scorecard follows")
+```
+
+---
+
+## 54. Decision matrix — weighted scoring (`decision_matrix`, alias `scoring_matrix`)
+
+**Category:** Evaluation — criteria × weights × options
+**Use when:** Options scored against weighted criteria (vendor selection,
+strategic option scoring, site selection, investment prioritisation).
+Shows raw score and weighted score, highlights the best score per row in
+gold, and adds a weighted-total row. A table, never a chart.
+**Required inputs:** `options: [str]`, `criteria: [{name, weight (25 | 0.25 | "25%"), scores: [num per option]}]`
+**Optional inputs:** `recommended: int` (tints that column), `show_weighted`,
+`highlight_best`, `decimals`, `scale_note`, `insight`, `insight_bullets`,
+`insight_title` (default "What drives the result")
+**Rule:** totals are computed from the given scores × weights — report them
+as derived; if the user changed scores, say which and why.
+**Example:**
+```python
+b.add("decision_matrix", title="The hybrid model scores highest overall",
+      options=["Build own", "3PL", "Hybrid"],
+      criteria=[{"name": "Capital efficiency", "weight": 40, "scores": [1, 5, 3]},
+                {"name": "Unit cost", "weight": 35, "scores": [5, 2, 4]},
+                {"name": "Time to capacity", "weight": 25, "scores": [1, 5, 4]}],
+      scale_note="1 = poor, 5 = excellent; weighted score in brackets")
+```
+
+---
+
+## 55. Risk register (`risk_register`)
+
+**Category:** Evaluation — risks and mitigations
+**Use when:** 2–6 risks, each with a severity (high / medium / low /
+critical), a one-line description and mitigations (and optionally an owner).
+**Required inputs:** `risks: [{title, severity, description?, mitigations?: [str], owner?}]`
+**Optional inputs:** `columns`, `mitigation_label`, `insight`, `insight_label`, `subtitle`
+**Example:**
+```python
+b.add("risk_register", title="Two high risks need owners before approval",
+      risks=[{"title": "Partner service failure", "severity": "high",
+              "description": "Peak-season misses hit NPS",
+              "mitigations": ["SLA with penalties", "Dual-source two regions"], "owner": "COO"},
+             {"title": "Contract lock-in", "severity": "low",
+              "mitigations": ["Break clause after 18 months"]}])
+```
+
+---
+
+## Slide-level options (every template)
+
+- `kicker="Option 1 | Leasing model"` — small letter-spaced label above the
+  title (section / position in the argument). Not drawn on cover, divider
+  and full-bleed slides.
+- `group="options"` — marks parallel slides (one per option / product /
+  region). They should use the same template; the checker treats a group as
+  one series instead of flagging it as repetition.
+- `insight_label=` — name the bottom bar for its role ("Verdict",
+  "Bottom line", "Preliminary view", "Decision needed").
+
+---
+
 # Choosing between similar templates
 
 Quick decision rules to avoid common confusions:
+
+- **Options / evaluation decks:** options overview → `option_profiles`;
+  one slide per option → `composite` (same regions for every option,
+  `group="options"`); scoring → `decision_matrix`; risks → `risk_register`.
+- **New decks default to the rich templates (41–55):** structured points →
+  `card_grid` / `card_rows`; tables → `data_table`; numbers → `chart`;
+  bridges → `waterfall`; KPIs vs. target → `scorecard`; plans → `roadmap`
+  / `timeline`; 2×2 → `matrix_2x2`; SWOT → `swot`; tiers → `tier_ladder`.
+  Use templates 1–40 for what these don't cover (org charts, issue trees,
+  BCG / bubble charts, process flows, funnels, cover / dividers).
 
 - **Deck structure:** First page → `cover_slide`; chapter break → `section_divider`;
   table of contents → `agenda`.
@@ -836,8 +1298,12 @@ Quick decision rules to avoid common confusions:
 - **Matrix / 2D:** two continuous axes → `bubble_chart` /
   `bubble_chart_takeaways`; market-share × growth quadrants → `growth_share`;
   impact × time bands → `prioritization_matrix`.
+- **Any table from the source:** → `data_table` (keep every row and column).
+  More than 4 series over time → `data_table` with `highlight_rows`, or a
+  `line_chart` of the 4 most relevant series *plus* the full table elsewhere.
 - **Comparison of options:** 2–4 options × criteria with Harvey balls →
-  `comparison_table`; one option's +/− → `pros_cons`; before/after or
+  `comparison_table` (only when the source gives ratings); options × text
+  features → `data_table` with `highlight_col`; one option's +/− → `pros_cons`; before/after or
   current/future → `two_column_compare`.
 - **Hierarchy:** drivers of an issue → `issue_tree`; reporting lines →
   `org_chart`; one leader + N teammates → `project_team_circles`; function ×
@@ -861,9 +1327,21 @@ These work on every template (don't add them unless useful):
 - `section_marker: str` — small label in the top-right (e.g. "Strategy review").
 - `page_number: int` — auto-numbered if `auto_page_numbers=True` on the builder.
 - `source: str`, `footnote: str` — bottom-left small text.
-- `theme: Theme` — pass a custom theme; for Korean use `Apple SD Gothic Neo`.
+- `theme: Theme` — build it with `make_theme(company, lang=..., brand=...)`.
 
 # Building a deck
+
+Chinese deck:
+
+```python
+from mckinsey_pptx import PresentationBuilder, make_theme
+
+b = PresentationBuilder(theme=make_theme("某某公司", lang="zh"), default_section_marker="Q4 回顾")
+b.add("dark_navy_summary", body="[核心结论]: ...")
+b.save("output/deck.pptx")
+```
+
+Korean / custom theme:
 
 ```python
 from mckinsey_pptx import PresentationBuilder, DEFAULT_THEME

@@ -12,12 +12,14 @@ $ARGUMENTS
 Delegate this to the `mckinsey-slide-agent` subagent. Pass the brief verbatim
 and let the agent:
 
-1. Plan the slide arc
-2. Pick a template per slide and defend each choice
-3. Generate the Python build script under `output/`
-4. Build the `.pptx`
+1. Decide source mode (an outline/document in the workspace) vs. brief mode
+2. Write the slide plan, picking and defending a template per slide
+3. Generate the Python build script under `output/` and build the `.pptx`
+4. Check the deck against the source files with `scripts/deck_check.py`
 5. Render PNG previews if `soffice` / `pdftoppm` are available
-6. Report back with the output path, per-slide rationales, and any caveats
+6. Report back with the output path, per-slide rationales, coverage and caveats
 
-If the brief is in Korean, the agent will respond in Korean and use the
-Apple SD Gothic Neo theme.
+The agent follows `${CLAUDE_PLUGIN_ROOT}/SKILL.md`. Slide language follows the
+source document (or the brief's language when there is no document) unless
+the user asks for a translation; Chinese slides use the Chinese theme. If the
+brief names a company, it goes into the footer attribution.

@@ -11,6 +11,15 @@ from . import (
     comparison_slides,
     extra_charts,
     process_extras,
+    table_slides,
+    card_slides,
+    native_chart,
+    ladder_slides,
+    finance_slides,
+    plan_slides,
+    matrix_slides,
+    composite_slides,
+    evaluation_slides,
 )
 
 __all__ = [
@@ -26,4 +35,13 @@ __all__ = [
     "comparison_slides",
     "extra_charts",
     "process_extras",
+    "table_slides",
+    "card_slides",
+    "native_chart",
+    "ladder_slides",
+    "finance_slides",
+    "plan_slides",
+    "matrix_slides",
+    "composite_slides",
+    "evaluation_slides",
 ]
