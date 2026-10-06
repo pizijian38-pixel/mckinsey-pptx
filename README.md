@@ -33,6 +33,9 @@
 
 ---
 
+> 🪐 **使用 Google Antigravity？** 本仓库同时也是一个 Antigravity Skill，
+> 安装方法见 [在 Google Antigravity 中使用](#在-google-antigravity-中使用)。
+
 ## 首次安装准备（5 分钟）
 
 这个工具运行在 **Claude Code** 里。可以把 Claude Code 理解为"在命令行里使用的 AI 助手"。
@@ -174,6 +177,70 @@ Claude 会自动：
 
 Claude 会告诉你文件路径，例如 `output/q4-review.pptx`。
 在访达（Mac）或文件资源管理器（Windows）里找到它，双击即可用 PowerPoint / WPS / Keynote 打开。
+
+---
+
+## 在 Google Antigravity 中使用
+
+本仓库根目录有一个 `SKILL.md`，所以**整个仓库文件夹就是一个 Antigravity Skill**。
+把它放进 Antigravity 的 skills 文件夹就能用，用法和 Claude Code 版一样：用中文说出需求即可。
+
+### 安装（二选一）
+
+**方式 1：全局安装（所有项目都能用，推荐）**
+
+Mac / Linux（终端）：
+
+```bash
+git clone https://github.com/pizijian38-pixel/mckinsey-pptx.git ~/.gemini/antigravity/skills/mckinsey-pptx
+```
+
+Windows（PowerShell）：
+
+```powershell
+git clone https://github.com/pizijian38-pixel/mckinsey-pptx.git "$env:USERPROFILE\.gemini\antigravity\skills\mckinsey-pptx"
+```
+
+**方式 2：只给当前项目用**
+
+在项目根目录执行：
+
+```bash
+git clone https://github.com/pizijian38-pixel/mckinsey-pptx.git .agent/skills/mckinsey-pptx
+```
+
+> 💡 没装 git？在 GitHub 页面点 **Code → Download ZIP**，解压后把文件夹改名为
+> `mckinsey-pptx`，放到上面任意一个路径下即可。确认 `SKILL.md` 在
+> `mckinsey-pptx/SKILL.md` 这一层，不要多套一层文件夹。
+
+装好后重新打开 Antigravity（或新开一个对话），让它加载新的 skill。
+
+### 安装依赖（只需一次）
+
+在 Antigravity 对话里说：
+
+```
+安装 mckinsey-pptx skill 需要的 Python 库
+```
+
+它会执行 `pip install python-pptx`。想让 AI 渲染预览图自检排版，再装 LibreOffice（可选）。
+
+### 使用
+
+在 Antigravity 里打开放着资料的项目文件夹，然后直接说：
+
+```
+用 inputs/销售数据.xlsx 做一份麦肯锡风格的 Q4 业务回顾 PPT，8 页，公司名是"星海科技"
+```
+
+Antigravity 会根据 skill 的描述自动启用它。如果没有触发，可以明确说
+"使用 mckinsey-pptx skill 做……"。生成的文件在项目的 `output/` 文件夹里。
+
+### 更新
+
+```bash
+cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
+```
 
 ---
 
@@ -628,6 +695,7 @@ axlabs-mckinsey-pptx/
 │   ├── demo.py                            # 英文示例
 │   ├── demo_chinese.py                    # 中文示例
 │   └── demo_korean.py                     # 韩文示例
+├── SKILL.md                               # Google Antigravity Skill 定义（仓库即 skill）
 ├── LICENSE                                # MIT © 2026 AX Labs
 ├── README.md                              # 中文说明（本文件）
 ├── README.ko.md                           # 韩文原版说明
