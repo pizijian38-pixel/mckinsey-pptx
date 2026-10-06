@@ -5,12 +5,13 @@
 Reports, per deck:
   1. Numbers on slides that never appear in the sources  -> possible fabrication
   2. Share of source numbers that made it into the deck  -> data coverage
-  3. Slides whose text fills little of the slide          -> too sparse
+  3. Text slides that say little (advisory, source mode)  -> add source detail
   4. Leftover template placeholders ([...], xx, Lorem)    -> unfinished
   5. Claims / quoted terms / vocabulary not in the sources -> possible invention
   6. Same template many slides in a row, or no chart      -> monotonous layout
   7. Body text below 12pt                                  -> hard to read
   8. Footer "Source:" misuse (caption as source, wrong language)
+  9. Insight bullets that only restate a table row
 
 Sources: .docx .pptx .md .txt .csv .xlsx (.pdf if pypdf is installed).
 Exit code 1 if anything is flagged, so a build script can gate on it.
@@ -68,8 +69,12 @@ def _pdf_text(path: Path) -> str:
     return "\n".join(p.extract_text() or "" for p in pypdf.PdfReader(str(path)).pages)
 
 
+_NUMBERING = re.compile(r"(?m)^\s*#{0,6}\s*\d{1,2}(?:\.\d{1,2})*[.)、]\s*")
+
+
 def source_text(path: Path) -> str:
-    return SCAFFOLD.sub(" ", _raw_source_text(path))
+    text = _NUMBERING.sub(" ", _raw_source_text(path))   # "## 3. Market" headings
+    return SCAFFOLD.sub(" ", text)
 
 
 def _raw_source_text(path: Path) -> str:
@@ -113,12 +118,18 @@ def _chart_text(slide) -> str:
             for plot in sh.chart.plots:
                 out += [str(c) for c in plot.categories]
                 for series in plot.series:
-                    out += [str(v) for v in series.values if v is not None]
+                    if series.name.startswith("_"):     # layout helper (waterfall base)
+                        continue
+                    out += [str(v) for v in series.values if v not in (None, 0)]
     return "\n".join(out)
 
 
+_CHROME = re.compile(r"^\s*(?:ⓒ|©|copyright\b).*$", re.I | re.M)
+
+
 def slide_text(slide) -> str:
-    return "\n".join([tf.text for tf, _ in _frames(slide)] + [_chart_text(slide)])
+    text = "\n".join([tf.text for tf, _ in _frames(slide)] + [_chart_text(slide)])
+    return _CHROME.sub(" ", text)         # footer "ⓒ 2026 Acme  3" is chrome
 
 
 def _slide_texts(prs):
@@ -129,7 +140,8 @@ def _slide_texts(prs):
 # ---------- checks ----------
 
 def _norm(n: str) -> str:
-    n = n.replace(",", "").replace("−", "-").lstrip("+")
+    # sign-insensitive: charts store decreases as positive heights
+    n = n.replace(",", "").replace("−", "-").lstrip("+-")
     if "." in n:
         n = n.rstrip("0").rstrip(".")
     return n
@@ -154,14 +166,26 @@ def fill_ratio(slide, slide_w, slide_h) -> float:
 
 # ---------- invention, layout, readability, sources ----------
 
-# Claim types the skill forbids adding; flagged when absent from the sources.
-RISK_TERMS = (
-    "#1", "no. 1", "number one", "market leader", "first-ever", "first ever",
-    "partnership", "partner with", "alliance", "joint venture", "exclusive",
-    "acquire", "acquisition", "patent", "certified", "certification",
-    "clinical trial", "fda", "award", "multi-pack", "subscription",
-    "flagship store", "pop-up", "guarantee", "official",
-)
+# Claim types the skill forbids adding, by category (regex, case-insensitive).
+# A match is flagged only when the matched phrase is absent from the sources.
+RISK_PATTERNS = {
+    "superlative / ranking": r"#\s?1\b|\bno\.?\s?1\b|\bnumber[- ]one\b|\bfastest[- ]?\w*"
+                             r"|\blargest\b|\bmarket[- ]lead\w*|\bindustry[- ]lead\w*"
+                             r"|\bbest[- ]in[- ]class\b|\bfirst[- ]ever\b|\bunmatched\b"
+                             r"|\bunrivall?ed\b|\bworld[- ]class\b",
+    "exclusivity / ownership": r"\bproprietary\b|\bpatent\w*|\bexclusive\w*|\btrademark\w*",
+    "credential / regulatory": r"\bcertifi\w*|\bclinically[- ]proven\b|\bclinical[- ]trials?\b"
+                               r"|\bfda\b|\baccredit\w*|\baward[- ]?\w*|\biso\s?\d{4,5}\b",
+    "partnership / deal": r"\bpartnership\w*|\bpartner(?:s|ed)? with\b|\balliance\b"
+                          r"|\bjoint[- ]venture\b|\bacqui(?:re|sition)\w*|\bmerger\b"
+                          r"|\bofficial\b",
+    "commitment / target": r"\bguarantee\w*|\bcommit(?:s|ted)? to\b|\bdominat\w*"
+                           r"|\bwill (?:double|triple)\b|\blead(?:s|ing)? (?:the market|in)\b",
+    "offer / packaging": r"\bsubscription\w*|\bbundl\w*|\bmulti[- ]?(?:pack|item)\w*"
+                         r"|\bfree[- ]trial\b|\bloyalty (?:program|programme|scheme)\b"
+                         r"|\bmembership\b|\bpop[- ]up\b|\bflagship store\b",
+}
+_RISK_RE = {k: re.compile(v, re.I) for k, v in RISK_PATTERNS.items()}
 # Double / curly quotes, or single quotes not used as apostrophes (YNBY's).
 _QUOTED = re.compile(r"[\"“]([^\"“”\n]{3,60})[\"”]"
                      r"|(?<![A-Za-z])[‘']([^‘’'\n]{3,60})[’'](?![A-Za-z])")
@@ -213,9 +237,13 @@ def _norm_text(t: str) -> str:
 
 def new_content(text: str, src_norm: str, src_stems: set[str]):
     """(risk claims, quoted phrases, novel words) on a slide vs. the sources."""
-    norm = _norm_text(text)
-    risk = sorted({t for t in RISK_TERMS
-                   if _norm_text(t).strip() in norm and _norm_text(t).strip() not in src_norm})
+    risk = set()
+    for cat, rx in _RISK_RE.items():
+        for m in rx.finditer(text):
+            phrase = _norm_text(m.group(0)).strip()
+            if phrase and phrase not in src_norm:
+                risk.add(f"{m.group(0).strip()} ({cat})")
+    risk = sorted(risk)
     def stemmed(t):
         return " ".join(_stem(w) for w in _norm_text(t).split())
     src_stemmed = stemmed(src_norm)
@@ -227,11 +255,47 @@ def new_content(text: str, src_norm: str, src_stems: set[str]):
     return risk, quoted, words
 
 
-_CHART_TEMPLATES = {"chart", "column_comparison", "column_simple_growth",
+def restated_rows(slide):
+    """Text outside a table that just re-says one of its rows."""
+    tables = [sh for sh in _iter_shapes(slide.shapes)
+              if getattr(sh, "has_table", False) and sh.has_table]
+    if not tables:
+        return []
+    rows = []
+    for t in tables:
+        for r in list(t.table.rows)[1:]:
+            stems = {_stem(w) for c in r.cells for w in _WORD.findall(c.text)}
+            stems |= set(NUM.findall(" ".join(c.text for c in r.cells)))
+            if stems:
+                rows.append(stems)
+    hits = []
+    # only text level with or below the table (skips title and subtitle)
+    top_cut = min(t.top for t in tables) - Emu(45720)
+    for sh in _iter_shapes(slide.shapes):
+        if not sh.has_text_frame or sh.top is None or sh.top < top_cut:
+            continue
+        for p in sh.text_frame.paragraphs:
+            t = p.text.strip()
+            stems = {_stem(w) for w in _WORD.findall(t)} | set(NUM.findall(t))
+            if len(stems) < 3:
+                continue
+            best = max((len(stems & r) / len(stems) for r in rows), default=0)
+            if best >= 0.6:
+                hits.append(t[:70])
+    return hits
+
+
+_CHART_TEMPLATES = {"chart", "waterfall", "column_comparison", "column_simple_growth",
                     "column_split_growth", "column_historic_forecast",
                     "stacked_column_chart", "grouped_column_chart", "line_chart",
                     "bubble_chart", "bubble_chart_takeaways", "growth_share"}
 _FAMILY = {"swot": "card_grid"}
+# Templates whose value is the text itself; visual ones (charts, roadmaps,
+# matrices, tables, scorecards, summaries) are not judged by text fill.
+_TEXT_TEMPLATES = {"card_grid", "card_rows", "swot", "executive_summary",
+                   "executive_summary_takeaways", "three_trends_icons",
+                   "three_trends_table", "three_trends_numbered", "five_key_areas",
+                   "overview_areas", "two_column_compare", "pros_cons"}
 
 
 def template_of(slide):
@@ -313,7 +377,7 @@ def main(argv=None) -> int:
     print(f"Deck: {args.deck}  ({len(prs.slides)} slides)")
     deck_nums_all: set[str] = set()
     sparse, leftovers, invented = [], [], []
-    risky, quoted_new, novel, small, src_bad = [], [], [], [], []
+    risky, quoted_new, novel, small, src_bad, restates = [], [], [], [], [], []
     templates = []
     for i, slide in enumerate(prs.slides, start=1):
         text = slide_text(slide)
@@ -329,7 +393,8 @@ def main(argv=None) -> int:
         ratio = fill_ratio(slide, sw, sh)
         if args.verbose:
             print(f"  slide {i:>2}: fill {ratio:.1%}")
-        if ratio < args.sparse and i > 1 and not has_chart(slide):
+        if (ratio < args.sparse and i > 1 and args.source
+                and template_of(slide) in _TEXT_TEMPLATES):
             sparse.append((i, ratio))
         if args.source:
             risk, quoted, words = new_content(text, src_norm, src_stems)
@@ -339,6 +404,9 @@ def main(argv=None) -> int:
                 quoted_new.append((i, quoted))
             if words:
                 novel.append((i, words))
+        rr = restated_rows(slide)
+        if rr:
+            restates.append((i, rr))
         bs = body_size(slide, sh)
         if bs is not None and bs < 12 and i > 1:
             small.append((i, bs))
@@ -366,12 +434,11 @@ def main(argv=None) -> int:
         if missing:
             print(f"  not used: {', '.join(missing[:60])}{' ...' if len(missing) > 60 else ''}")
 
-    print(f"\n[3] Sparse slides (text fill < {args.sparse:.0%}; chart slides exempt; "
-          "ignore cover / divider / closing slides):")
+    print(f"\n[3] Thin text slides (advisory; source mode, text templates, fill < {args.sparse:.0%}):")
     if sparse:
-        flagged = True
         for i, r in sparse:
-            print(f"  slide {i}: {r:.1%}")
+            print(f"  slide {i}: {r:.1%} — add supporting detail *from the source* if it has any; "
+                  "never pad. Fine for live talks.")
     else:
         print("  none")
 
@@ -446,6 +513,15 @@ def main(argv=None) -> int:
                 print(f"  slide {i}: {x}")
     else:
         print("  ok")
+    print("\n[9] Insight text that only restates a table row (synthesise instead):")
+    if restates:
+        flagged = True
+        for i, rr in restates:
+            for t in rr:
+                print(f"  slide {i}: {t}")
+    else:
+        print("  none")
+
     return 1 if flagged else 0
 
 

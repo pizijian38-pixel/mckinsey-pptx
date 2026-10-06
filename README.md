@@ -491,7 +491,7 @@ A. 能，就是**普通的 PowerPoint 文件**。用 PowerPoint / WPS / Keynote 
 
 ---
 
-## 能做哪些幻灯片？（45 个模板）
+## 能做哪些幻灯片？（51 个模板）
 
 Claude 会自动挑选，你也可以直接指定。
 
@@ -542,7 +542,13 @@ Claude 会自动挑选，你也可以直接指定。
 - **原生图表** `chart`：柱状、条形、折线、堆积、饼图、环形图；能在 PowerPoint 里"编辑数据"，
   可突出某个系列或某根柱子，并带洞察面板
 - **SWOT** `swot`：四象限，固定配色和图标
-- **价格阶梯** `tier_ladder`：基础 → 核心 → 高端的阶梯式价格或产品分层
+- **价格 / 服务阶梯** `tier_ladder`：基础 → 专业 → 企业这类逐级上升的分层
+- **横排列表** `card_rows`：决策事项、风险与应对、建议等需要一两句话说明的条目
+- **瀑布图 / 桥图** `waterfall`：营收、利润、成本从起点到终点的变动拆解（可编辑原生图表）
+- **计分卡** `scorecard`：KPI 目标 vs 实际 + 红黄绿状态
+- **路线图** `roadmap`：多条工作流 × 时间段，带里程碑
+- **时间线** `timeline`：3–7 个按时间排列的事件
+- **2×2 矩阵** `matrix_2x2`：影响 × 难度、可能性 × 严重度等两维度排序
 - 文字中可以用 `**加粗**`、`{red|标红}`、`{green|标绿}` 强调关键词，内置 88 个商务图标
 - **品牌配色**：说"用品牌色 #103B8C"即可，整套配色会自动换成你的品牌色
 
@@ -690,6 +696,15 @@ python -m mckinsey_pptx.cli --demo -o output/demo.pptx
 python -m mckinsey_pptx.cli specs.json -o deck.pptx --section-marker "Strategy review"
 ```
 
+### 冒烟测试
+
+```bash
+python tests/smoke/run.py            # 构建 4 个不同场景的 PPT 并逐个检查
+python tests/smoke/run.py --render   # 同时渲染预览图（需要 LibreOffice）
+```
+
+每次修改引擎或规则后跑一遍，避免只对某一类 PPT 有效。
+
 ### 运行示例
 
 ```bash
@@ -735,6 +750,7 @@ axlabs-mckinsey-pptx/
 │   └── slides/                            # 40 个模板（按类别分文件）
 ├── scripts/
 │   └── deck_check.py                      # 把 PPT 和源文件对照检查
+├── tests/smoke/                           # 多场景冒烟测试（财务回顾 / 项目汇报 / 中文战略 / 现场路演）
 ├── examples/
 │   ├── demo.py                            # 英文示例
 │   ├── demo_chinese.py                    # 中文示例

@@ -20,6 +20,7 @@ from .slides import (
     trends_slides, org_charts, timeline_slides, summary_slide,
     structure_slides, comparison_slides, extra_charts, process_extras,
     table_slides, card_slides, native_chart, ladder_slides,
+    finance_slides, plan_slides, matrix_slides,
 )
 
 
@@ -76,9 +77,17 @@ _REGISTRY = {
     "card_grid": card_slides.add_card_grid,
     "cards": card_slides.add_card_grid,
     "swot": card_slides.add_swot,
+    "card_rows": card_slides.add_card_rows,
     "chart": native_chart.add_native_chart,
     "native_chart": native_chart.add_native_chart,
     "tier_ladder": ladder_slides.add_tier_ladder,
+    "waterfall": finance_slides.add_waterfall,
+    "bridge": finance_slides.add_waterfall,
+    "scorecard": finance_slides.add_scorecard,
+    "roadmap": plan_slides.add_roadmap,
+    "timeline": plan_slides.add_timeline,
+    "matrix_2x2": matrix_slides.add_matrix_2x2,
+    "matrix": matrix_slides.add_matrix_2x2,
     "price_ladder": ladder_slides.add_tier_ladder,
 
     # Summary

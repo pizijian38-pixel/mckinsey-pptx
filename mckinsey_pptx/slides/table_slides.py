@@ -12,7 +12,7 @@ from pptx.util import Inches, Emu
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
 from ..base import add_chrome, add_textbox, blank_slide, write_paragraph
-from ..design import add_insight_panel, add_rich_runs
+from ..design import add_insight_panel, add_rich_runs, plain
 from ..theme import Theme, DEFAULT_THEME
 
 
@@ -30,6 +30,22 @@ def _write_cell(cell, text, *, size, color, family, theme, bold=False,
         p.alignment = align
         add_rich_runs(p, line, size=size, color=color, family=family,
                       theme=theme, bold=bold)
+
+
+def _auto_widths(columns, rows, n_cols):
+    """Relative column widths from content: long-text columns get the room,
+    short numeric columns stay narrow, no column narrower than its longest word."""
+    weights = []
+    for ci in range(n_cols):
+        cells = [plain(r[ci]) if ci < len(r) else "" for r in rows]
+        head = plain(columns[ci]) if ci < len(columns) else ""
+        lens = [len(c) for c in cells] or [0]
+        avg, mx = sum(lens) / len(lens), max(lens)
+        longest_word = max((len(w) for t in cells + [head] for w in t.split()),
+                           default=4)
+        weights.append(max(0.5 * avg + 0.5 * mx, longest_word * 1.15,
+                           len(head) * 0.6, 5))
+    return weights
 
 
 def _fill(cell, rgb):
@@ -55,7 +71,7 @@ def add_data_table(prs, *,
                    source=None, footnote=None,
                    theme: Theme = DEFAULT_THEME):
     """columns: header labels. rows: list of row cell lists (str/number).
-    col_widths: relative widths per column (default: first column wider).
+    col_widths: relative widths per column (default: sized from content).
     highlight_rows: row indices (0-based, body rows) tinted + bold — e.g. "us".
     highlight_col: column index tinted — e.g. the recommended option.
     insight / insight_bullets: optional Key-insight panel on the right.
@@ -87,9 +103,19 @@ def add_data_table(prs, *,
     n_cols = max(len(columns), 1)
     n_rows = len(rows) + 1
     if col_widths is None:
-        col_widths = [1.6] + [1.0] * (n_cols - 1) if n_cols > 1 else [1.0]
+        col_widths = _auto_widths(columns, rows, n_cols)
     total = float(sum(col_widths))
     widths_in = [table_w * w / total for w in col_widths]
+    # never squeeze a column below ~0.85" (numbers, short labels)
+    short = [i for i, w in enumerate(widths_in) if w < 0.85]
+    if short and len(short) < n_cols:
+        spare = sum(0.85 - widths_in[i] for i in short)
+        rest = [i for i in range(n_cols) if i not in short]
+        rest_total = sum(widths_in[i] for i in rest)
+        for i in short:
+            widths_in[i] = 0.85
+        for i in rest:
+            widths_in[i] -= spare * widths_in[i] / rest_total
 
     # Row height: share the body height so the table fills the slide.
     avail = bottom - top
@@ -108,7 +134,7 @@ def add_data_table(prs, *,
         table.rows[ri].height = Emu(int(Inches(row_h)))
 
     def is_num(v):
-        return bool(re.fullmatch(r"[\s<>≈~+\-−]*[\d.,]+\s*%?\s*", str(v)))
+        return bool(re.fullmatch(r"[\s<>≈~+\-−$€£¥]*[\d.,]+\s*[%xMBK]?\s*", plain(v)))
 
     for ci, label in enumerate(columns):
         cell = table.cell(0, ci)

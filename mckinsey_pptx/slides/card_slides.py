@@ -13,7 +13,7 @@ from typing import Dict, Optional, Sequence
 from pptx.enum.text import MSO_ANCHOR
 
 from ..base import add_chrome, add_rect, add_textbox, blank_slide, write_paragraph
-from ..design import (warn_small, add_callout_bar, add_icon, fit_one_line, fit_size, text_height_in,
+from ..design import (plain, warn_small, add_callout_bar, add_icon, fit_one_line, fit_size, text_height_in,
                       tone_rgb, write_rich_paragraph)
 from ..theme import Theme, DEFAULT_THEME
 
@@ -115,6 +115,16 @@ def add_card_grid(prs, *,
                "Shorten the longest card's bullets, drop the subtitle or the "
                "insight bar, or split the slide.")
     head_size = min(body_size + 2, 20)
+    # Headers never break inside a word: shrink until the longest word fits.
+    for c in cards:
+        hw_ = header_w if (has_icons and not c.get("value")) else body_w
+        words = plain(c.get("title", "")).split() or [""]
+        longest = max(words, key=len)
+        head_size = min(head_size, fit_one_line(longest, hw_, head_size, 11, bold=True))
+    if columns and card_w < 2.6 and not has_values:
+        warn_small("card_grid", title, 0,
+                   f"columns={columns} makes cards {card_w:.1f}\" wide — text cards "
+                   "read better in the default layout (4 cards -> 2x2); drop columns=.")
 
     # If the text tops out at the size cap, shrink the cards to their content
     # and centre the grid, rather than leaving the space inside each card.
@@ -214,3 +224,97 @@ def add_swot(prs, *,
                          insight=insight, columns=2, page_number=page_number,
                          section_marker=section_marker, source=source,
                          footnote=footnote, theme=theme)
+
+
+def add_card_rows(prs, *,
+                  title: str = "[Card rows / Insert action title]",
+                  rows: Sequence[Dict],
+                  subtitle: Optional[str] = None,
+                  insight: Optional[str] = None,
+                  insight_label: Optional[str] = "Key insight",
+                  label_width: float = 3.4,
+                  page_number=None, section_marker=None,
+                  source=None, footnote=None,
+                  theme: Theme = DEFAULT_THEME):
+    """Horizontal list: one band per item — icon + header on the left,
+    body / bullets on the right. Same item shape as card_grid:
+    rows: [{"title", "body"?, "bullets"?, "icon"?, "tone"?, "value"?}]
+    Good for 2-6 items with a sentence or two each (moves, risks, principles,
+    decisions), and as a visual change from card_grid.
+    """
+    slide = blank_slide(prs)
+    add_chrome(slide, title=title, theme=theme, page_number=page_number,
+               section_marker=section_marker, source=source, footnote=footnote)
+    pal, typo, layout = theme.palette, theme.typography, theme.layout
+    left = layout.margin_left_in
+    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+    top = layout.body_top_in + 0.05
+    bottom = layout.footer_top_in - 0.25
+    if subtitle:
+        tb = add_textbox(slide, left, top, width, 0.35)
+        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
+                        bold=True, color=pal.text_dark, family=typo.family,
+                        first=True)
+        top += 0.45
+    if insight:
+        h = 0.7
+        add_callout_bar(slide, theme, left, bottom - h, width, h, insight,
+                        label=insight_label)
+        bottom -= h + GAP
+
+    n = max(len(rows), 1)
+    gap = 0.15
+    row_h = min((bottom - top - gap * (n - 1)) / n, 1.5)
+    icon_d = min(0.5, row_h - 0.3)
+    has_icons = any(r.get("icon") for r in rows)
+    lab_text_w = label_width - PAD - ((icon_d + 0.15) if has_icons else 0) - 0.1
+    body_x = left + label_width + 0.2
+    body_w = width - label_width - 0.2 - PAD
+
+    sizes = [fit_size(_card_paras(r) or [" "], body_w, row_h - 2 * 0.14,
+                      max_size=17, min_size=10, para_gap_pt=4, indent_in=0.25)
+             for r in rows]
+    body_size = min(sizes) if sizes else 14
+    warn_small("card_rows", title, body_size,
+               "Shorten the longest row or split the slide.")
+    head_size = min(body_size + 2, 20)
+    for r in rows:
+        words = plain(r.get("title", "")).split() or [""]
+        head_size = min(head_size, fit_one_line(max(words, key=len), lab_text_w,
+                                                head_size, 11, bold=True))
+        head_size = min(head_size, fit_size([r.get("title", "")], lab_text_w,
+                                            row_h - 0.2, max_size=head_size,
+                                            min_size=11, line_spacing=1.15))
+
+    block_h = n * row_h + gap * (n - 1)
+    top += max(0, (bottom - top - block_h) / 2)
+    for i, r in enumerate(rows):
+        y = top + i * (row_h + gap)
+        tone = r.get("tone")
+        add_rect(slide, left, y, width, row_h, fill=pal.soft_gray)
+        add_rect(slide, left, y, label_width, row_h, fill=pal.light_gray)
+        x = left + PAD
+        if has_icons:
+            add_icon(slide, r.get("icon"), x, y + (row_h - icon_d) / 2, icon_d,
+                     theme, tone)
+            x += icon_d + 0.15
+        tb = add_textbox(slide, x, y, lab_text_w, row_h, anchor=MSO_ANCHOR.MIDDLE)
+        write_rich_paragraph(tb.text_frame, r.get("title", ""), size=head_size,
+                             theme=theme, bold=True, first=True)
+        if r.get("value"):
+            write_rich_paragraph(tb.text_frame, r["value"], size=head_size + 4,
+                                 theme=theme, color=tone_rgb(theme, tone),
+                                 bold=True)
+        tb = add_textbox(slide, body_x, y + 0.08, body_w, row_h - 0.16,
+                         anchor=MSO_ANCHOR.MIDDLE)
+        first = True
+        if r.get("body"):
+            write_rich_paragraph(tb.text_frame, r["body"], size=body_size,
+                                 theme=theme, first=True, space_after=3)
+            first = False
+        for b_ in r.get("bullets", []):
+            write_rich_paragraph(tb.text_frame, b_, size=body_size, theme=theme,
+                                 bullet=True, first=first,
+                                 space_before=0 if first else 4)
+            first = False
+    return slide

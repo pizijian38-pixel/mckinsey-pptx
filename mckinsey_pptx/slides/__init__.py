@@ -15,6 +15,9 @@ from . import (
     card_slides,
     native_chart,
     ladder_slides,
+    finance_slides,
+    plan_slides,
+    matrix_slides,
 )
 
 __all__ = [
@@ -34,4 +37,7 @@ __all__ = [
     "card_slides",
     "native_chart",
     "ladder_slides",
+    "finance_slides",
+    "plan_slides",
+    "matrix_slides",
 ]

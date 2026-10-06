@@ -818,8 +818,8 @@ b.add("kpi_dashboard",
 ## 41. Data table (`data_table`, alias `table`)
 
 **Category:** Table — any rows × columns
-**Use when:** The source has a table (market share by year, strengths ×
-impact, tier × price × channel, feature × competitor) or any grid of text /
+**Use when:** The source has a table (P&L by region, option × criteria,
+risk × owner × status, feature × competitor) or any grid of text /
 numbers that no specialised template fits. Native PowerPoint table, so the
 user can edit it. Optional Key-insight panel on the right.
 **Don't use when:** The data is a single series that reads better as a chart
@@ -842,17 +842,18 @@ Numeric tables (numbers by year / category) go to `chart` first; use
 Insight bullets synthesise (≤ 3) — don't restate each row.
 **Example:**
 ```python
+# Finance — quarterly results by region (text + numbers table)
 b.add("data_table",
-      title="Crest is losing share while local players gain",
-      subtitle="Market share by key players, %",
-      columns=["Brand", "2022", "2023", "2024", "2025 Est"],
-      rows=[["YNBY", 24.4, 24.6, 25.1, 25.0],
-            ["Crest", 8.8, 8.9, 8.5, 8.0],
-            ["LSL", 7.3, 8.0, 8.6, 9.0]],
+      title="EMEA margin fell 3 pts as freight costs doubled",
+      subtitle="Q3 results by region",
+      columns=["Region", "Revenue ($M)", "Gross margin", "Main driver"],
+      rows=[["North America", "412", "38%", "Price increase held"],
+            ["EMEA", "268", "{red|31%}", "Freight cost +104%"],
+            ["APAC", "190", "41%", "Mix shift to services"]],
       highlight_rows=[1],
-      insight="Crest fell from 8.8% to 8.0% while **LSL overtook it**",
-      insight_bullets=["YNBY stable at ~25%", "LSL +1.7 pts in four years"],
-      source="Company outline, Table 1")
+      insight="Freight explains almost all of the EMEA margin gap",
+      insight_bullets=["EMEA is the only region below 35%", "APAC margin rose with services mix"],
+      source="Company management accounts")
 ```
 
 ---
@@ -861,9 +862,9 @@ b.add("data_table",
 
 **Category:** Layout — 2–8 cards
 **Use when:** A slide has 2–8 parallel items, each with a header and 1–4
-supporting points: executive-summary blocks (reality / problem / shift /
-north star), weaknesses, channel shifts, persona aspects, distribution
-moves, campaign pillars, product formats, competitor counter-positions.
+supporting points: executive-summary blocks (situation / problem / answer /
+ask), workstream status, initiatives, risks, drivers, principles, options,
+customer segments, capabilities.
 Also KPI / objective cards via `value`. Text is fitted to the space (up to
 18pt) and cards shrink to their content, so short content doesn't leave
 empty boxes. Preferred over `executive_summary_takeaways`,
@@ -883,20 +884,25 @@ chart (use `chart`).
   cards, 5–6→3, 7–8→4)
 **Example:**
 ```python
-b.add("card_grid", title="The turnaround moment: from cavity protector to premium leader",
+# Project status — four workstreams
+b.add("card_grid", title="Two of four workstreams are behind plan",
       cards=[
-        {"title": "Current reality", "icon": "chart",
-         "bullets": ["Market share **8.5%**, trailing YNBY", "Ranked behind YNBY and Darlie"]},
-        {"title": "The problem", "icon": "alert", "tone": "red",
-         "bullets": ["{red|Brand aging} and a middle-income trap"]},
-        {"title": "Strategic shift", "icon": "rocket", "tone": "blue", "bullets": ["..."]},
-        {"title": "2026 North Star", "icon": "star", "tone": "green", "bullets": ["..."]},
+        {"title": "Data migration", "icon": "database", "tone": "red",
+         "bullets": ["{red|3 weeks late}: legacy schema gaps", "Recovery plan due 15 May"]},
+        {"title": "Process redesign", "icon": "settings", "tone": "green",
+         "bullets": ["On track — 6 of 8 processes signed off"]},
+        {"title": "Training", "icon": "users", "tone": "amber",
+         "bullets": ["Trainer hiring 2 weeks behind"]},
+        {"title": "Go-live readiness", "icon": "check", "tone": "green",
+         "bullets": ["Cut-over plan approved"]},
       ],
-      insight="Regaining Top 3 means winning premium functions and new channels")
+      insight="Go-live date holds only if migration recovers by end of May")
 
-b.add("card_grid", title="2026 objectives: back to Top 3",
-      cards=[{"value": "10.0%", "title": "Market share", "tone": "green",
-              "body": "Regain **2.0 pt** to return to Top 3"}, ...])
+# Targets as value cards
+b.add("card_grid", title="2025 targets: grow revenue while cutting cost to serve",
+      cards=[{"value": "+12%", "title": "Revenue", "tone": "green", "body": "Driven by renewals and upsell"},
+             {"value": "-8%", "title": "Cost to serve", "tone": "blue", "body": "Self-service and automation"},
+             {"value": "95%", "title": "On-time delivery", "tone": "navy", "body": "Up from **91%**"}])
 ```
 
 ---
@@ -911,11 +917,12 @@ and icons (S blue, W red, O green, T amber).
 **Optional inputs:** `labels` (4 headers, e.g. Chinese), `insight`, `subtitle`
 **Example:**
 ```python
-b.add("swot", title="Strong foundations, but trust and channel gaps",
-      strengths=["P&G brand equity", "Localized R&D"],
-      weaknesses=["Past advertising penalties", "Slow decision-making"],
-      opportunities=["CSAR 2023 regulatory resilience"],
-      threats=["YNBY dominance in gum health"])
+# Market entry assessment
+b.add("swot", title="Strong product fit, but no local sales channel yet",
+      strengths=["Product rated best-in-class by pilot customers", "Cost base 20% below incumbents"],
+      weaknesses=["No local sales team", "Brand unknown in the region"],
+      opportunities=["Regulation opens public tenders from 2026"],
+      threats=["Two incumbents bundling at discount"])
 ```
 
 ---
@@ -932,7 +939,7 @@ Preferred over the shape-drawn chart templates (`column_*`, `line_chart`,
   `stacked_column_100` | `bar` | `stacked_bar` | `line` | `pie` | `doughnut`
 - `categories: list`, `series: list[{name, values, tone?}]`
 **Optional inputs:**
-- `highlight`: `{"series": "Crest"}` (that series red, others gray — line/bar)
+- `highlight`: `{"series": "Services"}` (that series red, others gray — line/bar)
   or `{"point": 2}` (that bar red — single series)
 - `number_format`: label format, e.g. `'0.0'`, `'0"%"'`, `'#,##0'`
 - `insight: str`, `insight_bullets: list[str]`, `insight_title: str`
@@ -940,14 +947,15 @@ Preferred over the shape-drawn chart templates (`column_*`, `line_chart`,
 - Line charts with 3+ series label only the highlighted / toned series.
 **Example:**
 ```python
-b.add("chart", chart_type="line", title="Crest slipped from 8.8% to 8.0% while LSL overtook it",
-      subtitle="Market share by key players, %", categories=["2022", "2023", "2024", "2025 Est"],
-      series=[{"name": "YNBY", "values": [24.4, 24.6, 25.1, 25.0]},
-              {"name": "LSL", "values": [7.3, 8.0, 8.6, 9.0], "tone": "amber"},
-              {"name": "Crest", "values": [8.8, 8.9, 8.5, 8.0]}],
-      highlight={"series": "Crest"}, number_format="0.0",
-      insight="Local players gain share with clear functional claims",
-      insight_bullets=["Crest **8.8% → 8.0%**", "LSL **7.3% → 9.0%**"])
+# Revenue trend with the focus segment highlighted
+b.add("chart", chart_type="line", title="Services overtook hardware as the largest revenue line",
+      subtitle="Revenue by segment, $M", categories=["2021", "2022", "2023", "2024"],
+      series=[{"name": "Hardware", "values": [520, 505, 480, 455]},
+              {"name": "Software", "values": [210, 240, 275, 300]},
+              {"name": "Services", "values": [380, 430, 470, 515]}],
+      highlight={"series": "Services"}, number_format="#,##0",
+      insight="Services grew 36% while hardware declined every year",
+      insight_bullets=["Services **380 → 515**", "Hardware {red|520 → 455}"])
 ```
 
 ---
@@ -955,28 +963,29 @@ b.add("chart", chart_type="line", title="Crest slipped from 8.8% to 8.0% while L
 ## 45. Tier ladder (`tier_ladder`, alias `price_ladder`)
 
 **Category:** Framework — ascending tiers
-**Use when:** 2–5 tiers that step up: price architecture (base → core →
-halo), portfolio tiers, maturity levels, service levels.
+**Use when:** 2–5 tiers that step up: price or service tiers, capability
+maturity levels, portfolio tiers, escalation levels.
 **Required inputs:**
 - `tiers` (lowest first): `[{name, value?, lines?, label?, details?, tone?}]`
-  - `value`: big text, e.g. `"35-55 RMB"`; `lines`: bold lines (products);
+  - `value`: big text, e.g. `"$45 / user"`; `lines`: bold lines (what's included);
     `label` + `details`: a captioned list (e.g. "Target channel")
 **Optional inputs:** `insight`, `subtitle`
 **Example:**
 ```python
-b.add("tier_ladder", title='Pricing: raise the floor and escape the "Mushy Middle"',
-      tiers=[{"name": "Defensive Base", "value": "12-18 RMB", "lines": ["Legacy 3D White"],
-              "label": "Target channel", "details": ["Pinduoduo"]},
-             {"name": "Functional Core", "value": "35-55 RMB", "lines": ["Heat Sense"],
-              "label": "Target channel", "details": ["Tmall, JD, O2O"]},
-             {"name": "Prestige Halo", "value": "60-120 RMB", "lines": ["Resurfacing White Pump"],
-              "label": "Target channel", "details": ["Douyin, Sephora"]}],
-      insight="Core and halo tiers carry the premium shift")
+# Service tiers (works the same for price tiers, maturity levels, SLAs)
+b.add("tier_ladder", title="Three service tiers move customers up the value curve",
+      tiers=[{"name": "Basic", "value": "$20 / user", "lines": ["Core features"],
+              "label": "Support", "details": ["Email, 48h"]},
+             {"name": "Professional", "value": "$45 / user", "lines": ["Analytics, integrations"],
+              "label": "Support", "details": ["Chat, 8h"]},
+             {"name": "Enterprise", "value": "Custom", "lines": ["SSO, dedicated environment"],
+              "label": "Support", "details": ["Named manager, 1h"]}],
+      insight="Most upgrades happen when customers need integrations")
 ```
 
 ---
 
-## Rich text, tones and icons (templates 41–45)
+## Rich text, tones and icons (templates 41–51)
 
 - `**bold**` → bold; `{red|text}` → bold in that tone (`navy`, `blue`,
   `mid_blue`, `light_blue`, `red`, `green`, `amber`, `gray`). Use red for
@@ -990,14 +999,147 @@ b.add("tier_ladder", title='Pricing: raise the floor and escape the "Mushy Middl
 
 ---
 
+## 46. Card rows (`card_rows`)
+
+**Category:** Layout — horizontal list
+**Use when:** 2–6 items that each need a sentence or two (decisions needed,
+risks and mitigations, principles, recommendations). Icon + header on the
+left, text on the right. Same item shape as `card_grid`; use it to vary the
+layout when several card slides would otherwise follow each other.
+**Required inputs:** `rows: list[{title, body?, bullets?, icon?, tone?, value?}]`
+**Optional inputs:** `subtitle`, `insight`, `label_width` (default 3.4")
+**Example:**
+```python
+b.add("card_rows", title="Four decisions are needed from the steering committee",
+      rows=[{"title": "Approve budget", "icon": "money", "body": "Release **$2.4M** phase-2 budget"},
+            {"title": "Confirm go-live", "icon": "calendar", "body": "Hold **1 Oct** or move to January"},
+            {"title": "Accept risk", "icon": "alert", "tone": "red", "body": "{red|3-week slip} in migration"}])
+```
+
+---
+
+## 47. Waterfall / bridge (`waterfall`, alias `bridge`)
+
+**Category:** Chart — bridge from start to end value (native, editable)
+**Use when:** Explaining a change between two totals by its drivers:
+revenue / EBIT / cost / cash / headcount bridges, budget vs. actual
+variance, price-volume-mix. Increases green, decreases red, totals navy.
+**Required inputs:** `steps: list[{label, value, total?}]` — `total=True` for
+start / subtotal / end bars (drawn from zero); other values are deltas.
+**Optional inputs:** `subtitle` (put the unit here), `number_format`,
+`insight`, `insight_bullets`
+**Rule:** only use deltas the source gives; start + deltas must equal the end total.
+**Example:**
+```python
+b.add("waterfall", title="EBIT fell $14M as freight and wages outweighed price",
+      subtitle="EBIT bridge, $M",
+      steps=[{"label": "2023", "value": 120, "total": True}, {"label": "Price", "value": 18},
+             {"label": "Volume", "value": 6}, {"label": "Freight", "value": -22},
+             {"label": "Wages", "value": -11}, {"label": "FX", "value": -5},
+             {"label": "2024", "value": 106, "total": True}],
+      insight="Cost inflation (-38) more than offset commercial gains (+24)")
+```
+
+---
+
+## 48. Scorecard — target vs. actual (`scorecard`)
+
+**Category:** Performance — KPI status
+**Use when:** 3–8 KPIs with target, actual and a status (QBR, project
+health, OKR review, operating review). Status pill: `green` / `amber` /
+`red` (or "on track" / "at risk" / "off track").
+**Required inputs:** `metrics: list[{metric, target, actual, status, status_label?, comment?}]`
+**Optional inputs:** `columns` (header labels, e.g. Chinese), `subtitle`
+**Rule:** show values as given; don't compute variances the source doesn't state.
+**Example:**
+```python
+b.add("scorecard", title="Four of six KPIs on track; churn and NPS need action",
+      metrics=[{"metric": "Revenue growth", "target": "+10%", "actual": "+12%", "status": "green"},
+               {"metric": "Customer churn", "target": "<5%", "actual": "7.2%", "status": "red",
+                "comment": "Two large accounts lost"}])
+```
+
+---
+
+## 49. Roadmap — workstreams × periods (`roadmap`)
+
+**Category:** Plan — bars on a time grid
+**Use when:** A plan with several workstreams over months / quarters /
+years, with milestones (programme plan, product roadmap, transformation
+plan, implementation plan).
+**Required inputs:**
+- `periods: list[str]` — e.g. `["Q1", "Q2", "Q3", "Q4"]`
+- `lanes: list[{name, items: [{label, start, end, tone?}]}]` — `start` / `end`
+  are 0-based period indices; the bar runs from the start of `start` to the
+  end of `end` (`start=1, end=2` = Q2–Q3); add `.5` to begin mid-period.
+  Overlapping items in one lane stack automatically.
+**Optional inputs:** `milestones: [{label, at, tone?}]` (`at` = position on the
+axis: 2 = boundary between period 2 and 3), `subtitle`, `insight`
+**Example:**
+```python
+b.add("roadmap", title="ERP rollout completes in Q4 with two go-live waves",
+      periods=["Q1", "Q2", "Q3", "Q4"],
+      lanes=[{"name": "Design", "items": [{"label": "Process design", "start": 0, "end": 0}]},
+             {"name": "Build", "items": [{"label": "Configuration", "start": 1, "end": 2},
+                                          {"label": "Data migration", "start": 1, "end": 2, "tone": "amber"}]},
+             {"name": "Deploy", "items": [{"label": "Go-live", "start": 3, "end": 3, "tone": "green"}]}],
+      milestones=[{"label": "Design sign-off", "at": 1}, {"label": "Go-live", "at": 4, "tone": "green"}])
+```
+
+---
+
+## 50. Timeline (`timeline`)
+
+**Category:** Plan — dated events
+**Use when:** 3–7 dated events in sequence (history, launch plan, regulatory
+calendar, deal timeline). Text alternates above and below the line.
+**Required inputs:** `events: list[{date, title, body?, tone?}]`
+**Optional inputs:** `subtitle`, `insight`
+**Example:**
+```python
+b.add("timeline", title="From pilot to national rollout in 18 months",
+      events=[{"date": "Jan 2024", "title": "Pilot", "body": "3 stores"},
+              {"date": "Oct 2024", "title": "Wave 1", "body": "40 stores"},
+              {"date": "Jun 2025", "title": "National", "body": "All 310 stores", "tone": "green"}])
+```
+
+---
+
+## 51. 2×2 matrix (`matrix_2x2`, alias `matrix`)
+
+**Category:** Framework — two dimensions, four quadrants
+**Use when:** Sorting options, initiatives, customers or risks on two
+dimensions (impact × effort, likelihood × severity, attractiveness ×
+ability to win, value × complexity). Quadrants with item lists, and/or
+plotted points.
+**Required inputs:** `x_label`, `y_label`, and `quadrants` (order: top-left,
+top-right, bottom-left, bottom-right: `[{title, items?, tone?}]`) and/or
+`points: [{label, x: 0-1, y: 0-1, tone?}]`
+**Optional inputs:** `x_ends`, `y_ends` (default Low / High), `highlight`
+(quadrant index to tint), `subtitle`, `insight`
+**Example:**
+```python
+b.add("matrix_2x2", title="Automate high-volume, rule-based processes first",
+      x_label="Process volume", y_label="Rule-based",
+      quadrants=[{"title": "Standardise first", "items": ["Vendor onboarding"]},
+                 {"title": "Automate now", "tone": "green", "items": ["Invoice matching", "Expense audit"]},
+                 {"title": "Leave as is", "tone": "gray", "items": ["Board reporting"]},
+                 {"title": "Assist with tools", "items": ["Credit decisions"]}],
+      highlight=1)
+```
+
+---
+
 # Choosing between similar templates
 
 Quick decision rules to avoid common confusions:
 
-- **New decks default to the rich templates (41–45):** structured points →
-  `card_grid`; tables → `data_table`; numbers → `chart`; SWOT → `swot`;
-  tiers → `tier_ladder`. Use templates 1–40 for what these don't cover
-  (matrices, org charts, roadmaps, issue trees, cover/dividers).
+- **New decks default to the rich templates (41–51):** structured points →
+  `card_grid` / `card_rows`; tables → `data_table`; numbers → `chart`;
+  bridges → `waterfall`; KPIs vs. target → `scorecard`; plans → `roadmap`
+  / `timeline`; 2×2 → `matrix_2x2`; SWOT → `swot`; tiers → `tier_ladder`.
+  Use templates 1–40 for what these don't cover (org charts, issue trees,
+  BCG / bubble charts, process flows, funnels, cover / dividers).
 
 - **Deck structure:** First page → `cover_slide`; chapter break → `section_divider`;
   table of contents → `agenda`.

@@ -81,7 +81,10 @@ MIN_READABLE_PT = 12
 
 def warn_small(where: str, title: str, size: int, hint: str):
     """Tell the build log when fitting had to go below readable size."""
-    if size < MIN_READABLE_PT:
+    if size == 0:  # layout warning, not a size
+        print(f"[mckinsey_pptx] WARNING {where} \"{str(title)[:50]}\": {hint}",
+              file=sys.stderr)
+    elif size < MIN_READABLE_PT:
         print(f"[mckinsey_pptx] WARNING {where} \"{str(title)[:50]}\": text fitted "
               f"at {size}pt (< {MIN_READABLE_PT}pt). {hint}", file=sys.stderr)
 
@@ -120,9 +123,15 @@ def add_insight_panel(slide, theme: Theme, x, y, w, h, *, title="Key insight",
     """Tinted side panel: small blue title, bold insight, then bullets."""
     pal = theme.palette
     bullets = list(bullets)
-    add_rect(slide, x, y, w, h, fill=pal.soft_gray)
-    inner_w, inner_h = w - 0.5, h - 0.5
+    inner_w = w - 0.5
     paras = [title] + ([text] if text else []) + bullets
+    # Shrink the panel to its content when the text is short (no empty box).
+    need = text_height_in(paras, inner_w, 14, para_gap_pt=8, indent_in=0.3,
+                          bold=True) + 0.6
+    if need < h * 0.7:
+        h = max(need, min(h, 1.8))
+    add_rect(slide, x, y, w, h, fill=pal.soft_gray)
+    inner_h = h - 0.5
     if not size:
         size = fit_size(paras, inner_w, inner_h, max_size=14, min_size=10,
                         para_gap_pt=8, indent_in=0.3)

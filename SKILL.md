@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds McKinsey-style consulting slide decks as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 45 templates (card grids, data tables, native charts, SWOT, price ladders, executive summary, KPI dashboard, BCG matrix, prioritization matrix, historic+forecast charts, roadmap, Gantt, org chart, issue tree). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint, especially consulting-style business reviews, marketing or strategy plans, or turning an outline document into a deck — e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "build a McKinsey deck from this outline", "맥킨지 슬라이드 만들어줘".
+description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 51 templates (card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, tier ladders, org charts, issue trees). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -76,14 +76,18 @@ the deck's content.
    it to another fact *in the source*, or say what follows from it for the
    decision. You may **not** add anything the source doesn't contain, in
    particular:
-   - new targets, KPIs, rankings or ambitions ("#1 position on Douyin");
-   - new partners or forms of partnership ("official strategic partnership");
-   - new products, formats, pack sizes or features ("multi-pack formats");
-   - new channels, retailers, platforms, campaigns or markets;
-   - new technical, medical or scientific claims ("cellular defense",
-     "clinical trials", "masking dyes");
-   - new audience traits, behaviours or invented colour ("designer handbags",
-     "luxury department stores", "bureaucratic review cycles").
+   - new targets, KPIs, rankings or superlatives ("#1 in the region",
+     "fastest-growing", "market-leading");
+   - new partners, customers, suppliers or deal types ("strategic
+     partnership with …", "exclusive agreement");
+   - new products, features, offers, tiers or pricing ("a premium
+     subscription tier", "bundled packs");
+   - new markets, channels, sites, regions, campaigns or dates;
+   - new ownership, credential or regulatory claims ("proprietary",
+     "patented", "certified", "FDA-cleared", "clinically proven");
+   - new causes, mechanisms or customer / employee behaviour the source
+     doesn't state, and invented colour ("driven by bureaucracy",
+     "loved by Gen Z", "in every boardroom").
    Test for every supporting point: *can I point to the sentence in the
    source it comes from, or is it a plain logical consequence of two source
    facts?* If not, delete it. Two true points beat three padded ones; a card
@@ -110,8 +114,8 @@ the deck's content.
   - *Live presentation* — fewer words per slide, one message per slide.
   - *Pre-read / leave-behind / plan document* — slides must carry the full
     argument on their own: denser, every claim backed on the slide.
-  "给高管看" alone does not mean "cut content"; a marketing or strategy *plan*
-  is a pre-read unless the user says it is a short talk.
+  "给高管看" alone does not mean "cut content"; a plan, review or report built
+  from a document is a pre-read unless the user says it is a short talk.
 - **Slide count:**
   - Source mode: driven by the source — roughly one slide per section, plus
     a cover, an optional agenda / section dividers for 15+ slides, and a
@@ -145,8 +149,9 @@ every section is in the plan; every source table is in the "data used"
 column of some slide. Fix the plan, not the source.
 
 **Action titles.** Each title states the slide's takeaway as a claim
-("Crest is losing share while local players gain"), not a topic
-("Competitive landscape"). Take the claim from the source's own key message;
+("EMEA margin fell 3 pts as freight costs doubled", "Two of five
+workstreams are behind plan"), not a topic ("EMEA results", "Project
+status"). Take the claim from the source's own key message;
 keep the source's section name as the `section_marker` or subtitle if useful.
 
 ## Step 4 — Fill each slide to the right density
@@ -164,53 +169,70 @@ keep the source's section name as the `section_marker` or subtitle if useful.
   templates use `takeaways`.
 - **What a key insight is:** one sentence that *synthesises* — it combines
   two or more data points, or states what the data means for the decision
-  ("Both local players gain share via clear functional claims"). It is
+  ("Growth came entirely from new customers; the base shrank 4%"). It is
   **not** a restatement of the title, of one table row, or of the cards above.
   - Insight panels next to a table or chart: the insight sentence plus at
     most **3** bullets, each comparing or connecting data — never one bullet
     per table row (the table already shows the rows).
   - If you can't write an insight that adds something beyond the title, leave
-    `insight` out. Not every slide needs one; objectives, pricing and
-    canvas slides often don't.
+    `insight` out. Not every slide needs one; objectives, roadmaps and
+    reference tables often don't.
 - **Emphasis:** in the rich templates mark the 1–3 things the reader must
   see per card or panel — key numbers in `**bold**`, problems / declines in
   `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
 - **Icons:** give each `card_grid` card an `icon` that matches its meaning
-  (names in CATALOG, e.g. `alert` for problems, `users` for audiences,
-  `trend_up` for growth, `store` for retail, `phone` for e-commerce,
-  `lab` for science). Use `tone` for meaning, not decoration.
-- Use the source's numbers inside the text ("from 8.8% in 2022 to 8.0% in
-  2025"), not vague words ("declined slightly").
+  (names in CATALOG, e.g. `alert` for risks, `money` for cost, `users` for
+  customers or people, `trend_up` for growth, `clock` for time,
+  `settings` for operations). Use `tone` for meaning, not decoration.
+- Use the source's numbers inside the text ("from 12.4% to 9.8% in two
+  years"), not vague words ("declined slightly").
 
 **Data → template rules:**
 
-Default to the **rich templates** (41–45: `data_table`, `card_grid`,
-`swot`, `chart`, `tier_ladder`); they use larger type, fit text to the
-space, support emphasis and icons, and produce editable tables and charts.
-Use the older templates for what they uniquely cover.
+Default to the **rich templates** (41–51); they use larger type, fit text to
+the space, support emphasis and icons, and produce editable tables and
+charts. Use the older templates (1–40) for what they uniquely cover.
 
-| Source content | Template |
+| Content | Template |
 |---|---|
-| **Numeric** table (numbers by year / by category) | `chart` first: `line` for trends over time, `grouped_column` for two periods by category, `stacked_column` for composition, `bar` for rankings — with `highlight` on "us" and an `insight`. Add the full `data_table` on a following slide only if the chart can't show every value (e.g. > 6 series) |
-| **Text** table (or mixed text and numbers) | `data_table` — all rows and columns, `highlight_rows` for "us", `insight` |
-| Share of a total (one period) | `chart` `doughnut` / `pie`, or `stacked_column_100` for several periods |
-| Executive summary (3–4 blocks) | `card_grid` with icons, `insight` = the bottom line |
-| 2–8 parallel points with detail (weaknesses, channels, personas, moves, pillars, formats) | `card_grid` |
-| Targets / objectives / KPIs | `card_grid` with `value` per card (delta only if the source gives a baseline) |
+| **Numeric** table / series (by period or category) | `chart`: `line` = trend, `column` / `bar` = compare or rank, `grouped_column` = two periods side by side, `stacked_column` = composition, `doughnut` = share of one total. `highlight` the focus item, add an `insight`. Full `data_table` on a following slide only if the chart can't show every value |
+| Change between two totals, explained by drivers (bridge, variance, price-volume-mix) | `waterfall` |
+| KPIs with target vs. actual and status | `scorecard` |
+| Headline numbers / targets (2–4) | `card_grid` with `value` per card |
+| **Text** table, or mixed text and numbers | `data_table` (all rows and columns; `highlight_rows` / `highlight_col`) |
+| Options × criteria, as-is vs. to-be, feature comparison | `data_table`; `comparison_table` only when the source gives ratings |
+| Executive summary (situation / complication / resolution / ask) | `card_grid` (2×2) with `insight` = the bottom line |
+| 2–8 parallel points with detail (drivers, initiatives, risks, segments, workstreams) | `card_grid` |
+| 2–6 items needing a sentence each (decisions, recommendations, risks + mitigation) | `card_rows` |
+| Two-dimension prioritisation (impact × effort, likelihood × severity) | `matrix_2x2`; market-share × growth → `growth_share` |
 | SWOT or any S/W/O/T subset | `swot` |
-| Price tiers, portfolio tiers, maturity levels | `tier_ladder` |
-| Legacy vs. new / as-is vs. to-be | `data_table` (if a table) or `two_column_compare` |
-| Options × features (text) | `data_table` with `highlight_col` — never Harvey balls without source ratings |
-| Prioritization, BCG, issue tree, org chart | `prioritization_matrix`, `growth_share`, `issue_tree`, `org_chart` |
-| Phases / roadmap | `phases_chevron_3`, `phases_table_4`, `waves_timeline_4`, `gantt_timeline` |
-| Single bold statement / divider | `dark_navy_summary`, `section_divider` |
+| Tiers that step up (service / price tiers, maturity levels) | `tier_ladder` |
+| Workstreams over time with milestones | `roadmap`; 3–7 dated events → `timeline`; weekly detail → `gantt_timeline` |
+| Linear process (4–6 steps), funnel, issue tree, org chart | `process_flow_horizontal`, `funnel`, `issue_tree`, `org_chart` |
+| Single bold statement / chapter break | `dark_navy_summary`, `section_divider` |
+
+**Common deck types** — when the user has no outline (brief mode) or asks
+for a type of deck, start from the matching spine and adapt it:
+
+| Deck type | Typical spine |
+|---|---|
+| Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
+| Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `data_table` → recommendation `card_grid` → `roadmap` |
+| Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
+| Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
+| Operations / process improvement | baseline `chart` → root causes `issue_tree` / `card_grid` → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
+| Board / steering update | one-page summary → `scorecard` → decisions needed → appendix tables |
+| Marketing / product plan | market & customer → positioning `data_table` → offer / `tier_ladder` → channels & campaigns `card_grid` → targets & budget `chart` |
+
+These are starting points, not rules: in source mode the source's own
+structure always wins.
 
 **Vary the layouts.** At most **three** slides in a row with the same
-template (a `swot` counts as a `card_grid`). If the source has numeric
+template (a `swot` counts as a `card_grid`; `card_rows` is a different layout). If the source has numeric
 series, the deck must contain at least one `chart`. When a run gets long,
-re-express one slide differently — e.g. objectives as `card_grid` values,
-channel shift as a `chart` of the online share, a persona as a `data_table`
-(aspect × detail). The checker (step 6) flags violations.
+re-express one slide differently — e.g. targets as `card_grid` values, a
+list of drivers as a `chart` of their sizes, a profile or option set as a
+`data_table` (aspect × detail). The checker (step 6) flags violations.
 
 **Layout / overflow rules:**
 - Titles must fit on **one line** (the underline sits right below it):
@@ -273,13 +295,16 @@ The checker reports:
    say so in the report). In brief mode, list them as illustrative.
 2. **Source numbers used** → in source mode aim for ≥ 90%; for every unused
    number either add it or say in the report why it was left out.
-3. **Sparse slides** (text fill < 12%; cover / divider / closing slides are
-   exempt) → add the source's supporting detail, a key insight, or switch
-   to a denser template.
+3. **Thin text slides** (advisory, source mode only; charts, tables,
+   roadmaps and other visual templates are exempt) → add supporting detail
+   *if the source has it*. Never pad a slide with invented points to fill
+   space — a short slide is better than a fabricated one, and live talks are
+   meant to be light.
 4. **Leftover placeholders** → fill or remove.
 5. **Content not in the sources**
-   - a) forbidden claim types (`#1`, `partnership`, `official`, `multi-pack`,
-     `clinical trial` ...) and b) quoted terms that the source doesn't
+   - a) forbidden claim types (superlatives, exclusivity / ownership,
+     credentials, partnerships, commitments — e.g. `#1`, `fastest`,
+     `proprietary`, `certified`, `partnership`) and b) quoted terms that the source doesn't
      contain → delete the point, or trace it to the source sentence.
    - c) vocabulary not in the sources, per slide → re-read every slide with
      many new words and apply rule 5's test to each supporting point. Plain
@@ -292,6 +317,8 @@ The checker reports:
    `[mckinsey_pptx] WARNING ... text fitted at Npt` — treat it the same way.
 8. **Footer source line** → wrong-language label (fix `make_theme(lang=)`)
    or a caption used as a source (use `source=""`).
+9. **Insight restates a table row** → replace with a bullet that compares or
+   connects rows, or drop it.
 
 Fix and rebuild until the checker is clean or every remaining item is
 explained in the report.
@@ -343,8 +370,8 @@ language, the footer attribution and (optionally) brand colours:
 ```python
 from mckinsey_pptx import make_theme
 make_theme()                                         # English, no attribution
-make_theme("Crest China")                            # English, footer "ⓒ 2026 Crest China"
-make_theme("Crest China", brand="103B8C")            # + brand colour (accent= optional)
+make_theme("Acme Corp")                              # English, footer "ⓒ 2026 Acme Corp"
+make_theme("Acme Corp", brand="0B4DA2")              # + brand colour (accent= optional)
 make_theme("某某公司", lang="zh")                     # Chinese slides: 微软雅黑, "资料来源："
 make_theme("某某公司", lang="zh", font="PingFang SC") # 苹方 (or "Source Han Sans SC", "DengXian")
 make_theme("<company>", lang="ko")                   # Korean slides
