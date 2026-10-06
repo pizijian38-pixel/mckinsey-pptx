@@ -74,6 +74,18 @@ def write_rich_paragraph(tf, text, *, size, theme: Theme, color=None,
 
 # ---------- fitting ----------
 
+# ---------- warnings ----------
+
+MIN_READABLE_PT = 12
+
+
+def warn_small(where: str, title: str, size: int, hint: str):
+    """Tell the build log when fitting had to go below readable size."""
+    if size < MIN_READABLE_PT:
+        print(f"[mckinsey_pptx] WARNING {where} \"{str(title)[:50]}\": text fitted "
+              f"at {size}pt (< {MIN_READABLE_PT}pt). {hint}", file=sys.stderr)
+
+
 # ---------- icons ----------
 
 def add_icon(slide, name: Optional[str], x_in, y_in, d_in, theme: Theme,
@@ -111,8 +123,11 @@ def add_insight_panel(slide, theme: Theme, x, y, w, h, *, title="Key insight",
     add_rect(slide, x, y, w, h, fill=pal.soft_gray)
     inner_w, inner_h = w - 0.5, h - 0.5
     paras = [title] + ([text] if text else []) + bullets
-    size = size or fit_size(paras, inner_w, inner_h, max_size=14, min_size=10,
-                            para_gap_pt=8, indent_in=0.3)
+    if not size:
+        size = fit_size(paras, inner_w, inner_h, max_size=14, min_size=10,
+                        para_gap_pt=8, indent_in=0.3)
+        warn_small("insight panel", text or title, size,
+                   "Keep the insight to one sentence + at most 3 short bullets.")
     tb = add_textbox(slide, x + 0.25, y + 0.25, inner_w, inner_h)
     write_paragraph(tb.text_frame, title, size=size, bold=True,
                     color=pal.mid_blue, family=theme.typography.family,

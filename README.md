@@ -282,8 +282,11 @@ cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
 - **数据全部保留**：源文件里的每张表、每个数字都会出现在 PPT 里，用表格或图表呈现。
 - **不编造**：只用源文件里的数字和来源；缺的地方标"[待补充]"并列成清单。
 - **语言跟源文件一致**：英文大纲做英文 PPT，除非你明确说"做成中文版"。
-- **出稿后自检**：用 `scripts/deck_check.py` 把 PPT 和源文件逐项对照，
-  报告"疑似编造的数字""源数据覆盖率""内容过稀的页面""残留占位符"。
+- **只扩写，不新增**：可以解释和串联源文件内容，但不能新增目标、合作方、
+  产品形态、渠道、技术或医学主张。
+- **出稿后自检**：用 `scripts/deck_check.py` 把 PPT 和源文件逐项对照，报告：
+  疑似编造的数字、源数据覆盖率、内容过稀的页面、残留占位符、
+  源文件里没有的主张或引号词、同一版式连续过多或缺少图表、字号过小、页脚来源写法错误。
 
 示例：
 
@@ -628,9 +631,9 @@ axlabs-mckinsey-pptx/
 ### 直接调用 Python API
 
 ```python
-from mckinsey_pptx import PresentationBuilder, make_zh_theme
+from mckinsey_pptx import PresentationBuilder, make_theme
 
-b = PresentationBuilder(theme=make_zh_theme("某某公司"),
+b = PresentationBuilder(theme=make_theme("某某公司", lang="zh"),
                         default_section_marker="Q4 回顾")
 b.add("dark_navy_summary", body="[核心结论]: 未来五年将决定全球领导地位。")
 b.add("executive_summary_takeaways",
@@ -647,12 +650,12 @@ b.save("output/deck.pptx")
 ### 中文主题参数
 
 ```python
-from mckinsey_pptx import make_zh_theme
+from mckinsey_pptx import make_theme
 
-make_zh_theme()                                   # 微软雅黑，无署名
-make_zh_theme("某某公司")                          # 页脚 "ⓒ 2026 某某公司"
-make_zh_theme("某某公司", font="PingFang SC")      # 苹方
-make_zh_theme("某某公司", font="Source Han Sans SC", year=2027)
+make_theme(lang="zh")                                  # 中文页面，微软雅黑，无署名
+make_theme("某某公司", lang="zh")                       # 页脚 "ⓒ 2026 某某公司"
+make_theme("某某公司", lang="zh", font="PingFang SC")   # 苹方
+make_theme("Acme", brand="103B8C")                     # 英文页面 + 品牌色
 ```
 
 `Theme` 上与署名相关的字段：
@@ -664,7 +667,7 @@ make_zh_theme("某某公司", font="Source Han Sans SC", year=2027)
 | `source_label` | 页脚 `source=` 的前缀 | `"Source: "`（中文主题为 `"资料来源："`） |
 | `typography.east_asian_family` | 中日韩字形使用的字体 | `None`（中文主题为 `"Microsoft YaHei"`） |
 
-品牌配色：`make_brand_theme("103B8C", accent="E4002B", base=make_zh_theme("某某公司"))`。
+`lang` 是**幻灯片的语言**，不是你聊天用的语言。旧的 `make_zh_theme` / `make_brand_theme` 仍可使用。
 
 ### 自适应 API（`add_specs`）
 

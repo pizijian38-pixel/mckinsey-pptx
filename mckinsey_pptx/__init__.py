@@ -1,4 +1,4 @@
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 
 def __getattr__(name):
@@ -7,7 +7,7 @@ def __getattr__(name):
         return {"PresentationBuilder": PresentationBuilder,
                 "build_from_spec": build_from_spec}[name]
     if name in ("Theme", "DEFAULT_THEME", "ZH_THEME", "make_zh_theme",
-                "make_brand_theme"):
+                "make_brand_theme", "make_theme"):
         from . import theme
         return getattr(theme, name)
     raise AttributeError(name)

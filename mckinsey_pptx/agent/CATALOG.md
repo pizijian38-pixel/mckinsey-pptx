@@ -837,6 +837,9 @@ Never force a text table into `comparison_table` Harvey balls.
 - `font_size: int` — default 14 for ≤ 7 rows, else 12
 - Cells, `insight` and `insight_bullets` accept `**bold**` spans (this
   template only — other templates print the asterisks literally).
+Numeric tables (numbers by year / category) go to `chart` first; use
+`data_table` for text tables or as the full-detail companion of a chart.
+Insight bullets synthesise (≤ 3) — don't restate each row.
 **Example:**
 ```python
 b.add("data_table",
@@ -981,9 +984,9 @@ b.add("tier_ladder", title='Pricing: raise the floor and escape the "Mushy Middl
   card). Older templates (1–40) print the markup literally.
 - Bundled icons (white on a tone circle): `alert`, `arrow_right`, `arrows`, `atom`, `award`, `bag`, `book`, `bot`, `box`, `building`, `calculator`, `calendar`, `cart`, `chart`, `check`, `clipboard`, `clock`, `coins`, `compass`, `cpu`, `cross`, `crown`, `database`, `dna`, `droplet`, `eye`, `factory`, `file`, `filter`, `flag`, `gem`, `globe`, `handshake`, `heart`, `home`, `info`, `key`, `lab`, `layers`, `leaf`, `lightbulb`, `line_chart`, `link`, `lock`, `mail`, `map`, `medal`, `megaphone`, `message`, `microscope`, `money`, `moon`, `package`, `palette`, `pen`, `percent`, `phone`, `pie`, `pill`, `price`, `puzzle`, `question`, `refresh`, `rocket`, `scale`, `search`, `settings`, `share`, `shield`, `smile`, `sparkles`, `star`, `stethoscope`, `store`, `sun`, `target`, `team`, `thumbs_up`, `tooth`, `trend_down`, `trend_up`, `trophy`, `truck`, `user`, `users`, `video`, `wallet`, `zap`.
   Unknown names fall back to the first letter and print a warning.
-- Brand colours: `make_brand_theme("0B4DA2", accent="E4002B")` re-colours the
-  navy / blue family; combine with Chinese via
-  `make_brand_theme("0B4DA2", base=make_zh_theme("公司"))`.
+- Theme: `make_theme(company, lang="en"|"zh"|"ko"|"ja", brand="0B4DA2",
+  accent=None)` sets slide language (CJK font + footer "Source:" label),
+  attribution and brand colours in one call.
 
 ---
 
@@ -1044,16 +1047,16 @@ These work on every template (don't add them unless useful):
 - `section_marker: str` — small label in the top-right (e.g. "Strategy review").
 - `page_number: int` — auto-numbered if `auto_page_numbers=True` on the builder.
 - `source: str`, `footnote: str` — bottom-left small text.
-- `theme: Theme` — pass a custom theme; for Chinese use `make_zh_theme(...)`, for Korean use `Apple SD Gothic Neo`.
+- `theme: Theme` — build it with `make_theme(company, lang=..., brand=...)`.
 
 # Building a deck
 
 Chinese deck:
 
 ```python
-from mckinsey_pptx import PresentationBuilder, make_zh_theme
+from mckinsey_pptx import PresentationBuilder, make_theme
 
-b = PresentationBuilder(theme=make_zh_theme("某某公司"), default_section_marker="Q4 回顾")
+b = PresentationBuilder(theme=make_theme("某某公司", lang="zh"), default_section_marker="Q4 回顾")
 b.add("dark_navy_summary", body="[核心结论]: ...")
 b.save("output/deck.pptx")
 ```

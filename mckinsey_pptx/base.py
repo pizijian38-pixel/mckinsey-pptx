@@ -236,15 +236,21 @@ def add_section_marker(slide, label, theme: Theme = DEFAULT_THEME):
     layout = theme.layout
     pal = theme.palette
     typo = theme.typography
+    from .metrics import fit_one_line, text_width_pt
     w = layout.section_marker_w_in
     h = layout.section_marker_h_in
+    # One line: shrink to 8pt, then widen the box (up to 3") if still too long.
+    size = fit_one_line(label, w - 0.1, typo.small_size, 8)
+    need = text_width_pt(label, size) / 72 / 0.95 + 0.12
+    if need > w:
+        w = min(3.0, need)
     left = layout.slide_width_in - layout.margin_right_in - w
     top = 0.18
     add_rect(slide, left, top, w, h, fill=None, line=pal.placeholder_gray,
              line_width=0.5)
     tb = add_textbox(slide, left + 0.05, top, w - 0.1, h,
                      anchor=MSO_ANCHOR.MIDDLE)
-    write_paragraph(tb.text_frame, label, size=typo.small_size,
+    write_paragraph(tb.text_frame, label, size=size,
                     color=pal.footer_gray, family=typo.family,
                     align=PP_ALIGN.RIGHT, first=True)
 

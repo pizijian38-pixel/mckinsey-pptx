@@ -13,7 +13,7 @@ from typing import Dict, Optional, Sequence
 from pptx.enum.text import MSO_ANCHOR
 
 from ..base import add_chrome, add_rect, add_textbox, blank_slide, write_paragraph
-from ..design import (add_callout_bar, add_icon, fit_one_line, fit_size, text_height_in,
+from ..design import (warn_small, add_callout_bar, add_icon, fit_one_line, fit_size, text_height_in,
                       tone_rgb, write_rich_paragraph)
 from ..theme import Theme, DEFAULT_THEME
 
@@ -111,6 +111,9 @@ def add_card_grid(prs, *,
                               max_size=18, min_size=10, para_gap_pt=5,
                               indent_in=0.25))
     body_size = min(sizes) if sizes else 14
+    warn_small("card_grid", title, body_size,
+               "Shorten the longest card's bullets, drop the subtitle or the "
+               "insight bar, or split the slide.")
     head_size = min(body_size + 2, 20)
 
     # If the text tops out at the size cap, shrink the cards to their content

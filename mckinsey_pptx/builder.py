@@ -217,6 +217,12 @@ def infer_slide_type(spec: Dict[str, Any]) -> str:
     raise ValueError(f"Cannot infer slide type from spec keys: {list(spec.keys())}")
 
 
+def template_name(fn) -> str:
+    """Canonical template name for a registry callable (aliases collapse)."""
+    canon = {v: k for k, v in reversed(list(_REGISTRY.items()))}
+    return canon.get(fn, fn.__name__)
+
+
 class PresentationBuilder:
     """Compose a full deck of McKinsey-style slides."""
 
@@ -242,7 +248,11 @@ class PresentationBuilder:
                 and "section_marker" not in kwargs):
             kwargs["section_marker"] = self.default_section_marker
         kwargs.setdefault("theme", self.theme)
-        return fn(self.prs, **kwargs)
+        out = fn(self.prs, **kwargs)
+        # Record the template on the slide (<p:cSld name>) so
+        # scripts/deck_check.py can check layout variety.
+        self.prs.slides[-1]._element.cSld.set("name", "mp:" + template_name(fn))
+        return out
 
     # Adaptive add (type optional)
     def add_spec(self, spec: Dict[str, Any]):

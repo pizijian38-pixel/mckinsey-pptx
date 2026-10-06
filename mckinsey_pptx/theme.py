@@ -130,3 +130,37 @@ def make_brand_theme(primary: str, accent: Optional[str] = None, *,
         light_blue=_mix(acc or p, "FFFFFF", 0.6),
     )
     return replace(base, palette=pal)
+
+
+_LANG_DEFAULTS = {
+    # lang: (latin font, east-asian font, source label)
+    "en": ("Arial", None, "Source: "),
+    "zh": ("Arial", "Microsoft YaHei", "资料来源："),
+    "ko": ("Arial", "Malgun Gothic", "출처: "),
+    "ja": ("Arial", "Yu Gothic", "出典："),
+}
+
+
+def make_theme(company: Optional[str] = None, *, lang: str = "en",
+               brand: Optional[str] = None, accent: Optional[str] = None,
+               font: Optional[str] = None, year: int = 2026,
+               base: Theme = DEFAULT_THEME) -> Theme:
+    """One-stop theme: attribution + language + brand colours.
+
+    lang: "en" | "zh" | "ko" | "ja" — sets the CJK font and the footer
+          "Source:" label in the deck's language (use the slide language,
+          not the chat language).
+    company: footer "ⓒ <year> <company>" and the dark-slide brand mark.
+    brand / accent: hex colours, see make_brand_theme.
+    font: override the CJK font (zh: "PingFang SC", "Source Han Sans SC" ...).
+    """
+    latin, cjk, label = _LANG_DEFAULTS.get(lang, _LANG_DEFAULTS["en"])
+    t = replace(
+        base,
+        typography=replace(base.typography, family=latin,
+                           east_asian_family=font or cjk),
+        copyright_text=f"ⓒ {year} {company}" if company else "",
+        brand_text=company or "",
+        source_label=label,
+    )
+    return make_brand_theme(brand, accent, base=t) if brand else t

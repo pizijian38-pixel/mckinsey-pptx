@@ -67,13 +67,27 @@ the deck's content.
    slot needs a number the source doesn't have, leave the slot out, or write
    `[待补充]` / `[TBD]` and list it in your report. A KPI tile without a
    source baseline gets no delta.
-4. **No invented sources.** Pass `source=` only with a source the input
-   actually cites ("Nielsen", "Table 1 of the outline"). Otherwise
-   `source=""`.
-5. **Elaborate in words, not in facts.** You may expand a terse source bullet
-   into a header plus supporting points, explaining what it means, why it
-   matters and what follows from it — using only facts already in the
-   source. You may not add new brands, products, people, numbers or events.
+4. **No invented sources.** `source=` names a publisher or dataset the input
+   actually cites ("Nielsen Retail Audit", "Kantar Household Panel"). A
+   table's caption, a section name or "the outline" is **not** a source —
+   use `source=""` then.
+5. **Elaborate, don't decide.** You may expand a terse source bullet into a
+   header plus supporting points: restate it, explain what it means, connect
+   it to another fact *in the source*, or say what follows from it for the
+   decision. You may **not** add anything the source doesn't contain, in
+   particular:
+   - new targets, KPIs, rankings or ambitions ("#1 position on Douyin");
+   - new partners or forms of partnership ("official strategic partnership");
+   - new products, formats, pack sizes or features ("multi-pack formats");
+   - new channels, retailers, platforms, campaigns or markets;
+   - new technical, medical or scientific claims ("cellular defense",
+     "clinical trials", "masking dyes");
+   - new audience traits, behaviours or invented colour ("designer handbags",
+     "luxury department stores", "bureaucratic review cycles").
+   Test for every supporting point: *can I point to the sentence in the
+   source it comes from, or is it a plain logical consequence of two source
+   facts?* If not, delete it. Two true points beat three padded ones; a card
+   with one source bullet may stay short.
 6. **Language follows the source document**, not the language of the
    user's chat message. An English outline makes an English deck even if
    the user wrote to you in Chinese — unless the user explicitly asks for a
@@ -119,8 +133,12 @@ invent template names or argument shapes.
 Before writing any build code, write `output/<slug>_plan.md` — a table with
 one row per slide:
 
-| # | Source section | Message (action title) | Template | Source data used |
-|---|---|---|---|---|
+| # | Source section | Message (action title) | Template | Source data used | Inferences added |
+|---|---|---|---|---|---|
+
+"Inferences added" lists every supporting point or insight that is a
+consequence you drew rather than a sentence from the source — so the user
+can check them. Keep it short; most rows should say "—".
 
 In source mode, check the plan against the source before continuing:
 every section is in the plan; every source table is in the "data used"
@@ -141,10 +159,19 @@ keep the source's section name as the `section_marker` or subtitle if useful.
   "so what"). A slide with four one-line bullets and nothing else is too
   thin.
 - Every analysis slide (market, competition, segments, channels, SWOT)
-  carries a **key insight**: one sentence on what the data means for the
-  decision. Every rich template has an `insight` slot (`card_grid`, `chart`,
-  `data_table`, `swot`, `tier_ladder`); older chart templates use
-  `takeaways`.
+  carries a **key insight**. Every rich template has an `insight` slot
+  (`card_grid`, `chart`, `data_table`, `swot`, `tier_ladder`); older chart
+  templates use `takeaways`.
+- **What a key insight is:** one sentence that *synthesises* — it combines
+  two or more data points, or states what the data means for the decision
+  ("Both local players gain share via clear functional claims"). It is
+  **not** a restatement of the title, of one table row, or of the cards above.
+  - Insight panels next to a table or chart: the insight sentence plus at
+    most **3** bullets, each comparing or connecting data — never one bullet
+    per table row (the table already shows the rows).
+  - If you can't write an insight that adds something beyond the title, leave
+    `insight` out. Not every slide needs one; objectives, pricing and
+    canvas slides often don't.
 - **Emphasis:** in the rich templates mark the 1–3 things the reader must
   see per card or panel — key numbers in `**bold**`, problems / declines in
   `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
@@ -164,8 +191,8 @@ Use the older templates for what they uniquely cover.
 
 | Source content | Template |
 |---|---|
-| Any table (text or numbers) | `data_table` — all rows and columns, `highlight_rows` for "us", `insight` |
-| Numbers over time / by category | `chart` (`line`, `column`, `grouped_column`, `stacked_column`, `bar`) with `highlight` + `insight`; > 6 series → `data_table` too |
+| **Numeric** table (numbers by year / by category) | `chart` first: `line` for trends over time, `grouped_column` for two periods by category, `stacked_column` for composition, `bar` for rankings — with `highlight` on "us" and an `insight`. Add the full `data_table` on a following slide only if the chart can't show every value (e.g. > 6 series) |
+| **Text** table (or mixed text and numbers) | `data_table` — all rows and columns, `highlight_rows` for "us", `insight` |
 | Share of a total (one period) | `chart` `doughnut` / `pie`, or `stacked_column_100` for several periods |
 | Executive summary (3–4 blocks) | `card_grid` with icons, `insight` = the bottom line |
 | 2–8 parallel points with detail (weaknesses, channels, personas, moves, pillars, formats) | `card_grid` |
@@ -178,13 +205,19 @@ Use the older templates for what they uniquely cover.
 | Phases / roadmap | `phases_chevron_3`, `phases_table_4`, `waves_timeline_4`, `gantt_timeline` |
 | Single bold statement / divider | `dark_navy_summary`, `section_divider` |
 
-Vary the layouts: don't put more than three `card_grid` slides in a row —
-alternate with charts and tables where the source allows.
+**Vary the layouts.** At most **three** slides in a row with the same
+template (a `swot` counts as a `card_grid`). If the source has numeric
+series, the deck must contain at least one `chart`. When a run gets long,
+re-express one slide differently — e.g. objectives as `card_grid` values,
+channel shift as a `chart` of the online share, a persona as a `data_table`
+(aspect × detail). The checker (step 6) flags violations.
 
 **Layout / overflow rules:**
 - Titles must fit on **one line** (the underline sits right below it):
   ≤ ~75 characters English, ≤ ~34 Chinese characters. Put the rest of the
   message in the subtitle or the key insight.
+- `default_section_marker` / `section_marker` is a short label in a small
+  top-right box: ≤ 20 characters ("Reignite 2026", "Market review").
 - `cover_slide`: `client` and `date` are one short line each (e.g. "Group 8",
   "2026"); put a long key message in `subtitle`.
 - In dense templates (`overview_areas`, `phases_table_4`, `waves_timeline_4`,
@@ -212,10 +245,10 @@ alternate with charts and tables where the source allows.
 import sys
 from pathlib import Path
 sys.path.insert(0, r"SKILL_DIR")          # absolute path of this skill folder
-from mckinsey_pptx import PresentationBuilder, DEFAULT_THEME, make_zh_theme
+from mckinsey_pptx import PresentationBuilder, make_theme
 
 OUT = Path(__file__).resolve().parent
-b = PresentationBuilder(theme=DEFAULT_THEME,          # see Theme
+b = PresentationBuilder(theme=make_theme("Acme"),     # see Theme
                         default_section_marker="Marketing plan 2026")
 b.add("cover_slide", title="...", subtitle="...", date="2026")
 b.add("data_table", title="...", columns=[...], rows=[...],
@@ -244,9 +277,24 @@ The checker reports:
    exempt) → add the source's supporting detail, a key insight, or switch
    to a denser template.
 4. **Leftover placeholders** → fill or remove.
+5. **Content not in the sources**
+   - a) forbidden claim types (`#1`, `partnership`, `official`, `multi-pack`,
+     `clinical trial` ...) and b) quoted terms that the source doesn't
+     contain → delete the point, or trace it to the source sentence.
+   - c) vocabulary not in the sources, per slide → re-read every slide with
+     many new words and apply rule 5's test to each supporting point. Plain
+     explanatory words are fine; new facts, features, places or behaviours
+     are not.
+6. **Layout variety** → more than three slides of the same template in a
+   row, or no chart although the source has numbers → re-express a slide.
+7. **Small body text (< 12pt)** → shorten the longest bullets, drop the
+   subtitle or the insight bar, or split the slide. The build also prints
+   `[mckinsey_pptx] WARNING ... text fitted at Npt` — treat it the same way.
+8. **Footer source line** → wrong-language label (fix `make_theme(lang=)`)
+   or a caption used as a source (use `source=""`).
 
 Fix and rebuild until the checker is clean or every remaining item is
-explained.
+explained in the report.
 
 ## Step 7 — Render and inspect (mandatory when the tools exist)
 
@@ -289,45 +337,27 @@ vs categorical) and audience. Common mistakes:
 
 ## Theme
 
-Footer attribution is blank by default (page number only).
-
-**Chinese** — always use the Chinese theme for Chinese slides. Latin
-text/numbers stay Arial; every run gets the East Asian font so Chinese
-renders in 微软雅黑:
+Always build the theme with **`make_theme`** — one call sets the slide
+language, the footer attribution and (optionally) brand colours:
 
 ```python
-from mckinsey_pptx import make_zh_theme
-make_zh_theme("某某公司")                      # footer "ⓒ 2026 某某公司", brand mark "某某公司"
-make_zh_theme()                                 # no company given → no attribution
-make_zh_theme("某某公司", font="PingFang SC")    # user asks for 苹方
-```
-Other fonts on request: 思源黑体 `"Source Han Sans SC"`, 等线 `"DengXian"`.
-
-**Korean:**
-```python
-from dataclasses import replace
-from mckinsey_pptx import DEFAULT_THEME
-KO = replace(DEFAULT_THEME,
-             typography=replace(DEFAULT_THEME.typography,
-                                family="Apple SD Gothic Neo",
-                                east_asian_family="Apple SD Gothic Neo"),
-             copyright_text="ⓒ 2026 <company>", brand_text="<company>")
+from mckinsey_pptx import make_theme
+make_theme()                                         # English, no attribution
+make_theme("Crest China")                            # English, footer "ⓒ 2026 Crest China"
+make_theme("Crest China", brand="103B8C")            # + brand colour (accent= optional)
+make_theme("某某公司", lang="zh")                     # Chinese slides: 微软雅黑, "资料来源："
+make_theme("某某公司", lang="zh", font="PingFang SC") # 苹方 (or "Source Han Sans SC", "DengXian")
+make_theme("<company>", lang="ko")                   # Korean slides
 ```
 
-**English:** `PresentationBuilder()` with the default theme; set attribution
-with `replace(DEFAULT_THEME, copyright_text="ⓒ 2026 Acme", brand_text="Acme")`.
-
-**Brand colours:** when the user names a brand colour or the brand has an
-obvious one, re-colour the deck (semantic red / green / amber stay):
-
-```python
-from mckinsey_pptx import make_brand_theme, make_zh_theme
-theme = make_brand_theme("0B4DA2", accent="E4002B")                 # English deck
-theme = make_brand_theme("0B4DA2", base=make_zh_theme("某某公司"))   # Chinese deck
-```
-
-`copyright_text` = footer on content slides; `brand_text` = bottom-right mark
-on `dark_navy_summary`; `source_label` = prefix of the footer source line.
+- `lang` is the language **of the slides** (step 0, rule 6), never the
+  language the user chats in. Using `lang="zh"` for an English deck puts
+  "资料来源：" in every footer — the checker flags it.
+- `company`: only if the user gave it or it is in their files. Footer
+  attribution is blank otherwise (page number only).
+- `brand`: when the user names a brand colour, or the brand has a well-known
+  one. Semantic red / green / amber stay as they are.
+- Older helpers (`make_zh_theme`, `make_brand_theme`) still work.
 
 ## Iterating
 

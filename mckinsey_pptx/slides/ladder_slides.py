@@ -7,7 +7,7 @@ from typing import Dict, Optional, Sequence
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 
 from ..base import add_chrome, add_rect, add_textbox, blank_slide, write_paragraph
-from ..design import (add_callout_bar, fit_one_line, fit_size, tone_rgb,
+from ..design import (warn_small, add_callout_bar, fit_one_line, fit_size, tone_rgb,
                       write_rich_paragraph)
 from ..theme import Theme, DEFAULT_THEME
 
@@ -68,6 +68,7 @@ def add_tier_ladder(prs, *,
         sizes.append(fit_size(paras or [" "], col_w - 2 * pad, max(avail, 0.4),
                               max_size=15, min_size=10, para_gap_pt=5))
     size = min(sizes) if sizes else 13
+    warn_small("tier_ladder", title, size, "Shorten tier lines / details.")
 
     for i, t in enumerate(tiers):
         h = col_h(i)
