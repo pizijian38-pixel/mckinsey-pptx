@@ -19,6 +19,7 @@ from .slides import (
     executive_summary, assessment_table, bubble_chart, column_chart,
     trends_slides, org_charts, timeline_slides, summary_slide,
     structure_slides, comparison_slides, extra_charts, process_extras,
+    table_slides,
 )
 
 
@@ -66,6 +67,10 @@ _REGISTRY = {
     "gantt_timeline": timeline_slides.add_gantt_timeline,
     "overview_areas": timeline_slides.add_overview_areas,
     "process_activities": timeline_slides.add_process_activities,
+
+    # Generic table
+    "data_table": table_slides.add_data_table,
+    "table": table_slides.add_data_table,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,

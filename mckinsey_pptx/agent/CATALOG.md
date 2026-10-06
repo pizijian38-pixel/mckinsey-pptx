@@ -815,6 +815,45 @@ b.add("kpi_dashboard",
 
 ---
 
+## 41. Data table (`data_table`, alias `table`)
+
+**Category:** Table — any rows × columns
+**Use when:** The source has a table (market share by year, strengths ×
+impact, tier × price × channel, feature × competitor) or any grid of text /
+numbers that no specialised template fits. Native PowerPoint table, so the
+user can edit it. Optional Key-insight panel on the right.
+**Don't use when:** The data is a single series that reads better as a chart
+(use a column/line chart), or cells are ratings (use `comparison_table`).
+Never force a text table into `comparison_table` Harvey balls.
+**Required inputs:**
+- `columns: list[str]` — header labels
+- `rows: list[list[str | number]]` — body rows, same order as the source
+**Optional inputs:**
+- `subtitle: str` — bold label above the table (e.g. "Market share, %")
+- `col_widths: list[float]` — relative column widths (default: first column wider)
+- `highlight_rows: list[int]` — 0-based body rows to tint + bold (e.g. "us")
+- `highlight_col: int` — column to tint (e.g. the proposed option)
+- `insight: str`, `insight_bullets: list[str]`, `insight_title: str` — right panel
+- `font_size: int` — default 14 for ≤ 7 rows, else 12
+- Cells, `insight` and `insight_bullets` accept `**bold**` spans (this
+  template only — other templates print the asterisks literally).
+**Example:**
+```python
+b.add("data_table",
+      title="Crest is losing share while local players gain",
+      subtitle="Market share by key players, %",
+      columns=["Brand", "2022", "2023", "2024", "2025 Est"],
+      rows=[["YNBY", 24.4, 24.6, 25.1, 25.0],
+            ["Crest", 8.8, 8.9, 8.5, 8.0],
+            ["LSL", 7.3, 8.0, 8.6, 9.0]],
+      highlight_rows=[1],
+      insight="Crest fell from 8.8% to 8.0% while **LSL overtook it**",
+      insight_bullets=["YNBY stable at ~25%", "LSL +1.7 pts in four years"],
+      source="Company outline, Table 1")
+```
+
+---
+
 # Choosing between similar templates
 
 Quick decision rules to avoid common confusions:
@@ -838,8 +877,12 @@ Quick decision rules to avoid common confusions:
 - **Matrix / 2D:** two continuous axes → `bubble_chart` /
   `bubble_chart_takeaways`; market-share × growth quadrants → `growth_share`;
   impact × time bands → `prioritization_matrix`.
+- **Any table from the source:** → `data_table` (keep every row and column).
+  More than 4 series over time → `data_table` with `highlight_rows`, or a
+  `line_chart` of the 4 most relevant series *plus* the full table elsewhere.
 - **Comparison of options:** 2–4 options × criteria with Harvey balls →
-  `comparison_table`; one option's +/− → `pros_cons`; before/after or
+  `comparison_table` (only when the source gives ratings); options × text
+  features → `data_table` with `highlight_col`; one option's +/− → `pros_cons`; before/after or
   current/future → `two_column_compare`.
 - **Hierarchy:** drivers of an issue → `issue_tree`; reporting lines →
   `org_chart`; one leader + N teammates → `project_team_circles`; function ×

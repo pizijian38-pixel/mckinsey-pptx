@@ -11,6 +11,7 @@ from . import (
     comparison_slides,
     extra_charts,
     process_extras,
+    table_slides,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "comparison_slides",
     "extra_charts",
     "process_extras",
+    "table_slides",
 ]

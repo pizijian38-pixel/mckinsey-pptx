@@ -1,5 +1,6 @@
 """Common slide primitives: title, underline, footer, section marker, text/shape helpers."""
 from __future__ import annotations
+import re
 from typing import Optional, Iterable
 
 from pptx.util import Inches, Pt, Emu
@@ -78,6 +79,26 @@ def write_paragraph(tf, text, *, size, bold=False, italic=False, color=None,
         _set_bullet(p, color)
     else:
         _clear_bullet(p)
+    return p
+
+
+_BOLD_SPAN = re.compile(r"(\*\*.+?\*\*)")
+
+
+def write_rich(tf, text, *, size, bold=False, color=None, family="Arial",
+               align=PP_ALIGN.LEFT, space_before=None, space_after=None,
+               bullet=False, first=False):
+    """Like write_paragraph, but `**spans**` inside `text` are rendered bold."""
+    p = write_paragraph(tf, "", size=size, bold=bold, color=color,
+                        family=family, align=align, space_before=space_before,
+                        space_after=space_after, bullet=bullet, first=first)
+    p.runs[0]._r.getparent().remove(p.runs[0]._r)
+    for part in _BOLD_SPAN.split(str(text)):
+        if not part:
+            continue
+        is_bold = part.startswith("**") and part.endswith("**")
+        set_run(p.add_run(), part[2:-2] if is_bold else part, size=size,
+                bold=bold or is_bold, color=color, family=family)
     return p
 
 
