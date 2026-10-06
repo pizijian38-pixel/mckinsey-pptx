@@ -15,7 +15,7 @@ def add_dark_navy_summary(prs, *,
                           body: str,
                           eyebrow: Optional[str] = None,
                           page_number: Optional[int] = None,
-                          corner_text: str = "McKinsey & Company",
+                          corner_text: Optional[str] = None,
                           theme: Theme = DEFAULT_THEME,
                           # full-bleed style — these are accepted but unused
                           section_marker=None,
@@ -91,9 +91,11 @@ def add_dark_navy_summary(prs, *,
     cw = 3.5
     tb = add_textbox(slide, layout.slide_width_in - layout.margin_right_in - cw,
                      layout.slide_height_in - 0.4, cw, 0.25)
+    if corner_text is None:
+        corner_text = theme.brand_text
     parts = corner_text
     if page_number is not None:
-        parts = f"{corner_text}    {page_number}"
+        parts = f"{corner_text}    {page_number}" if corner_text else str(page_number)
     write_paragraph(tb.text_frame, parts, size=typo.footer_size,
                     color=pal.placeholder_gray, family=typo.family,
                     align=PP_ALIGN.RIGHT, first=True)

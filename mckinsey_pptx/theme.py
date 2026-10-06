@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from typing import Optional
 from pptx.util import Pt, Inches, Emu
 from pptx.dml.color import RGBColor
 
@@ -33,6 +34,10 @@ class Palette:
 @dataclass(frozen=True)
 class Typography:
     family: str = "Arial"
+    # East Asian (CJK) typeface. PowerPoint renders Chinese/Japanese/Korean
+    # glyphs with the run's <a:ea> font, not the Latin one, so set this for
+    # CJK decks. None leaves the PowerPoint default in place.
+    east_asian_family: Optional[str] = None
     title_size: int = 24
     section_title_size: int = 14
     body_size: int = 12
@@ -64,7 +69,36 @@ class Theme:
     palette: Palette = field(default_factory=Palette)
     typography: Typography = field(default_factory=Typography)
     layout: Layout = field(default_factory=Layout)
-    copyright_text: str = "Copyright of mckinsey-AX"
+    # Bottom-right footer text on every content slide. Empty -> page number only.
+    copyright_text: str = ""
+    # Bottom-right brand mark on full-bleed slides (e.g. dark_navy_summary).
+    brand_text: str = ""
+    # Prefix for the `source=` line in the footer.
+    source_label: str = "Source: "
 
 
 DEFAULT_THEME = Theme()
+
+
+def make_zh_theme(company: Optional[str] = None, *,
+                  font: str = "Microsoft YaHei",
+                  latin_font: str = "Arial",
+                  year: int = 2026,
+                  base: Theme = DEFAULT_THEME) -> Theme:
+    """Simplified-Chinese theme: Latin text in `latin_font`, Chinese glyphs in
+    `font` (微软雅黑 by default; "PingFang SC" is the macOS-native choice).
+
+    `company` fills the footer copyright ("ⓒ 2026 <company>") and the brand
+    mark on full-bleed slides. Leave it None to keep both blank.
+    """
+    return replace(
+        base,
+        typography=replace(base.typography, family=latin_font,
+                           east_asian_family=font),
+        copyright_text=f"ⓒ {year} {company}" if company else "",
+        brand_text=company or "",
+        source_label="资料来源：",
+    )
+
+
+ZH_THEME = make_zh_theme()

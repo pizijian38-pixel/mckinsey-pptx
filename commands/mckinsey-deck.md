@@ -19,5 +19,7 @@ and let the agent:
 5. Render PNG previews if `soffice` / `pdftoppm` are available
 6. Report back with the output path, per-slide rationales, and any caveats
 
-If the brief is in Korean, the agent will respond in Korean and use the
-Apple SD Gothic Neo theme.
+If the brief is in Chinese, the agent will respond in Chinese and use the
+Chinese theme (`make_zh_theme`, 微软雅黑). If the brief is in Korean, it will
+respond in Korean and use the Apple SD Gothic Neo theme. If the brief names a
+company, it goes into the footer attribution.

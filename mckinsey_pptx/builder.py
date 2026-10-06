@@ -13,7 +13,7 @@ If `type` is missing, `infer_slide_type` chooses based on the payload shape.
 from __future__ import annotations
 from typing import Sequence, Optional, Dict, Any, Iterable, List
 
-from .base import init_presentation
+from .base import init_presentation, apply_east_asian_font
 from .theme import Theme, DEFAULT_THEME
 from .slides import (
     executive_summary, assessment_table, bubble_chart, column_chart,
@@ -240,6 +240,9 @@ class PresentationBuilder:
         return [self.add_spec(s) for s in specs]
 
     def save(self, path: str):
+        ea = self.theme.typography.east_asian_family
+        if ea:
+            apply_east_asian_font(self.prs, ea)
         self.prs.save(path)
         return path
 

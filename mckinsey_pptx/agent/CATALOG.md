@@ -77,7 +77,7 @@ as a full-bleed deep navy slide with bold white text.
 - `body: str` — the headline. If it starts with `"[Label]: "`, the label is bolded.
 **Optional inputs:**
 - `eyebrow: str` — small text in the top-right (e.g. report name).
-- `corner_text: str` — bottom-right brand mark, defaults to "McKinsey & Company".
+- `corner_text: str` — bottom-right brand mark, defaults to the theme's `brand_text` (blank by default).
 **Example:**
 ```python
 b.add("dark_navy_summary",
@@ -192,6 +192,8 @@ per item. Top-right cell is highlighted.
 **Optional inputs:**
 - `ox, oy: float (0-1)` — within-cell offset for tighter layout
 - `d: float` — bubble diameter override
+- `description: str` — bold label above the matrix (top-left)
+- `legend: (str, str, str)` — labels for the green / amber / red dots
 **Example:**
 ```python
 b.add("prioritization_matrix",
@@ -861,9 +863,21 @@ These work on every template (don't add them unless useful):
 - `section_marker: str` — small label in the top-right (e.g. "Strategy review").
 - `page_number: int` — auto-numbered if `auto_page_numbers=True` on the builder.
 - `source: str`, `footnote: str` — bottom-left small text.
-- `theme: Theme` — pass a custom theme; for Korean use `Apple SD Gothic Neo`.
+- `theme: Theme` — pass a custom theme; for Chinese use `make_zh_theme(...)`, for Korean use `Apple SD Gothic Neo`.
 
 # Building a deck
+
+Chinese deck:
+
+```python
+from mckinsey_pptx import PresentationBuilder, make_zh_theme
+
+b = PresentationBuilder(theme=make_zh_theme("某某公司"), default_section_marker="Q4 回顾")
+b.add("dark_navy_summary", body="[核心结论]: ...")
+b.save("output/deck.pptx")
+```
+
+Korean / custom theme:
 
 ```python
 from mckinsey_pptx import PresentationBuilder, DEFAULT_THEME
