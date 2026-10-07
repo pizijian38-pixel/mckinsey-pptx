@@ -34,7 +34,7 @@ b.add("executive_summary_paragraph",
       title="Executive summary",
       paragraphs=[
           "Market grew 22% per year and is expected to grow further.",
-          "Korean players are losing 2 pts of share annually due to ...",
+          "Korean players are losing 2 pts of share annually as Chinese rivals cut prices.",
       ])
 ```
 
@@ -132,7 +132,13 @@ Use when there is no separate takeaway pane needed.
 **Example:**
 ```python
 b.add("bubble_chart",
-      bubbles=[{"label": "P1", "x": 200, "y": 1500, "size": 2, "group": "blue_dark"}, ...])
+      title="Premium products sell less volume but at three times the price",
+      source="", footnote="",
+      bubbles=[{"label": "P1", "x": 200, "y": 1500, "size": 2, "group": "blue_dark"},
+               {"label": "P2", "x": 450, "y": 900, "size": 3, "group": "blue_light"},
+               {"label": "P3", "x": 700, "y": 1800, "size": 1.5, "group": "navy"}],
+      x_label="Price", x_unit="$", y_label="Volume", y_unit="units",
+      groups=[("blue_dark", "Core range"), ("blue_light", "Value range"), ("navy", "Premium")])
 ```
 
 ---
@@ -151,8 +157,13 @@ then use `growth_share` or `prioritization_matrix`.
 **Example:**
 ```python
 b.add("bubble_chart_takeaways",
-      bubbles=[...],
-      takeaways=["Cluster of products ...", "Outlier P4 deserves attention"])
+      title="Two low-price products carry most of the volume",
+      source="", footnote="",
+      bubbles=[{"label": "P1", "x": 200, "y": 1500, "size": 2, "group": "blue_dark"},
+               {"label": "P2", "x": 250, "y": 1400, "size": 2, "group": "blue_dark", "label_pos": "left"},
+               {"label": "P3", "x": 600, "y": 700, "size": 1.5, "group": "blue_light"},
+               {"label": "P4", "x": 800, "y": 1900, "size": 3, "group": "navy"}],
+      takeaways=["P1 and P2 cluster at low price and high volume", "Outlier P4 deserves attention"])
 ```
 
 ---
@@ -172,7 +183,12 @@ bands rather than a 2x2 split — use `prioritization_matrix`.
 **Example:**
 ```python
 b.add("growth_share",
-      bus=[{"name": "[BU1]", "x": 12, "y": 37, "size": 4}, ...])
+      title="Batteries are the only question mark worth funding",
+      source="", footnote="",
+      bus=[{"name": "Batteries", "x": 12, "y": 37, "size": 4},
+           {"name": "Inverters", "x": 55, "y": 28, "size": 3},
+           {"name": "Cables", "x": 70, "y": 6, "size": 5},
+           {"name": "Lighting", "x": 20, "y": 4, "size": 2}])
 ```
 
 ---
@@ -197,7 +213,13 @@ per item. Top-right cell is highlighted.
 **Example:**
 ```python
 b.add("prioritization_matrix",
-      items=[{"name": "[A]", "x_band": 2, "y_band": 0, "status": "green"}, ...])
+      title="Pricing delivers high impact soonest; the new plant is late",
+      source="", footnote="",
+      items=[{"name": "Pricing", "x_band": 2, "y_band": 0, "status": "green"},
+             {"name": "Sourcing", "x_band": 1, "y_band": 1, "status": "amber"},
+             {"name": "New plant", "x_band": 2, "y_band": 2, "status": "red"}],
+      description="Initiatives by impact and time to impact",
+      legend=("On track", "At risk", "Delayed"))
 ```
 
 ---
@@ -263,7 +285,12 @@ forecast vs actuals (use `column_historic_forecast`).
 **Example:**
 ```python
 b.add("column_split_growth",
-      categories=[2014,...,2022], values=[1035,...,1535],
+      title="Growth quadrupled after 2018",
+      description="Revenue, $M", takeaway_header="Growth accelerated from 2% to 8%",
+      data_label="Revenue", data_unit="$M",
+      source="", footnote="",
+      categories=[2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022],
+      values=[1035, 1056, 1077, 1099, 1121, 1211, 1308, 1413, 1535],
       split_index=4, growth_pct_first="2%", growth_pct_second="8%")
 ```
 
@@ -283,7 +310,12 @@ bars in bright blue, with two growth-rate arrows (historic and forecast).
 **Example:**
 ```python
 b.add("column_historic_forecast",
-      categories=[2018,...,2026], values=[1035,...,1535],
+      title="Forecast growth doubles to 6% a year",
+      description="Revenue, $M", takeaway_header="Forecast assumes new capacity from 2023",
+      data_label="Revenue", data_unit="$M",
+      source="", footnote="",
+      categories=[2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
+      values=[1035, 1066, 1098, 1131, 1165, 1235, 1309, 1388, 1471],
       forecast_from_index=5,
       historic_growth="3%", forecast_growth="6%")
 ```
@@ -306,13 +338,16 @@ than three (use `overview_areas`), or want examples per theme
 **Example:**
 ```python
 b.add("three_trends_icons",
+      title="Three trends reshape the market",
+      subtitle="What changes for suppliers by 2030", section_marker="Market trends",
+      source="", footnote="",
       trends=[
           {"label": "Tech disruption", "icon": "🤖",
-           "bullets": ["AI accelerating", "..."]},
+           "bullets": ["AI accelerating", "Automation lowers unit cost"]},
           {"label": "Regulation",     "icon": "⚖",
-           "bullets": ["IRA", "CRMA", "..."]},
+           "bullets": ["IRA", "CRMA", "Local-content rules"]},
           {"label": "Customer shift", "icon": "👥",
-           "bullets": ["..."]},
+           "bullets": ["Buyers expect subscription pricing"]},
       ])
 ```
 
@@ -330,7 +365,14 @@ or `three_trends_numbered`.
 **Example:**
 ```python
 b.add("three_trends_table",
-      trends=[{"name":"Trend 1","description":["..."], "examples":["Example A"]}, ...])
+      title="Three trends reshape the battery value chain",
+      section_marker="Market trends", source="", footnote="",
+      trends=[{"name": "Electrification", "description": ["EV share passes 20% of sales"],
+               "examples": ["OEM battery plants"]},
+              {"name": "Localisation", "description": ["Supply chains move closer to demand"],
+               "examples": ["US cathode plants"]},
+              {"name": "Recycling", "description": ["Regulation sets recycled-content quotas"],
+               "examples": ["EU Battery Regulation"]}])
 ```
 
 ---
@@ -360,7 +402,14 @@ Best for compact "5 strategic areas" slides.
 **Example:**
 ```python
 b.add("five_key_areas",
-      areas=[{"name":"[Area 1]", "description":"..."}, ...])
+      title="Five areas deliver the margin target",
+      subtitle="Margin programme 2026", section_marker="Programme",
+      source="", footnote="",
+      areas=[{"name": "Pricing", "description": "Raise list prices 3% on core range"},
+             {"name": "Sourcing", "description": "Dual-source the top 10 components"},
+             {"name": "Footprint", "description": "Close two sub-scale plants"},
+             {"name": "Sales", "description": "Shift key accounts to direct coverage"},
+             {"name": "Digital", "description": "Launch online ordering for SMEs"}])
 ```
 
 ---
@@ -379,7 +428,14 @@ and bullet content. Optional bottom-left blue call-out tag.
 **Example:**
 ```python
 b.add("overview_areas",
-      areas=[{"name":"[A1]", "bullets":["b1", "b2"]}, ...],
+      title="Five workstreams, pricing first",
+      subtitle="Margin programme 2026", section_marker="Programme",
+      source="", footnote="",
+      areas=[{"name": "Pricing", "bullets": ["List price +3%", "Discount guardrails"]},
+             {"name": "Sourcing", "bullets": ["Dual-source top 10", "Index-linked contracts"]},
+             {"name": "Footprint", "bullets": ["Close two plants"]},
+             {"name": "Sales", "bullets": ["Direct key accounts"]},
+             {"name": "Digital", "bullets": ["SME web shop"]}],
       call_out="Short-term focus")
 ```
 
@@ -1774,7 +1830,7 @@ Chinese deck:
 from mckinsey_pptx import PresentationBuilder, make_theme
 
 b = PresentationBuilder(theme=make_theme("某某公司", lang="zh"), default_section_marker="Q4 回顾")
-b.add("dark_navy_summary", body="[核心结论]: ...")
+b.add("dark_navy_summary", body="核心结论：营收增长 14%，但两项 KPI 延误，需要追加投资")
 b.save("output/deck.pptx")
 ```
 
@@ -1792,9 +1848,12 @@ KO_THEME = replace(
 )
 
 b = PresentationBuilder(theme=KO_THEME, default_section_marker="Q4 review")
-b.add("dark_navy_summary", body="[Bottom line]: ...")
-b.add("executive_summary_takeaways", sections=[...])
-b.add("column_historic_forecast", categories=[...], values=[...], forecast_from_index=5,
+b.add("dark_navy_summary", body="Bottom line: revenue grew 14%, but two KPIs are late")
+b.add("executive_summary_takeaways",
+      sections=[{"takeaway": "Revenue grew 14%", "bullets": ["Driven by new customers"]},
+                {"takeaway": "Two KPIs are late", "bullets": ["Recovery plan due in May"]}])
+b.add("column_historic_forecast", categories=[2021, 2022, 2023, 2024, 2025, 2026],
+      values=[100, 103, 106, 109, 116, 123], forecast_from_index=4,
       historic_growth="3%", forecast_growth="6%")
 b.save("output/deck.pptx")
 ```

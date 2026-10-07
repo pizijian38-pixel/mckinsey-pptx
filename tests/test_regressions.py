@@ -98,6 +98,39 @@ def test_docx_source_entities_are_decoded():
         assert " amp" not in report, report
 
 
+def test_catalog_examples_run():
+    """Every python example in CATALOG.md must run as written: the agent copies
+    them. Old examples used `...` as a placeholder (TypeError / AttributeError)."""
+    import os
+    import re
+    cat = (ROOT / "mckinsey_pptx" / "agent" / "CATALOG.md").read_text(encoding="utf8")
+    blocks = re.findall(r"```python\n(.*?)```", cat, re.S)
+    assert len(blocks) > 50, len(blocks)
+    bad = [blk[:80] for blk in blocks if re.search(r"(?<![.\w])\.\.\.(?![.\w])", blk)]
+    assert not bad, f"'...' placeholder in catalog examples: {bad}"
+    failures = []
+    with tempfile.TemporaryDirectory() as d:
+        cwd = os.getcwd()
+        os.chdir(d)
+        os.makedirs("output", exist_ok=True)
+        try:
+            shared = PresentationBuilder(nav=["Overview", "Situation"])
+            for blk in blocks:
+                if "b.add(" not in blk and "make_theme(" not in blk:
+                    continue
+                env = {"b": shared}
+                try:
+                    with contextlib.redirect_stderr(io.StringIO()), \
+                            contextlib.redirect_stdout(io.StringIO()):
+                        exec(blk, env)
+                except Exception as e:  # noqa: BLE001
+                    failures.append(f"{type(e).__name__}: {e} :: {blk[:70]!r}")
+            shared.save("output/all_examples.pptx")
+        finally:
+            os.chdir(cwd)
+    assert not failures, "\n".join(failures)
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
