@@ -22,6 +22,7 @@ Exit code 1 if anything is flagged, so a build script can gate on it.
 from __future__ import annotations
 
 import argparse
+import html
 import re
 import sys
 import zipfile
@@ -53,7 +54,9 @@ def _docx_text(path: Path) -> str:
     with zipfile.ZipFile(path) as z:
         xml = z.read("word/document.xml").decode("utf8")
     xml = re.sub(r"</w:p>|</w:tc>", "\n", xml)
-    return re.sub(r"<[^>]+>", "", xml)
+    # &quot; &amp; &lt; ... are XML entities: decode them, or quoted terms and
+    # words next to "&" never match the deck text
+    return html.unescape(re.sub(r"<[^>]+>", "", xml))
 
 
 def _pptx_text(path: Path) -> str:

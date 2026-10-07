@@ -52,6 +52,12 @@ def draw_cards(slide, theme: Theme, left, top, width, height, cards: Sequence[Di
 
     icon_d = 0.5 if card_h >= 1.6 else 0.38
     has_icons = any(c.get("icon") for c in cards)
+    if (has_icons and not has_values and card_h < 1.6 and card_w >= 2.8 * card_h):
+        # Wide, short cards (e.g. a stack in a composite column): stacking icon,
+        # header and body leaves the body ~0.2" and forces 10pt. Put the icon
+        # on the left and header + body in one text column instead.
+        return _draw_side_cards(slide, theme, left, top, card_w, card_h, cols, cards,
+                                where=where, max_size=max_size)
     header_w = card_w - 2 * PAD - ((icon_d + 0.15) if has_icons and not has_values else 0)
     value_h = min(1.3, card_h * 0.36) if has_values else 0
 
@@ -150,6 +156,48 @@ def draw_cards(slide, theme: Theme, left, top, width, height, cards: Sequence[Di
                                      theme=theme, bullet=True, first=first,
                                      space_before=0 if first else 5)
                 first = False
+
+
+def _draw_side_cards(slide, theme: Theme, left, top, card_w, card_h, cols, cards, *,
+                     where: str = "", max_size: int = 18):
+    """Wide-card layout: icon at the left, header + body beside it."""
+    pal = theme.palette
+    pad = 0.16
+    icon_d = min(0.46, card_h - 2 * pad)
+    tx_off = pad + icon_d + 0.18
+    tw = card_w - tx_off - pad
+    avail = card_h - 2 * pad
+
+    def need(c, size):
+        h = text_height_in([c.get("title", "")], tw, size + 1, bold=True) + 0.06
+        paras = _card_paras(c)
+        if paras:
+            h += text_height_in(paras, tw, size, para_gap_pt=4, indent_in=0.25)
+        return h
+
+    size = 10
+    for s in range(max_size, 9, -1):
+        if all(need(c, s) <= avail for c in cards):
+            size = s
+            break
+    warn_small("card_grid", where, size,
+               "Shorten the longest card's text, drop the insight bar, or split the slide.")
+    for i, c in enumerate(cards):
+        r, k = divmod(i, cols)
+        x = left + k * (card_w + GAP)
+        y = top + r * (card_h + GAP)
+        add_rect(slide, x, y, card_w, card_h, fill=pal.soft_gray)
+        add_icon(slide, c.get("icon"), x + pad, y + (card_h - icon_d) / 2, icon_d, theme,
+                 c.get("tone"))
+        tb = add_textbox(slide, x + tx_off, y + pad, tw, avail, anchor=MSO_ANCHOR.MIDDLE)
+        write_rich_paragraph(tb.text_frame, c.get("title", ""), size=size + 1, theme=theme,
+                             color=pal.text_dark, bold=True, first=True, space_after=3)
+        if c.get("body"):
+            write_rich_paragraph(tb.text_frame, c["body"], size=size, theme=theme,
+                                 space_after=2)
+        for b_ in c.get("bullets", []):
+            write_rich_paragraph(tb.text_frame, b_, size=size, theme=theme, bullet=True,
+                                 space_before=3)
 
 
 def add_card_grid(prs, *,

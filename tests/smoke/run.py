@@ -87,6 +87,12 @@ def main() -> int:
                            capture_output=True)
             pdf = deck.with_suffix(".pdf")
             subprocess.run(["pdftoppm", "-jpeg", "-r", "50", str(pdf), str(out / deck.stem)], capture_output=True)
+    # regression tests for bugs found on real decks
+    reg = subprocess.run([sys.executable, str(ROOT / "tests" / "test_regressions.py")],
+                         capture_output=True, text=True)
+    for line in reg.stdout.splitlines():
+        print(line)
+    failed += reg.returncode != 0
     print(f"\n{'all passed' if not failed else f'{failed} scenario(s) failed'}")
     return 1 if failed else 0
 
