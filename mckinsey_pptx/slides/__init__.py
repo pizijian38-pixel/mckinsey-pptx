@@ -20,6 +20,7 @@ from . import (
     matrix_slides,
     composite_slides,
     evaluation_slides,
+    logic_slides,
 )
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "matrix_slides",
     "composite_slides",
     "evaluation_slides",
+    "logic_slides",
 ]

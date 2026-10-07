@@ -298,7 +298,7 @@ _FAMILY = {"swot": "card_grid"}
 _TEXT_TEMPLATES = {"card_grid", "card_rows", "swot", "executive_summary",
                    "executive_summary_takeaways", "three_trends_icons",
                    "three_trends_table", "three_trends_numbered", "five_key_areas",
-                   "overview_areas", "two_column_compare", "pros_cons"}
+                   "overview_areas", "two_column_compare", "pros_cons", "logic_grid"}
 
 
 def _record(slide):

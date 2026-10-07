@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 55 templates and a composite layout (option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
+description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 58 templates and a composite layout (logic grids, strategic-challenge and storyline summary pages, option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases and strategic analyses, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -201,6 +201,17 @@ keep the source's section name as the `section_marker` or subtitle if useful.
   - If you can't write an insight that adds something beyond the title, leave
     `insight` out. Not every slide needs one; objectives, roadmaps and
     reference tables often don't.
+- **Analysis pages end in a "so what" for the company.** On situation pages
+  (market, customers, competitors, PEST, five forces) the last column, band
+  or bar says what the facts mean for the company — "Competitive
+  advantage", "Impact on <company>", "Implication". In `logic_grid` that is
+  the conclusion column; in `composite` the last column or a `callout`.
+  The conclusion must follow from the cells beside it; in source mode,
+  list it under "Inferences added" unless the source states it.
+- **Show the chain, not just the list.** When a slide argues A → B → C
+  (cause → effect → consequence), use a layout whose columns or rows carry
+  that order (`logic_grid`, `composite` with `connectors`,
+  `strategic_challenge`), with column headers that name each step.
 - **Name the bottom bar for its role** (`insight_label=`): "Bottom line",
   "Verdict", "Implication", "What it takes", "Preliminary view", "Decision
   needed" — not "Key insight" on every slide.
@@ -216,7 +227,7 @@ keep the source's section name as the `section_marker` or subtitle if useful.
 
 **Data → template rules:**
 
-Default to the **rich templates** (41–55); they use larger type, fit text to
+Default to the **rich templates** (41–58); they use larger type, fit text to
 the space, support emphasis and icons, and produce editable tables and
 charts. Use the older templates (1–40) for what they uniquely cover. When no
 single template fits a slide that mixes content types, build it with
@@ -227,6 +238,11 @@ single template fits a slide that mixes content types, build it with
 | **Scores, ratings or rankings against criteria** (weighted evaluation, vendor / option scoring, maturity ratings) | **table, not a chart**: `decision_matrix` (weights, raw + weighted scores, best per row, totals); plain ratings → `data_table` |
 | 2–4 options / products / scenarios side by side, each with the same facets (summary, key numbers, pros, cons) | `option_profiles` |
 | One option / initiative / product in depth (how it works + numbers + why / how / pros / cons + verdict) | `composite` (e.g. `flow` + `kv_table` on the left, 2×2 `cards` on the right) |
+| One option read as an argument (current situation → strategy → advantages → disadvantages; how it addresses the challenge → key activities → impact) | `composite` with `headers` + `connectors=True`; `callout` for the value proposition, `pyramid` for positioning, `sections` for feasibility / pros / cons |
+| **A chain of reasoning per topic** (external situation → capability → advantage; customer need → what we do → performance → implication; factor → impact → implication) | `logic_grid` — one row per topic, conclusion column on the right |
+| PEST, five forces, stakeholders — each with "current situation" and "influence on us" | `logic_grid(direction="down")` |
+| Drivers that converge on one threat and the key question of the deck | `strategic_challenge` |
+| Executive summary of a problem-solving deck (situation → question → options → recommendation) | `storyline_summary` |
 | Risks with severity, owner or mitigation | `risk_register` |
 | **Numeric** series where *magnitude or trend* is the point (by period or category) | `chart`: `line` = trend, `column` / `bar` = compare or rank, `grouped_column` = two periods side by side, `stacked_column` = composition, `doughnut` = share of one total. `highlight` the focus item, add an `insight`. Full `data_table` on a following slide only if the chart can't show every value |
 | Change between two totals, explained by drivers (bridge, variance, price-volume-mix) | `waterfall` |
@@ -252,6 +268,7 @@ for a type of deck, start from the matching spine and adapt it:
 | Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
 | Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `data_table` → recommendation `card_grid` → `roadmap` |
 | Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
+| Strategy case / strategic analysis (MBA case, strategy review) | `storyline_summary` → situation `logic_grid`s (firm: need → what we do → performance → implication; competition and new entrants) + `chart`s → `strategic_challenge` → `option_profiles` → one `composite` per option (`headers` + `connectors`, `group="options"`) → `decision_matrix` → recommendation (`card_grid` rationale + `roadmap`) → `risk_register` → appendix: `logic_grid(direction="down")` for PEST / five forces, `swot`, `data_table` |
 | Options evaluation / proposal | `option_profiles` (neutral) → one `composite` per option (`group="options"`, same regions each time) → `decision_matrix` → recommendation `card_grid` + `roadmap` → `risk_register` |
 | Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
 | Operations / process improvement | baseline `chart` → root causes `issue_tree` / `card_grid` → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |

@@ -1158,6 +1158,26 @@ dedicated template when one fits the whole slide.
 - `bullets` — `items: [str]`; `text` — `text: str | [str]`
 - `chart` — same arguments as `chart` (`chart_type`, `categories`, `series`, ...)
 - `table` — same arguments as `data_table` (`columns`, `rows`, ...)
+- `callout` — `text`, `label?`, `style: outline | solid | tint`, `tone?` — one
+  highlighted statement: the new value proposition, the option in one line,
+  the "so what" at the end of a column
+- `pyramid` — `levels: [str]` (top first), `highlight: int | [int]`,
+  `note?: str` (beside the highlighted level) or `notes: [str per level]` —
+  positioning (high / mid / low end), hierarchy, maturity
+- `sections` — `sections: [{title, bullets? | body?, tone?, mark?}]`,
+  `boxed: bool` — stacked titled groups with a ruled header, e.g.
+  Feasibility / Pros / Cons; `tone: green` → ✓ marks, `red` → ✗ marks
+  (`mark: check | cross | dot` to override). Use `boxed: False` inside a `panel`.
+
+**Logic options** — for pages that read left to right as one argument
+("current situation → strategy → advantages → disadvantages", "how it
+addresses the challenge → key activities → impact"):
+- `headers: [str | {text, dark}]` — one header per column (`None` skips one)
+- `header_style: chevron | rule | bar` (default: chevron with connectors, else rule)
+- `connectors: bool` — an arrow between consecutive columns
+- region `"arrow": True` — a down arrow from the region above it in the same
+  column (bullets → arrow → `callout` with the resulting value proposition)
+- region `"panel": True | "outline" | "tint"` — gray, outlined or tinted backdrop
 **Example:**
 ```python
 b.add("composite", kicker="Option 2 | Outsource to a 3PL partner", group="options",
@@ -1177,6 +1197,35 @@ b.add("composite", kicker="Option 2 | Outsource to a 3PL partner", group="option
             {"title": "Advantages", "icon": "check", "tone": "green", "bullets": ["$0 capex"]},
             {"title": "Disadvantages", "icon": "cross", "tone": "red", "bullets": ["+$0.40 per order"]}]}]],
       widths=[1.15, 1], insight="Worth it only below 2M orders a year", insight_label="Verdict")
+
+# Option deep dive that reads as one argument (same frame for every option)
+b.add("composite", kicker="Option 1 | Sell through retail channels", group="options",
+      title="Option 1: sell the house brands through retail as a second growth engine",
+      headers=["How it addresses the challenge", "Key activities", "Advantages and risks"],
+      connectors=True,
+      columns=[
+        [{"type": "bullets", "items": ["**Bigger market:** category worth $15B, growing fast",
+                                       "**Builds the brand** outside our own stores"]},
+         {"type": "callout", "arrow": True, "label": "New value proposition",
+          "text": "Our signature products, wherever customers shop"}],
+        [{"type": "sections", "sections": [
+            {"title": "Product", "bullets": ["Two current SKUs already suit retail"]},
+            {"title": "Sales", "bullets": ["Channel team for e-commerce and convenience stores"]}]}],
+        [{"type": "pros_cons", "pros": ["Second growth engine", "Scale lowers unit cost"],
+          "cons": ["Competes with category leaders", "May cannibalise store visits"]}]])
+
+# Positioning + evaluation (option elaboration | option evaluation)
+b.add("composite", title="Option A: keep the mid-market position and partner for the new segment",
+      headers=[{"text": "Option elaboration", "dark": True}, {"text": "Option evaluation", "dark": True}],
+      header_style="bar",
+      columns=[
+        [{"type": "pyramid", "levels": ["High-end", "Mid-end", "Low-end"], "highlight": 1,
+          "note": "**Keep the current position:** premium, not luxury", "panel": "tint", "weight": 1.6},
+         {"type": "callout", "label": "New segment", "text": "**Partner** with a specialist brand"}],
+        {"type": "sections", "sections": [
+            {"title": "Feasibility", "mark": "dot", "bullets": ["Already strong in the mid-market"]},
+            {"title": "Pros", "tone": "green", "bullets": ["Closes the product gap fast"]},
+            {"title": "Cons", "tone": "red", "bullets": ["Depends on the partner"]}]}])
 ```
 
 ---
@@ -1252,6 +1301,125 @@ b.add("risk_register", title="Two high risks need owners before approval",
 
 ---
 
+## 56. Logic grid (`logic_grid`, alias `logic_chain`)
+
+**Category:** Logic — one page that carries an argument
+**Use when:** Each topic must be followed through the same chain of
+reasoning, and the reader should see the chain: *external situation →
+our capability → competitive advantage*; *what customers need → what we do
+→ performance → implication*; *factor → impact on performance →
+relevance → implication*; *new entrant → definition → their advantages →
+challenge for us*. Situation-analysis pages of a strategy case, KSF
+analyses, competitor moves and their impact.
+`direction="down"` turns it into one column per topic with stages as bands
+from top to bottom — the frame for PEST, five forces or stakeholder pages
+("Political | Economic" × "Current situation → Influence on us").
+**Don't use when:** The cells hold numbers to compare (use `data_table` or
+`chart`); items are parallel with no chain between columns (use
+`card_grid` / `card_rows`); one column needs a chart or a different kind of
+content (use `composite` with `headers` + `connectors`).
+**Required inputs:**
+- `stages: [str]` — headers of the analysis columns, in reasoning order
+- `rows: [{label?, icon?, cells: [cell per stage], conclusion?, tone?}]`;
+  `cell` = str | [bullets] | `{body?, bullets?}`; `conclusion` = str or [bullets]
+**Optional inputs:** `conclusion_label` (header of the dark conclusion column,
+default "Implication"), `conclusion` (one shared conclusion for all rows
+instead of one per row), `direction: across | down`, `arrows: conclusion |
+all | none`, `header_style: chevron | rule | bar`, `label_header`,
+`subtitle`, `insight`, `insight_label`
+**Rules:** 2–4 rows (across) or 2–4 topics (down), 2–3 stages, 2–3 short
+bullets per cell. The conclusion is a consequence the reader can check
+against the cells on its left — not a new fact.
+**Example:**
+```python
+b.add("logic_grid", kicker="Situation analysis (1/3)",
+      title="Local fit and efficient production made us the market leader",
+      stages=["External situation", "Our capability"],
+      conclusion_label="Competitive advantage",
+      rows=[{"label": "Local market", "icon": "globe",
+             "cells": [["Regional differences make a local database a KSF",
+                        "Price sensitivity is higher than in Europe"],
+                       ["Largest regional database", "Price well below the global leader"]],
+             "conclusion": "Products fit local customers better"},
+            {"label": "Production", "icon": "factory",
+             "cells": [["Scale is needed to carry R&D cost"],
+                       ["**41%** of market volume", "Plants **20%** more efficient than average"]],
+             "conclusion": "High standard at lower cost"}])
+
+# PEST / five forces: topics as columns, stages top -> bottom
+b.add("logic_grid", direction="down", title="High barriers protect us; substitutes still matter",
+      stages=["Current situation"], conclusion_label="Influence on us",
+      rows=[{"label": "New entrants", "cells": [["Barrier built on users and qualified partners"]],
+             "conclusion": "High barrier from the community"},
+            {"label": "Substitutes", "cells": [["Offline channels still used by **42%** of users"]],
+             "conclusion": "Integrate offline channels"}])
+```
+
+---
+
+## 57. Strategic challenge (`strategic_challenge`, alias `key_question`)
+
+**Category:** Logic — convergence on the key question
+**Use when:** The page that turns the situation analysis into the one
+question the rest of the deck answers: 2–4 drivers (competitors, new
+entrants, customers, regulation …) → what each could do to us → the one
+threat they converge on → "How can <company> <goal>, given <constraint>?".
+Optionally 2–4 `directions` that lead into the options.
+**Don't use when:** There is no single question (use `card_grid`), or the
+drivers need data to be believed (show the data first, then this page).
+**Required inputs:** `drivers: [{title?, body, result?}]`, `question: str`
+**Optional inputs:** `threat`, `labels` (3 column headers, default
+"Drivers", "Possible results", "Key threat"), `question_label` (default
+"Strategic challenge"), `directions: [str | {title, body}]`,
+`directions_label`, `subtitle`
+**Example:**
+```python
+b.add("strategic_challenge", kicker="Strategic challenge",
+      title="The challenge is to defend the customer base on two fronts",
+      drivers=[{"title": "Competitors", "body": "The global leader is investing heavily",
+                "result": "We may fall behind when the duopoly breaks"},
+               {"title": "New entrants", "body": "Device giants and online players may enter",
+                "result": "We may lose on production scale and channels"}],
+      threat="We may lose our advantages and, with them, future customers",
+      question="How can we secure our lead in customers, given competition in existing and new markets?")
+```
+
+---
+
+## 58. Storyline summary (`storyline_summary`)
+
+**Category:** Logic — executive summary as a story
+**Use when:** The executive summary of a problem-solving deck (strategy
+case, options paper, board proposal): situation blocks → the key question
+→ the options considered, with the chosen one(s) marked → the
+recommendation. The reader gets the whole argument on one page, in the
+order the deck tells it.
+**Don't use when:** The deck has no question / options structure (use
+`card_grid` 2×2 or `executive_summary_takeaways`). Do not mark a
+recommended option the source doesn't recommend.
+**Required inputs:** `situation: [{title, body? | bullets?}]` (1–4),
+`question: str`
+**Optional inputs:** `options: [str | {name?, body, badge?}]` (names default
+to "Option A, B …"; `option_prefix` to change), `recommended: int | [int]`,
+`badge` (default "Recommended"; per option via `badge`),
+`recommendation: str | [str] | [{title, body}]`, `labels` (left band labels;
+`None` hides them), `subtitle`
+**Example:**
+```python
+b.add("storyline_summary", title="Partner now in the kids' segment, build our own line later",
+      situation=[{"title": "Key success factors", "bullets": ["Local fit", "Efficient production"]},
+                 {"title": "Current challenges", "bullets": ["Leader expanding", "New entrants"]}],
+      question="How can we secure our lead in customers, given competition in existing and new markets?",
+      options=[{"body": "Keep position; partner for kids' products", "badge": "Top priority"},
+               {"body": "Keep position; build a kids' line in-house", "badge": "2nd priority"},
+               {"body": "Move to the low end via direct-to-consumer"}],
+      recommended=[0, 1],
+      recommendation=[{"title": "Short term", "body": "partner to close the gap fast"},
+                      {"title": "Long term", "body": "build our own line on our database"}])
+```
+
+---
+
 ## Slide-level options (every template)
 
 - `kicker="Option 1 | Leasing model"` — small letter-spaced label above the
@@ -1269,6 +1437,13 @@ b.add("risk_register", title="Two high risks need owners before approval",
 
 Quick decision rules to avoid common confusions:
 
+- **A chain of reasoning on one page** (situation → capability → advantage;
+  need → what we do → performance → implication; factor → impact →
+  implication) → `logic_grid`; PEST / five forces with "influence on us" →
+  `logic_grid(direction="down")`; drivers converging on the key question →
+  `strategic_challenge`; executive summary of a problem-solving deck →
+  `storyline_summary`; one option / column needs a chart, pyramid or
+  callout inside the chain → `composite` with `headers` + `connectors`.
 - **Options / evaluation decks:** options overview → `option_profiles`;
   one slide per option → `composite` (same regions for every option,
   `group="options"`); scoring → `decision_matrix`; risks → `risk_register`.

@@ -21,7 +21,7 @@ from .slides import (
     structure_slides, comparison_slides, extra_charts, process_extras,
     table_slides, card_slides, native_chart, ladder_slides,
     finance_slides, plan_slides, matrix_slides, composite_slides,
-    evaluation_slides,
+    evaluation_slides, logic_slides,
 )
 
 
@@ -95,6 +95,13 @@ _REGISTRY = {
     "scoring_matrix": evaluation_slides.add_decision_matrix,
     "risk_register": evaluation_slides.add_risk_register,
     "price_ladder": ladder_slides.add_tier_ladder,
+
+    # Logic (one page that carries an argument)
+    "logic_grid": logic_slides.add_logic_grid,
+    "logic_chain": logic_slides.add_logic_grid,
+    "strategic_challenge": logic_slides.add_strategic_challenge,
+    "key_question": logic_slides.add_strategic_challenge,
+    "storyline_summary": logic_slides.add_storyline_summary,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,

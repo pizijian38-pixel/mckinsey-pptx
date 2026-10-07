@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "axlabs-mckinsey-pptx",
-      "description": "McKinsey-style PPTX generator — 55 slide templates + subagent that picks the right one. Built by AX Labs.",
+      "description": "McKinsey-style PPTX generator — 58 slide templates + subagent that picks the right one. Built by AX Labs.",
       "version": "0.7.0",
       "source": "./",
       "category": "productivity",
