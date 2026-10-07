@@ -1420,6 +1420,243 @@ b.add("storyline_summary", title="Partner now in the kids' segment, build our ow
 
 ---
 
+## 59. Cycle / flywheel (`cycle`, alias `flywheel`)
+
+**Category:** Logic — causal loop
+**Use when:** Effects reinforce each other. *Branch* form (default): one
+driver → 2–4 parallel chains of effects → one result, with a dashed
+feedback arrow back to the driver (virtuous cycle, flywheel, network
+effect). *Loop* form (`steps`): 3–6 steps around a centre — a vicious
+cycle (`kind="vicious"`, red) or a self-reinforcing loop.
+**Don't use when:** The steps happen once, in order (use
+`process_flow_horizontal`); causes of one problem (use `issue_tree`).
+**Required inputs:** branch: `start`, `paths: [[step, step], ...]`, `end`
+(each str or `{title, body?, icon?}`); loop: `steps: [str | {title, body?}]`
+**Optional inputs:** `connector_label` ("leads to …"), `feedback: bool | str`,
+`center` (loop), `kind: virtuous | vicious`, `conclusion` (bold statement
+under the diagram), `subtitle`, `insight`
+**Example:**
+```python
+b.add("cycle", title="A larger customer base starts a virtuous cycle",
+      start="Customer base grows",
+      paths=[[{"title": "Fixed cost spread", "icon": "coins"}, "Cost leadership"],
+             [{"title": "Database grows", "icon": "database"}, "Better treatment results"]],
+      end="Sales grow", connector_label="leads to …",
+      conclusion="Losing the customer base stops the flywheel")
+b.add("cycle", title="Falling bookings may set off a revenue spiral", kind="vicious",
+      steps=["Revenue depends on ad fees", "Fewer customers book", "Advertisers cut budgets"],
+      center="Revenue decline")
+```
+
+---
+
+## 60. Risk heat map (`risk_heatmap`, alias `risk_matrix`)
+
+**Category:** Evaluation — risks on probability × impact
+**Use when:** 3–7 risks the reader should see by severity, with one
+mitigation each: graded zones (low → high), numbered risk boxes placed by
+probability and impact, mitigations listed by number on the right.
+**Don't use when:** Risks need owners and several mitigations each (use
+`risk_register`); no probability / impact view exists in the source.
+**Required inputs:** `risks: [{title, probability, impact, mitigation?}]` —
+levels as `"low" | "medium" | "high"`, 1–3, 1–5 or 0–1
+**Optional inputs:** `zones: blue | traffic`, `x_label`, `y_label`, `ends`,
+`map_label`, `mitigation_label`, `insight`
+**Example:**
+```python
+b.add("risk_heatmap", title="Two of five risks need action before launch",
+      risks=[{"title": "Leader cuts prices", "probability": "high", "impact": "high",
+              "mitigation": "Strengthen cost leadership"},
+             {"title": "New segment grows slowly", "probability": "medium", "impact": "medium",
+              "mitigation": "Educate customers"},
+             {"title": "Cost overrun", "probability": "low", "impact": "medium",
+              "mitigation": "Phase the investment"}])
+```
+
+---
+
+## 61. Positioning scale (`positioning_scale`)
+
+**Category:** Comparison — players on indicator scales
+**Use when:** 2–5 competitors compared on 3–8 indicators, where the point
+is *relative position* (who is ahead on what): one row per indicator with
+what it means, and a low → high scale with each player's marker. Optional
+left panel with each player's keywords.
+**Don't use when:** Exact values matter (use `data_table` or `chart`);
+two dimensions at once (use `matrix_2x2` / `bubble_chart`).
+**Required inputs:** `players: [str | {name, short?, tone?, keywords?}]`,
+`indicators: [{name, note?, ends?, values: [num per player]}]`
+**Optional inputs:** `focus` (index of the player to emphasise, default 0),
+`scale: (min, max)`, `ends` (default Low / High), `headers`, `insight`
+**Rule:** values are positions from the source (ranks, ratings, figures);
+do not invent precise positions — if the source only says "higher" /
+"lower", use a coarse 1–3 scale and say so in the report.
+**Example:**
+```python
+b.add("positioning_scale", title="We lead on reach but trail on product range",
+      players=[{"name": "Us", "short": "U"}, {"name": "Leader", "short": "L"},
+               {"name": "Challenger", "short": "C"}],
+      indicators=[{"name": "Case volume", "note": "More cases, richer data", "values": [3, 3, 1]},
+                  {"name": "Product range", "note": "More choice for customers", "values": [2, 3, 1]}],
+      scale=(1, 3))
+```
+
+---
+
+## 62. Value chain (`value_chain`)
+
+**Category:** Framework — industry stages
+**Use when:** The industry's stages left → right with what matters in each
+(key success factors, activities, margins) and which stages the company
+performs (`own`). `value` adds a second line per stage (cost, price,
+margin); `groups` add ruled headers spanning stages (Suppliers / Buyers).
+**Don't use when:** A company's own process steps (use `process_flow`).
+**Required inputs:** `stages: [{name, value?, bullets? | body?, own?}]` (3–6)
+**Optional inputs:** `own_label` (legend, e.g. "Activities of Acme"),
+`groups: [{label, start, end}]`, `body_label` ("Key success factors"), `insight`
+**Example:**
+```python
+b.add("value_chain", title="We own the two stages that hold most of the margin",
+      stages=[{"name": "Materials", "value": "~$150", "bullets": ["Low differentiation"]},
+              {"name": "Design", "own": True, "bullets": ["AI treatment planning"]},
+              {"name": "Production", "own": True, "bullets": ["3D printing at scale"]},
+              {"name": "Clinics", "value": "$5,000+", "bullets": ["Doctors steer decisions"]}],
+      own_label="Activities of Acme", body_label="Key success factors")
+```
+
+---
+
+## 63. Phase grid (`phase_grid`, alias `implementation_grid`)
+
+**Category:** Plan — rows × stages
+**Use when:** An implementation plan where each stage has the same kinds of
+content (partners, actions, resources, goals) — rows are those kinds,
+columns are stages or years. Cells can `span` several stages (a bar across
+years); a row can carry a full-width `kpi` band; `side` adds a risk
+mitigation panel on the right.
+**Don't use when:** Workstreams with dated bars and milestones (use
+`roadmap`); only 3 phases with a few bullets (use `phases` in `composite`).
+**Required inputs:** `stages: [str]`, `rows: [{label, cells: [cell per stage], kpi?}]`;
+cell = None | str | [bullets] | `{body? | bullets?, span?, tone?}`
+(`tone: navy` draws a solid bar)
+**Optional inputs:** `side: {title, items: [str | {title, bullets}]}`,
+`timeline: bool` (dots on a line under the stage headers), `insight`
+**Example:**
+```python
+b.add("phase_grid", title="Enter channels one by one, online first",
+      stages=["Stage 1: E-commerce", "Stage 2: Convenience stores"],
+      rows=[{"label": "Partners", "cells": ["Tmall, JD", "7-11, FamilyMart"]},
+            {"label": "Actions", "cells": [["Open official stores"], ["Negotiate shelf space"]],
+             "kpi": "RMB 2M revenue in year 1"}],
+      side={"title": "Risk mitigation", "items": [{"title": "Avoid head-on competition",
+                                                   "bullets": ["Start where giants are weak"]}]})
+```
+
+---
+
+## 64. Evaluation matrix (`evaluation_matrix`)
+
+**Category:** Evaluation — scores *with reasons*
+**Use when:** Options compared on criteria where each cell needs its
+reason, or ratings are shown as dots, or criteria are grouped into
+dimensions (attractiveness / feasibility / risk), or a banner states why
+these criteria (`basis`: "Profit = users × pay rate × ARPU − cost − risk").
+Works text-only (`rating=None`) for a qualitative (+) / (−) comparison.
+**Don't use when:** Plain weighted numbers with no reasons (use
+`decision_matrix`); feature check-marks (use `data_table`).
+**Required inputs:** `options: [str | {name, badge?}]`,
+`criteria: [{name, group?, weight?, scores?, notes?}]`
+**Optional inputs:** `rating: number | dots | None`, `scale_max` (dots),
+`total: auto | weighted | average | sum | None | [given]`, `total_label`,
+`basis`, `recommended: int | [int]`, `scale_note`, `decimals`, `insight`
+**Rules:** totals are computed from the scores (and weights) — report them as
+derived. Weights must add up to 100% (the build warns otherwise). Mark
+`recommended` / badges only when the source recommends.
+**Example:**
+```python
+b.add("evaluation_matrix", title="Option A scores highest on profitability",
+      basis="Why these criteria: Profit = Users × Pay rate × ARPU − Cost",
+      options=["A: new user groups", "B: own clinics"],
+      criteria=[{"name": "User base", "scores": [2, 1], "notes": ["Adds men and 40+ users", "No direct impact"]},
+                {"name": "ARPU", "scores": [3, 3], "notes": ["Higher-priced services", "Service fees"]},
+                {"name": "Cost", "scores": [-2, -3], "notes": ["Marketing to new groups", "Clinics need capex"]}],
+      total="sum", recommended=0)
+b.add("evaluation_matrix", title="Partner first, build second", rating="dots", scale_max=4,
+      options=[{"name": "Partner", "badge": "Top priority"}, {"name": "Build", "badge": "2nd priority"}],
+      criteria=[{"name": "Speed", "scores": [4, 1]}, {"name": "Control", "scores": [2, 4]}])
+```
+
+---
+
+## 65. Business model canvas (`business_model_canvas`, alias `bmc`)
+
+**Category:** Framework — nine blocks
+**Use when:** Describing how a company creates, delivers and captures value
+(strategy-case backup, company profile, new-business design).
+**Required inputs:** any of `partners`, `activities`, `resources`,
+`value_proposition`, `relationships`, `channels`, `segments`, `costs`,
+`revenue` (each str | [bullets] | {body?, bullets?}; empty blocks show "—")
+**Optional inputs:** `labels: {key: name}` (rename a block), `highlight`
+(blocks with a dark header, default the value proposition), `insight`
+**Example:**
+```python
+b.add("business_model_canvas", title="We earn from advertisers by giving users trusted information",
+      partners=["Clinics", "Product brands"], activities=["Content moderation"],
+      resources=["User community"], value_proposition=["Free, transparent reviews"],
+      relationships=["Community"], channels=["Own app"], segments=["Young urban users"],
+      costs=["Marketing **64%**"], revenue=["Advertising", "Booking fees"])
+```
+
+---
+
+## 66. Strategic triangle (`strategic_triangle`)
+
+**Category:** Framework — internal alignment
+**Use when:** Internal analysis: goals in the centre; resources &
+capabilities, business & value proposition, and structure / systems /
+people around it — do they support the goal?
+**Required inputs:** `goal: str` (one short sentence)
+**Optional inputs:** `resources`, `business` (str | [str] | {title, bullets} |
+[{title, bullets}]), `structure: [{title, bullets}]` (1–3 blocks along the
+bottom), `labels` (3 corner names), `goal_label`, `insight`
+**Example:**
+```python
+b.add("strategic_triangle", title="Resources, offer and organisation all serve one goal",
+      goal="Lead the online market and expand into adjacent services",
+      resources=[{"title": "Users", "bullets": ["Largest community"]}],
+      business=[{"title": "For customers", "bullets": ["Reviews and booking"]}],
+      structure=[{"title": "Systems", "bullets": ["App, website"]},
+                 {"title": "People", "bullets": ["Advisory board"]}])
+```
+
+---
+
+## 67. Hub and spoke (`hub_spoke`)
+
+**Category:** Framework — one concept and its parts
+**Use when:** One concept made of 3–6 elements (disciplines, capabilities,
+stakeholders, ecosystem partners), each with a one-line note, and what
+that means (`side` panel).
+**Don't use when:** The parts are steps in order (use `process_flow`) or
+need detail (use `card_grid`).
+**Required inputs:** `center: str`, `spokes: [{title, note?, icon?}]` (3–6)
+**Optional inputs:** `direction: in | out`, `heading` (caption above the
+diagram), `side: {title, bullets}`, `insight`
+**Rules:** spoke titles 1–2 words, notes one short line.
+**Example:**
+```python
+b.add("hub_spoke", title="The product combines four disciplines; the weakest sets the limit",
+      center="Clear aligners",
+      spokes=[{"title": "Dentistry", "note": "Basis of treatment"},
+              {"title": "Materials", "note": "Gentle, constant force"},
+              {"title": "Software", "note": "AI treatment planning"},
+              {"title": "Manufacturing", "note": "3D printing at scale"}],
+      side={"title": "Partnerships and talent are critical",
+            "bullets": ["A gap in one discipline weakens the whole product"]})
+```
+
+---
+
 ## Slide-level options (every template)
 
 - `kicker="Option 1 | Leasing model"` — small letter-spaced label above the
@@ -1430,6 +1667,14 @@ b.add("storyline_summary", title="Partner now in the kids' segment, build our ow
   one series instead of flagging it as repetition.
 - `insight_label=` — name the bottom bar for its role ("Verdict",
   "Bottom line", "Preliminary view", "Decision needed").
+- `nav="Situation"` — section breadcrumb at the top-left (current chapter
+  highlighted). Set the chapters once: `PresentationBuilder(..., nav=["Overview",
+  "Situation", "Challenge", "Options", "Recommendation"])`. It takes the
+  kicker's place: on a slide with `nav`, the kicker is not drawn.
+- **Language of default labels:** build the theme with `make_theme(lang="zh" |
+  "ko" | "ja")` and every default label ("Key insight", "Weighted total",
+  "Recommended", "Strengths", "Low / High" …) is drawn in that language.
+  Labels you pass yourself are drawn as given.
 
 ---
 
@@ -1444,6 +1689,23 @@ Quick decision rules to avoid common confusions:
   `strategic_challenge`; executive summary of a problem-solving deck →
   `storyline_summary`; one option / column needs a chart, pyramid or
   callout inside the chain → `composite` with `headers` + `connectors`.
+- **Causal loops:** effects that reinforce each other → `cycle` (branch
+  flywheel, or `steps` loop; `kind="vicious"` for a downward spiral).
+- **Risks:** probability × impact picture with one mitigation each →
+  `risk_heatmap`; owners and several mitigations per risk → `risk_register`.
+- **Competitors on indicators:** relative position per indicator →
+  `positioning_scale`; exact values → `data_table` / `chart`.
+- **Industry structure:** stages with KSFs or margins, own stages marked →
+  `value_chain`.
+- **Implementation:** same row types per stage (partners / actions /
+  resources), spans across years, KPI bands, risk panel → `phase_grid`;
+  workstreams with dated bars and milestones → `roadmap`.
+- **Scoring:** reasons per cell, dots, dimension groups or a formula banner
+  → `evaluation_matrix`; plain weighted numbers → `decision_matrix`.
+- **Frameworks:** business model → `business_model_canvas`; internal
+  alignment around a goal → `strategic_triangle`; one concept and its parts →
+  `hub_spoke`; PEST / five forces → `logic_grid(direction="down")`;
+  SWOT → `swot`.
 - **Options / evaluation decks:** options overview → `option_profiles`;
   one slide per option → `composite` (same regions for every option,
   `group="options"`); scoring → `decision_matrix`; risks → `risk_register`.

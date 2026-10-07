@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 58 templates and a composite layout (logic grids, strategic-challenge and storyline summary pages, option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases and strategic analyses, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
+description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 67 templates and a composite layout (logic grids, strategic-challenge and storyline summary pages, flywheels, risk heat maps, positioning scales, value chains, phase grids, evaluation matrices, business model canvas, strategic triangle, hub-and-spoke, option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases and strategic analyses, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -227,7 +227,7 @@ keep the source's section name as the `section_marker` or subtitle if useful.
 
 **Data → template rules:**
 
-Default to the **rich templates** (41–58); they use larger type, fit text to
+Default to the **rich templates** (41–67); they use larger type, fit text to
 the space, support emphasis and icons, and produce editable tables and
 charts. Use the older templates (1–40) for what they uniquely cover. When no
 single template fits a slide that mixes content types, build it with
@@ -243,6 +243,13 @@ single template fits a slide that mixes content types, build it with
 | PEST, five forces, stakeholders — each with "current situation" and "influence on us" | `logic_grid(direction="down")` |
 | Drivers that converge on one threat and the key question of the deck | `strategic_challenge` |
 | Executive summary of a problem-solving deck (situation → question → options → recommendation) | `storyline_summary` |
+| Effects that reinforce each other (flywheel, network effect, vicious cycle) | `cycle` (branch with feedback, or `steps` loop; `kind="vicious"`) |
+| Risks by probability × impact, one mitigation each | `risk_heatmap`; owners / several mitigations → `risk_register` |
+| Competitors' relative position on several indicators | `positioning_scale` |
+| Industry stages with KSFs, margins or prices; own stages marked | `value_chain` |
+| Implementation plan: same row types per stage (partners / actions / resources), bars across years, KPI rows, risk panel | `phase_grid` |
+| Option scores **with a reason per cell**, dot ratings, criteria grouped by dimension, or a "why these criteria" formula | `evaluation_matrix` (text-only with `rating=None`) |
+| Business model | `business_model_canvas`; internal alignment around a goal → `strategic_triangle`; one concept and its 3–6 parts → `hub_spoke` |
 | Risks with severity, owner or mitigation | `risk_register` |
 | **Numeric** series where *magnitude or trend* is the point (by period or category) | `chart`: `line` = trend, `column` / `bar` = compare or rank, `grouped_column` = two periods side by side, `stacked_column` = composition, `doughnut` = share of one total. `highlight` the focus item, add an `insight`. Full `data_table` on a following slide only if the chart can't show every value |
 | Change between two totals, explained by drivers (bridge, variance, price-volume-mix) | `waterfall` |
@@ -268,7 +275,7 @@ for a type of deck, start from the matching spine and adapt it:
 | Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
 | Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `data_table` → recommendation `card_grid` → `roadmap` |
 | Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
-| Strategy case / strategic analysis (MBA case, strategy review) | `storyline_summary` → situation `logic_grid`s (firm: need → what we do → performance → implication; competition and new entrants) + `chart`s → `strategic_challenge` → `option_profiles` → one `composite` per option (`headers` + `connectors`, `group="options"`) → `decision_matrix` → recommendation (`card_grid` rationale + `roadmap`) → `risk_register` → appendix: `logic_grid(direction="down")` for PEST / five forces, `swot`, `data_table` |
+| Strategy case / strategic analysis (MBA case, strategy review) | `storyline_summary` → situation `logic_grid`s (firm: need → what we do → performance → implication; competition and new entrants) + `chart`s, `cycle` for a flywheel → `strategic_challenge` → `option_profiles` → one `composite` per option (`headers` + `connectors`, `group="options"`) → `evaluation_matrix` (or `decision_matrix`) → recommendation (`card_grid` rationale + `phase_grid` / `roadmap`) → `risk_heatmap` / `risk_register` → appendix: `business_model_canvas`, `strategic_triangle`, `logic_grid(direction="down")` for PEST / five forces, `positioning_scale`, `value_chain`, `swot`, `data_table`. With 10+ slides, set chapters with `PresentationBuilder(nav=[...])` and pass `nav=` per slide |
 | Options evaluation / proposal | `option_profiles` (neutral) → one `composite` per option (`group="options"`, same regions each time) → `decision_matrix` → recommendation `card_grid` + `roadmap` → `risk_register` |
 | Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
 | Operations / process improvement | baseline `chart` → root causes `issue_tree` / `card_grid` → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
@@ -386,6 +393,9 @@ The checker reports:
    or a caption used as a source (use `source=""`).
 9. **Insight restates a table row** → replace with a bullet that compares or
    connects rows, or drop it.
+10. **English default labels in a CJK deck** → build the theme with
+   `make_theme(lang=...)` (the slide language) so default labels are
+   translated, or pass the labels yourself.
 
 Fix and rebuild until the checker is clean or every remaining item is
 explained in the report.
@@ -447,6 +457,12 @@ make_theme("<company>", lang="ko")                   # Korean slides
 - `lang` is the language **of the slides** (step 0, rule 6), never the
   language the user chats in. Using `lang="zh"` for an English deck puts
   "资料来源：" in every footer — the checker flags it.
+- `lang` also translates every **default label** templates draw ("Key
+  insight" → "关键洞察", "Weighted total" → "加权总分", "Recommended" →
+  "推荐", SWOT headers, "Low / High", "Option A" → "方案 A" …). A Chinese
+  deck built without `lang="zh"` shows English labels — never do that.
+  Labels you pass explicitly are drawn as given, so write them in the slide
+  language.
 - `company`: only if the user gave it or it is in their files. Footer
   attribution is blank otherwise (page number only).
 - `brand`: when the user names a brand colour, or the brand has a well-known

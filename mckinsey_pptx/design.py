@@ -19,6 +19,7 @@ from pptx.util import Inches
 
 from .base import add_oval, add_rect, add_textbox, set_run, write_paragraph
 from .theme import Theme
+from .labels import loc
 from .metrics import (TONE_NAMES, fit_one_line, fit_size, plain,  # noqa: F401
                       text_height_in, text_width_pt)
 
@@ -125,6 +126,7 @@ def add_insight_panel(slide, theme: Theme, x, y, w, h, *, title="Key insight",
                       size: Optional[int] = None):
     """Tinted side panel: small blue title, bold insight, then bullets."""
     pal = theme.palette
+    title = loc(theme, title)
     bullets = list(bullets)
     inner_w = w - 0.5
     paras = [title] + ([text] if text else []) + bullets
@@ -236,6 +238,7 @@ def add_stage_banners(slide, theme: Theme, spans, y, h, *, style="chevron",
     from pptx.util import Emu, Pt
     from .base import add_line
     pal, typo = theme.palette, theme.typography
+    spans = [(s[0], s[1], loc(theme, s[2]), *s[3:]) for s in spans]
     if size is None:
         size = 14
         for (x, w, label, _k, *_c) in spans:
@@ -297,6 +300,7 @@ def add_callout_bar(slide, theme: Theme, x, y, w, h, text, *,
                     tone="blue", size: Optional[int] = None):
     """Full-width highlighted takeaway bar with an icon on the left."""
     pal = theme.palette
+    label = loc(theme, label)
     add_rect(slide, x, y, w, h, fill=pal.soft_gray)
     d = min(0.42, h - 0.16)
     add_icon(slide, icon, x + 0.18, y + (h - d) / 2, d, theme, tone)

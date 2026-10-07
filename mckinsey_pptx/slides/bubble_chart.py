@@ -17,6 +17,7 @@ from ..base import (
     write_paragraph,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..labels import loc
 from .column_chart import _draw_takeaway, _draw_description_header
 
 
@@ -447,12 +448,12 @@ def add_prioritization_matrix(prs, *,
                      anchor=MSO_ANCHOR.MIDDLE)
     p = tb.text_frame.paragraphs[0]
     p.alignment = PP_ALIGN.RIGHT
-    r = p.add_run(); r.text = "TIME TO IMPACT"
+    r = p.add_run(); r.text = loc(theme, "TIME TO IMPACT")
     r.font.size = Pt(typo.section_title_size); r.font.bold = True
     r.font.color.rgb = pal.text_dark; r.font.name = typo.family
 
     tb = add_textbox(slide, pl + pw - 2.5, pt + ph + 0.30, 2.5, 0.3)
-    write_paragraph(tb.text_frame, "LEVEL OF IMPACT",
+    write_paragraph(tb.text_frame, loc(theme, "LEVEL OF IMPACT"),
                     size=typo.section_title_size, bold=True,
                     color=pal.text_dark, family=typo.family,
                     align=PP_ALIGN.RIGHT, first=True)

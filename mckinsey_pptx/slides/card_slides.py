@@ -220,6 +220,8 @@ def add_swot(prs, *,
              theme: Theme = DEFAULT_THEME):
     """Classic 2x2 SWOT. Empty quadrants are kept (shown as "—") so the frame
     stays readable; pass only what the source supports."""
+    from ..labels import loc
+    labels = [loc(theme, t) for t in labels]
     quads = [
         (labels[0], strengths, "shield", "blue"),
         (labels[1], weaknesses, "alert", "red"),

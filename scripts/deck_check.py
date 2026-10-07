@@ -13,6 +13,8 @@ Reports, per deck:
   7. Body text below 12pt                                  -> hard to read
   8. Footer "Source:" misuse (caption as source, wrong language)
   9. Insight bullets that only restate a table row
+ 10. English default labels ("Key insight", "Weighted total" ...) left in a
+     Chinese / Korean / Japanese deck
 
 Sources: .docx .pptx .md .txt .csv .xlsx (.pdf if pypdf is installed).
 Exit code 1 if anything is flagged, so a build script can gate on it.
@@ -27,6 +29,13 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.util import Emu
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+try:
+    from mckinsey_pptx.labels import english_defaults
+    _EN_LABELS = {t.lower() for t in english_defaults()}
+except Exception:  # checker still runs without the package
+    _EN_LABELS = set()
 
 # A leading sign counts only when it isn't a range dash ("30%-50%", "12-18").
 NUM = re.compile(r"(?:(?<![\w.%)])[-+−])?(?<![\w.])\d{1,3}(?:,\d{3})+(?:\.\d+)?"
@@ -356,6 +365,22 @@ def body_size(slide, slide_h) -> float | None:
 _SRC_LABEL = re.compile(r"^(Source:|Sources:|资料来源：|來源：|출처:|出典：)\s*(.*)$")
 
 
+def english_labels(slide):
+    """Known English default labels drawn on the slide (whole text or 'Label: ...')."""
+    hits = set()
+    for tf, _ in _frames(slide):
+        for p in tf.paragraphs:
+            t = p.text.strip()
+            if not t:
+                continue
+            low = t.lower().rstrip(":")
+            if low in _EN_LABELS:
+                hits.add(t.rstrip(":"))
+            elif ":" in t and t.split(":", 1)[0].lower() in _EN_LABELS:
+                hits.add(t.split(":", 1)[0])
+    return hits
+
+
 def source_issues(slide, deck_is_cjk: bool):
     out = []
     texts = [tf.text.strip() for tf, _ in _frames(slide) if tf.text.strip()]
@@ -405,6 +430,7 @@ def main(argv=None) -> int:
     deck_nums_all: set[str] = set()
     sparse, leftovers, invented = [], [], []
     risky, quoted_new, novel, small, src_bad, restates = [], [], [], [], [], []
+    en_labels = []
     templates, groups = [], []
     for i, slide in enumerate(prs.slides, start=1):
         text = slide_text(slide)
@@ -437,6 +463,10 @@ def main(argv=None) -> int:
         bs = body_size(slide, sh)
         if bs is not None and bs < 12 and i > 1:
             small.append((i, bs))
+        if deck_is_cjk and _EN_LABELS:
+            hits = sorted(english_labels(slide))
+            if hits:
+                en_labels.append((i, hits))
         issues = source_issues(slide, deck_is_cjk)
         if issues:
             src_bad.append((i, issues))
@@ -566,6 +596,15 @@ def main(argv=None) -> int:
         for i, rr in restates:
             for t in rr:
                 print(f"  slide {i}: {t}")
+    else:
+        print("  none")
+
+    print("\n[10] English default labels in a CJK deck (build with make_theme(lang=...)"
+          " or pass translated labels):")
+    if en_labels:
+        flagged = True
+        for i, hits in en_labels:
+            print(f"  slide {i}: {', '.join(hits)}")
     else:
         print("  none")
 

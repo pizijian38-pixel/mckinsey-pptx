@@ -31,6 +31,7 @@ from .base import add_line, add_rect, add_textbox, write_paragraph
 from .design import (add_icon, add_rich_runs, fit_one_line, fit_size, text_height_in,
                      text_width_pt, tone_rgb, warn_small, write_rich_paragraph)
 from .theme import Theme
+from .labels import loc
 
 HEADING_H = 0.34
 MIN_PT, MAX_PT = 10, 16
@@ -44,7 +45,7 @@ def letter_space(paragraph, hundredths_pt: int = 150):
 def draw_heading(slide, theme: Theme, x, y, w, text, *, color=None, size=11):
     """Small-caps style label above a region ("BUSINESS MODEL")."""
     tb = add_textbox(slide, x, y, w, HEADING_H - 0.04, anchor=MSO_ANCHOR.BOTTOM)
-    p = write_paragraph(tb.text_frame, str(text).upper(), size=size, bold=True,
+    p = write_paragraph(tb.text_frame, str(loc(theme, text)).upper(), size=size, bold=True,
                         color=color or theme.palette.mid_blue,
                         family=theme.typography.family, first=True)
     letter_space(p, 120)
@@ -182,7 +183,8 @@ def comp_pros_cons(slide, theme, x, y, w, h, *, pros: Sequence[str] = (),
                    cons: Sequence[str] = (), labels=("Advantages", "Disadvantages"),
                    layout="stacked", size=None, where=""):
     """✓ / ✗ lists; layout 'stacked' (one above the other) or 'columns'."""
-    groups = [(labels[0], list(pros), "check", "green"), (labels[1], list(cons), "cross", "red")]
+    groups = [(loc(theme, labels[0]), list(pros), "check", "green"),
+              (loc(theme, labels[1]), list(cons), "cross", "red")]
     groups = [g for g in groups if g[1]]
     if not groups:
         return
@@ -327,6 +329,7 @@ def comp_callout(slide, theme, x, y, w, h, *, text, label=None, style="outline",
     a 'so what'. style: outline (label sits on the border) | solid | tint."""
     from .design import tint
     pal, typo = theme.palette, theme.typography
+    label = loc(theme, label)
     color = tone_rgb(theme, tone) if tone else pal.mid_blue
     lab_h = 0.3 if label else 0.0
     inner_w = w - 0.4
@@ -502,6 +505,9 @@ def comp_sections(slide, theme, x, y, w, h, *, sections: Sequence[Dict], boxed=T
     needs = [need(s, size) for s in secs]
     extra = h - sum(needs) - gap * (m - 1)
     add = min(extra / m, 0.4) if extra > 0 else 0.0
+    if extra < 0:  # even the minimum size does not fit: stay inside the region
+        k = (h - gap * (m - 1)) / sum(needs)
+        needs = [max(nh * k, head_h + 0.3) for nh in needs]
     cy = y
     for s, nh in zip(secs, needs):
         sh = nh + add

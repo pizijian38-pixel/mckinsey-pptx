@@ -87,6 +87,9 @@ def add_matrix_2x2(prs, *,
     # axes
     add_line(slide, gx, gy + gh + 0.08, gx + gw, gy + gh + 0.08, color=pal.rule_gray, width_pt=1)
     add_line(slide, gx - 0.08, gy, gx - 0.08, gy + gh, color=pal.rule_gray, width_pt=1)
+    from ..labels import loc
+    x_ends = [loc(theme, t) for t in x_ends]
+    y_ends = [loc(theme, t) for t in y_ends]
     for txt, x, al in ((x_ends[0], gx, PP_ALIGN.LEFT), (x_ends[1], gx + gw - 2, PP_ALIGN.RIGHT)):
         tb = add_textbox(slide, x, gy + gh + 0.12, 2, 0.3)
         write_paragraph(tb.text_frame, txt, size=11, color=pal.footer_gray,

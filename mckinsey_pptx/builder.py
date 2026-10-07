@@ -21,7 +21,7 @@ from .slides import (
     structure_slides, comparison_slides, extra_charts, process_extras,
     table_slides, card_slides, native_chart, ladder_slides,
     finance_slides, plan_slides, matrix_slides, composite_slides,
-    evaluation_slides, logic_slides,
+    evaluation_slides, logic_slides, analysis_slides, framework_slides,
 )
 
 
@@ -102,6 +102,19 @@ _REGISTRY = {
     "strategic_challenge": logic_slides.add_strategic_challenge,
     "key_question": logic_slides.add_strategic_challenge,
     "storyline_summary": logic_slides.add_storyline_summary,
+    "cycle": analysis_slides.add_cycle,
+    "flywheel": analysis_slides.add_cycle,
+    "risk_heatmap": analysis_slides.add_risk_heatmap,
+    "risk_matrix": analysis_slides.add_risk_heatmap,
+    "positioning_scale": analysis_slides.add_positioning_scale,
+    "value_chain": analysis_slides.add_value_chain,
+    "phase_grid": plan_slides.add_phase_grid,
+    "implementation_grid": plan_slides.add_phase_grid,
+    "evaluation_matrix": evaluation_slides.add_evaluation_matrix,
+    "business_model_canvas": framework_slides.add_business_model_canvas,
+    "bmc": framework_slides.add_business_model_canvas,
+    "strategic_triangle": framework_slides.add_strategic_triangle,
+    "hub_spoke": framework_slides.add_hub_spoke,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,
@@ -256,6 +269,51 @@ def add_kicker(slide, text, theme):
     letter_space(p, 200)
 
 
+def add_nav(slide, sections, current, theme):
+    """Section breadcrumb at the top-left: one small chevron per section, the
+    current one dark (where the slide sits in the deck's storyline)."""
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+    from pptx.util import Inches, Emu
+    from .base import write_paragraph
+    from .design import tint
+    from .metrics import fit_one_line, text_width_pt
+    layout, pal = theme.layout, theme.palette
+    avail = (layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+             - layout.section_marker_w_in - 0.3)
+    n = len(sections)
+    cur = current if isinstance(current, int) else (
+        list(sections).index(current) if current in sections else -1)
+    if cur < 0:
+        import sys
+        print(f"[mckinsey_pptx] WARNING nav: {current!r} is not one of {list(sections)}",
+              file=sys.stderr)
+    size = 10
+    ws = [text_width_pt(s, size, True) / 72 / 0.9 + 0.45 for s in sections]
+    if sum(ws) > avail:
+        k = avail / sum(ws)
+        ws = [w * k for w in ws]
+        size = min(fit_one_line(s, w - 0.4, 10, 7, True) for s, w in zip(sections, ws))
+    x, y, h = layout.margin_left_in, 0.13, 0.26
+    for i, (s, w) in enumerate(zip(sections, ws)):
+        shp = slide.shapes.add_shape(MSO_SHAPE.PENTAGON if i == 0 else MSO_SHAPE.CHEVRON,
+                                     Inches(x), Inches(y), Inches(w + 0.08), Inches(h))
+        shp.adjustments[0] = 0.4
+        shp.shadow.inherit = False
+        shp.line.fill.background()
+        shp.fill.solid()
+        on = i == cur
+        shp.fill.fore_color.rgb = pal.mid_blue if on else tint(pal.mid_blue, 0.88)
+        tf = shp.text_frame
+        tf.margin_left, tf.margin_right = Inches(0.18), Inches(0.08)
+        tf.margin_top = tf.margin_bottom = Emu(0)
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        tf.word_wrap = False
+        write_paragraph(tf, s, size=size, bold=on, color=pal.white if on else pal.footer_gray,
+                        family=theme.typography.family, align=PP_ALIGN.CENTER, first=True)
+        x += w + 0.02
+
+
 def template_name(fn) -> str:
     """Canonical template name for a registry callable (aliases collapse)."""
     canon = {v: k for k, v in reversed(list(_REGISTRY.items()))}
@@ -267,8 +325,12 @@ class PresentationBuilder:
 
     def __init__(self, theme: Theme = DEFAULT_THEME, *,
                  auto_page_numbers: bool = True,
-                 default_section_marker: Optional[str] = None):
+                 default_section_marker: Optional[str] = None,
+                 nav: Optional[Sequence[str]] = None):
+        """nav: the deck's chapters (["Overview", "Situation", ...]); a slide
+        added with nav="Situation" (or an index) shows the breadcrumb bar."""
         self.theme = theme
+        self.nav = list(nav) if nav else None
         self.auto_page_numbers = auto_page_numbers
         self.default_section_marker = default_section_marker
         self.prs = init_presentation(theme)
@@ -289,10 +351,14 @@ class PresentationBuilder:
         kwargs.setdefault("theme", self.theme)
         kicker = kwargs.pop("kicker", None)
         group = kwargs.pop("group", None)
+        nav = kwargs.pop("nav", None)
         out = fn(self.prs, **kwargs)
         slide = self.prs.slides[-1]
         name = template_name(fn)
-        if kicker and name not in _FULL_BLEED:
+        if nav is not None and self.nav and name not in _FULL_BLEED:
+            # one line of space above the title: the breadcrumb replaces the kicker
+            add_nav(slide, self.nav, nav, kwargs["theme"])
+        elif kicker and name not in _FULL_BLEED:
             add_kicker(slide, kicker, kwargs["theme"])
         # Record template (+ parallel group) on the slide (<p:cSld name>) so
         # scripts/deck_check.py can check layout variety and consistency.

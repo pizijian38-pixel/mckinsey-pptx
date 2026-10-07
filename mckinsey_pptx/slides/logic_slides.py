@@ -28,6 +28,7 @@ from ..design import (add_arrow, add_fade_wedge, add_icon, add_stage_banners, ad
                       fit_one_line, fit_size, plain, set_dashed, text_height_in, text_width_pt,
                       tint, tone_rgb, warn_small, write_rich_paragraph)
 from ..theme import Theme, DEFAULT_THEME
+from ..labels import loc
 from .evaluation_slides import _frame
 
 Cell = Union[None, str, Sequence[str], Dict]
@@ -291,7 +292,8 @@ def _grid_down(slide, theme, left, top, width, bottom, stages, items, conclusion
         return max([text_height_in([it.get("conclusion", "")], inner, s, bold=True) + 0.3
                     for it in items] + [0.5])
 
-    lab_texts = list(stages) + ([conclusion_label or ""] if has_concl else [])
+    lab_texts = [loc(theme, t) for t in stages] + ([loc(theme, conclusion_label) or ""]
+                                                   if has_concl else [])
     size = MIN_PT
     for s in range(MAX_PT, MIN_PT - 1, -1):
         if sum(band_need(i, s) for i in range(bands)) + bg * (bands - 1) <= avail:
@@ -369,6 +371,9 @@ def add_strategic_challenge(prs, *,
         prs, theme, title, subtitle, None, None, page_number=page_number,
         section_marker=section_marker, source=source, footnote=footnote)
     pal, typo = theme.palette, theme.typography
+    labels = [loc(theme, t) for t in labels]
+    question_label = loc(theme, question_label)
+    directions_label = loc(theme, directions_label)
     drivers = [_as_driver(d) for d in drivers]
     n = max(len(drivers), 1)
     has_res = any(d.get("result") for d in drivers)
@@ -411,7 +416,8 @@ def add_strategic_challenge(prs, *,
     if has_res:
         spans.append((rx, rw_, labels[1], "stage"))
     if has_threat:
-        spans.append((tx, tw_, labels[2] if len(labels) > 2 else "Key threat", "result"))
+        spans.append((tx, tw_, labels[2] if len(labels) > 2 else loc(theme, "Key threat"),
+                      "result"))
     add_stage_banners(slide, theme, spans, top, head_h, style="rule", where=title)
 
     def d_text(d):
@@ -543,6 +549,9 @@ def add_storyline_summary(prs, *,
         prs, theme, title, subtitle, None, None, page_number=page_number,
         section_marker=section_marker, source=source, footnote=footnote)
     pal, typo = theme.palette, theme.typography
+    labels = [loc(theme, t) for t in labels] if labels else labels
+    option_prefix = loc(theme, option_prefix)
+    badge = loc(theme, badge)
     sit = [_as_block(b) for b in situation]
     opts = [_as_block(o) for o in (options or [])]
     for i, o in enumerate(opts):

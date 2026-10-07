@@ -20,6 +20,7 @@ from ..base import (
     write_paragraph, add_subtitle_placeholder,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..labels import loc
 
 
 # ---------- shared chevron primitive ----------
@@ -68,13 +69,13 @@ def add_phases_chevron_3(prs, *,
              fill=pal.deep_navy)
     tb = add_textbox(slide, layout.margin_left_in + width - 1.95, leg_y - 0.02,
                      1.05, 0.30, anchor=MSO_ANCHOR.MIDDLE)
-    write_paragraph(tb.text_frame, "Deliverables", size=typo.chart_label_size,
+    write_paragraph(tb.text_frame, loc(theme, "Deliverables"), size=typo.chart_label_size,
                     color=pal.text_dark, family=typo.family, first=True)
     add_oval(slide, layout.margin_left_in + width - 0.85, leg_y, 0.22, 0.22,
              fill=pal.deep_navy)
     tb = add_textbox(slide, layout.margin_left_in + width - 0.6, leg_y - 0.02,
                      0.7, 0.30, anchor=MSO_ANCHOR.MIDDLE)
-    write_paragraph(tb.text_frame, "People", size=typo.chart_label_size,
+    write_paragraph(tb.text_frame, loc(theme, "People"), size=typo.chart_label_size,
                     color=pal.text_dark, family=typo.family, first=True)
 
     # Timeframes row (above chevrons)
@@ -212,7 +213,7 @@ def add_phases_table_4(prs, *,
         # Key activities header + bullets
         sec_top = arrow_y + 1.95
         tb = add_textbox(slide, cx, sec_top, col_w, 0.30)
-        write_paragraph(tb.text_frame, "Key activities",
+        write_paragraph(tb.text_frame, loc(theme, "Key activities"),
                         size=typo.body_size, bold=True,
                         color=pal.text_dark, family=typo.family, first=True)
         tb = add_textbox(slide, cx, sec_top + 0.30, col_w, 1.6)
@@ -225,7 +226,7 @@ def add_phases_table_4(prs, *,
         # Outcomes header + bullets
         out_top = sec_top + 1.95
         tb = add_textbox(slide, cx, out_top, col_w, 0.30)
-        write_paragraph(tb.text_frame, "Outcomes",
+        write_paragraph(tb.text_frame, loc(theme, "Outcomes"),
                         size=typo.body_size, bold=True,
                         color=pal.text_dark, family=typo.family, first=True)
         tb = add_textbox(slide, cx, out_top + 0.30, col_w,
@@ -381,7 +382,7 @@ def add_gantt_timeline(prs, *,
     cell_w = grid_w / n_weeks
     # "Week" label
     tb = add_textbox(slide, layout.margin_left_in, header_y, label_w - 0.1, 0.28)
-    write_paragraph(tb.text_frame, "Week", size=typo.body_size - 1, bold=True,
+    write_paragraph(tb.text_frame, loc(theme, "Week"), size=typo.body_size - 1, bold=True,
                     color=pal.text_dark, family=typo.family, first=True)
     for i, wk in enumerate(weeks):
         tb = add_textbox(slide, grid_left + i * cell_w,

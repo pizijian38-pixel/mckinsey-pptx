@@ -10,6 +10,7 @@ from ..base import (
     write_paragraph,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..labels import loc
 
 StatusColor = Literal["green", "amber", "red"]
 
@@ -56,7 +57,7 @@ def add_assessment_table(prs, *, title="[Assessment or status overview / Insert 
 
     # Header row
     header_h = 0.4
-    header_titles = ["Category"] + list(columns)
+    header_titles = [loc(theme, "Category")] + [loc(theme, c) for c in columns]
     for x, w, txt in zip(col_xs, col_ws, header_titles):
         tb = add_textbox(slide, x + 0.1, top, w - 0.2, header_h,
                          anchor=MSO_ANCHOR.MIDDLE)
