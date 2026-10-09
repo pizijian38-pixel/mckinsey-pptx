@@ -294,6 +294,61 @@ def test_slopegraph_axes_share_one_scale():
     assert all(abs(y - (y0 + (v - v0) * slope)) < 2000 for v, y in pts), pts  # < 0.002 in
 
 
+def test_heatmap_shade_orders_with_value():
+    """Darker cell = larger value, on one ramp for the whole grid."""
+    vals = [[1, 9, 4], [7, 2, 5]]
+    b = PresentationBuilder()
+    b.add("heatmap", title="t", rows=["r1", "r2"], columns=["a", "b", "c"], values=vals)
+    m = _marks(b.prs.slides[0], "heatmap:")
+    lum = {}
+    for i, r in enumerate(["r1", "r2"]):
+        for j, c in enumerate(["a", "b", "c"]):
+            rgb = m[f"{r} / {c}"].fill.fore_color.rgb
+            lum[vals[i][j]] = sum(rgb)
+    ordered = [lum[v] for v in sorted(lum)]
+    assert ordered == sorted(ordered, reverse=True), lum
+
+
+def test_bump_ranks_sit_on_fixed_rows():
+    series = [{"name": "a", "ranks": [1, 2, 3]}, {"name": "b", "ranks": [2, 1, 1]},
+              {"name": "c", "ranks": [3, 3, 2]}]
+    b = PresentationBuilder()
+    b.add("bump", title="t", snapshots=["Q1", "Q2", "Q3"], series=series)
+    m = _marks(b.prs.slides[0], "bump:")
+    y = {}
+    for sr in series:
+        for k in range(2):
+            ln = m[f"{sr['name']}|{k}"]
+            for rank, yy in ((sr["ranks"][k], ln.begin_y), (sr["ranks"][k + 1], ln.end_y)):
+                y.setdefault(rank, set()).add(round(yy / 1000))
+    assert all(len(v) == 1 for v in y.values()), y           # one row per rank
+    rows = [y[r].pop() for r in sorted(y)]
+    steps = {rows[i + 1] - rows[i] for i in range(len(rows) - 1)}
+    assert len(steps) == 1 and steps.pop() > 0, rows          # equal pitch, rank 1 on top
+    try:
+        PresentationBuilder().add("bump", title="t", snapshots=["a", "b", "c"],
+                                  series=[{"name": "x", "ranks": [1, 1, 1]},
+                                          {"name": "y", "ranks": [1, 2, 2]}])
+    except ValueError:
+        return
+    raise AssertionError("duplicate rank accepted")
+
+
+def test_radar_is_native_and_on_one_scale():
+    b = PresentationBuilder()
+    b.add("radar", title="t", criteria=["a", "b", "c"], scale_max=5,
+          series=[{"name": "x", "values": [1, 5, 3]}, {"name": "y", "values": [4, 2, 2]}])
+    gf = [sh for sh in b.prs.slides[0].shapes if sh.has_chart][0]
+    assert [list(s.values) for s in gf.chart.plots[0].series] == [[1, 5, 3], [4, 2, 2]]
+    assert gf.chart.value_axis.maximum_scale == 5
+    try:
+        PresentationBuilder().add("radar", title="t", criteria=["a", "b", "c"], scale_max=5,
+                                  series=[{"name": "x", "values": [1, 50, 3]}])
+    except ValueError:
+        return
+    raise AssertionError("value off the shared scale accepted")
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

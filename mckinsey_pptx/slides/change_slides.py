@@ -195,3 +195,77 @@ def add_dumbbell(prs, *,
     legend_strip(slide, theme, [("ring", base, labels[0]), ("dot", base, labels[1])],
                  bottom - 0.42)
     return slide
+
+
+# ---------------------------------------------------------------- bump
+
+def add_bump(prs, *,
+             title: str = "[Bump chart / Insert action title]",
+             snapshots: Sequence[str],
+             series: Sequence[Dict],
+             focus=None,
+             subtitle: Optional[str] = None,
+             insight: Optional[str] = None,
+             insight_label: Optional[str] = "Key insight",
+             page_number=None, section_marker=None,
+             source=None, footnote=None,
+             theme: Theme = DEFAULT_THEME):
+    """Rank movement across 3-6 ordered snapshots (position, not magnitude).
+    snapshots: captions left to right. series: [{"name", "ranks": [1-based rank per
+    snapshot, or None when absent]}] (4-10). Ranks sit on a fixed row pitch;
+    straight segments, a dot at every vertex; labels at first and last appearance.
+    focus: the series the title is about — accent, heavier line.
+    """
+    slide, left, top, width, bottom = _frame(
+        prs, theme, title, subtitle, insight, insight_label, page_number=page_number,
+        section_marker=section_marker, source=source, footnote=footnote)
+    pal, typo = theme.palette, theme.typography
+    names = [s.get("name", "") for s in series]
+    check_focus("bump", title, focus, names)
+    m = len(snapshots)
+    if not 3 <= m <= 6:
+        warn_small("bump", title, 0, f"{m} snapshots; bump needs 3-6 (2 → slopegraph).")
+    for k in range(m):
+        col = [s["ranks"][k] for s in series if k < len(s["ranks"]) and s["ranks"][k] is not None]
+        if len(col) != len(set(col)):
+            raise ValueError(f"bump \"{str(title)[:40]}\": duplicate rank in '{snapshots[k]}' ({col}).")
+    focused = has_focus(focus)
+    max_rank = max(r for s in series for r in s["ranks"] if r is not None)
+    size = typo.chart_label_size + 1
+    gw = min(max(text_width_pt(n, size, True) / 72 for n in names) + 0.75, 3.0)
+    xa, xb = left + gw, left + width - gw
+    ya, yb = top + 0.45, bottom - 0.2
+    pitch = (yb - ya) / max(max_rank - 1, 1)
+    xs = [xa + (xb - xa) * k / max(m - 1, 1) for k in range(m)]
+
+    def y_of(r):
+        return ya + (r - 1) * pitch
+    for k, (x, cap) in enumerate(zip(xs, snapshots)):
+        add_line(slide, x, ya - 0.1, x, yb + 0.1, color=pal.light_gray, width_pt=HAIRLINE_PT)
+        eyebrow(slide, theme, x - 1.0, top, 2.0, cap, color=pal.text_dark, align=PP_ALIGN.CENTER)
+    order = sorted(range(len(series)), key=lambda i: is_focus(focus, i, names[i]))
+    for i in order:
+        s = series[i]
+        f = is_focus(focus, i, names[i])
+        col = pal.bright_blue if f else (tint(pal.dark_navy, 0.6) if focused else pal.dark_navy)
+        pts = [(xs[k], y_of(r)) for k, r in enumerate(s["ranks"][:m]) if r is not None]
+        for (x0, y0), (x1, y1), k in zip(pts, pts[1:], range(len(pts))):
+            ln = add_line(slide, x0, y0, x1, y1, color=col, width_pt=3.0 if f else 1.5)
+            ln.name = f"bump:{names[i]}|{k}"
+        for x, y in pts:
+            d = 0.15 if f else 0.11
+            add_oval(slide, x - d / 2, y - d / 2, d, d, fill=col, line=pal.white, line_width=0.75)
+        ks = [k for k, r in enumerate(s["ranks"][:m]) if r is not None]
+        if not ks:
+            continue
+        strong = f or not focused
+        for k, side in ((ks[0], "left"), (ks[-1], "right")):
+            r = s["ranks"][k]
+            txt = f"{names[i]}  #{r}" if side == "left" else f"#{r}  {names[i]}"
+            x = xs[k] - gw - 0.12 if side == "left" else xs[k] + 0.14
+            tb = add_textbox(slide, x, y_of(r) - 0.13, gw, 0.26, anchor=MSO_ANCHOR.MIDDLE)
+            write_paragraph(tb.text_frame, txt, size=size, bold=strong,
+                            color=pal.deep_navy if strong else pal.footer_gray,
+                            family=typo.family,
+                            align=PP_ALIGN.RIGHT if side == "left" else PP_ALIGN.LEFT, first=True)
+    return slide

@@ -18,7 +18,8 @@ All templates accept these common optional kwargs (omit unless useful):
 `matrix_2x2`, `prioritization_matrix`, `cycle`, `risk_heatmap`,
 `process_flow`, `funnel`, `issue_tree`, `org_chart`, `hub_spoke` and the data
 diagrams `marimekko`, `treemap`, `sankey`, `slopegraph`, `dumbbell`,
-`fishbone`, `journey` take
+`fishbone`, `journey`, `heatmap`, `radar`, `venn`, `bump`, `swimlane`,
+`layer_stack` take
 `focus=`: the label (or 0-based index, or a list) of the item the action
 title is about. That item carries the accent; everything else is drawn
 neutral, so the eye lands where the title points. Without `focus` every item
@@ -1960,6 +1961,166 @@ b.add("journey", title="Trial users love setup but stall when they hit the plan 
               {"name": "Upgrade", "sentiment": "neutral", "action": "Picks annual plan",
                "touchpoint": "Billing page"}],
       focus="Hit the limit", source="12 user interviews, June")
+```
+
+---
+
+## 75. Heat map (`heatmap`, alias `heat_map`)
+
+**Category:** Data — value per row × column
+**Use when:** One measure across two categorical dimensions (failure rate by
+service × sprint, margin by region × product, NPS by segment × touchpoint)
+and the reader should spot the hot cells. Shade = value on one ramp for the
+whole grid; the number is printed in every cell.
+**Don't use when:** Probability × impact of risks (use `risk_heatmap`); exact
+values matter more than the pattern (use `data_table`); one dimension (use a
+bar chart).
+**Required inputs:** `rows: [str]`, `columns: [str]`, `values: [[number | None]]`
+(3–8 × 3–8)
+**Optional inputs:** `fmt`, `midpoint` (diverging scale: below red, above
+navy), `low_label`, `high_label`, `focus` (a cell `"Row / Column"`, a row or a
+column — outlined in the accent; colour stays the data), `subtitle`, `insight`
+**Example:**
+```python
+b.add("heatmap", title="Payments failures spiked in sprint 4; every other service stayed below 10%",
+      rows=["Auth", "Payments", "API gateway", "Billing", "Notifications"],
+      columns=["S1", "S2", "S3", "S4", "S5", "S6"],
+      values=[[4, 5, 6, 3, 2, 2], [3, 4, 5, 47, 6, 4], [2, 3, 4, 2, 1, 1],
+              [5, 7, 9, 6, 4, 3], [1, 2, 2, 2, 1, 1]],
+      fmt="{:.0f}%", focus="Payments / S4", source="CI failure logs")
+```
+
+---
+
+## 76. Radar (`radar`, alias `spider`)
+
+**Category:** Data — profile across criteria
+**Use when:** 2–5 options compared on 3–8 criteria that share one scale
+(scores 1–5, normalised 0–10) and the *shape* of each profile is the message.
+Native PowerPoint radar chart (Edit Data works).
+**Don't use when:** Criteria on different units (normalise first); one option
+(use a bar chart); exact scores with reasons (use `evaluation_matrix`).
+**Required inputs:** `criteria: [str]`, `series: [{name, values}]`
+**Optional inputs:** `scale_max` (default 5; values outside 0..scale_max raise
+an error), `focus` (the option the title is about), `side: {title, bullets}`,
+`subtitle`, `insight`
+**Example:**
+```python
+b.add("radar", title="Vendor B is the only option strong on both integration and support",
+      criteria=["Functionality", "Integration", "Support", "Price", "Scalability"],
+      series=[{"name": "Vendor A", "values": [5, 2, 3, 4, 4]},
+              {"name": "Vendor B", "values": [4, 5, 5, 3, 4]},
+              {"name": "Vendor C", "values": [3, 3, 2, 5, 3]}],
+      scale_max=5, focus="Vendor B",
+      side={"title": "Integration and support decide the rollout",
+            "bullets": ["Vendor A leads on features but integrates poorly",
+                        "Vendor C is cheapest but weakest on support"]},
+      source="Team scoring, 1-5")
+```
+
+---
+
+## 77. Venn (`venn`)
+
+**Category:** Framework — overlap of 2–3 sets
+**Use when:** What sits where two or three conditions meet (desirable ×
+feasible × viable; capabilities × market needs × trends) and the overlap is
+the point.
+**Don't use when:** Four or more sets (use `matrix_2x2` or a table);
+quantities (the circles are not to scale).
+**Required inputs:** `sets: [{name, note?}]` (2–3)
+**Optional inputs:** `overlaps: {"A & B": label, "A & B & C": label}`, `focus`
+(one overlap — the sweet spot — or a set), `side: {title, bullets}`,
+`subtitle`, `insight`
+**Example:**
+```python
+b.add("venn", title="Good products sit where desirability, feasibility and viability meet",
+      sets=[{"name": "Desirable", "note": "People want it"},
+            {"name": "Feasible", "note": "We can build it"},
+            {"name": "Viable", "note": "It sustains a business"}],
+      overlaps={"Desirable & Feasible": "Nice idea, no model",
+                "Desirable & Viable": "Wanted, can't build",
+                "Feasible & Viable": "Buildable, unwanted",
+                "Desirable & Feasible & Viable": "Ship it"},
+      focus="Desirable & Feasible & Viable", source="")
+```
+
+---
+
+## 78. Bump chart (`bump`, alias `rank_chart`)
+
+**Category:** Data — rank over 3–6 snapshots
+**Use when:** Ranking changes over time (brand preference by year, market
+position by quarter, league tables) where position, not size, is the story.
+**Don't use when:** Two snapshots (use `slopegraph`); magnitudes matter (use
+`line_chart` / `chart`).
+**Required inputs:** `snapshots: [str]`, `series: [{name, ranks: [int | None]}]`
+**Optional inputs:** `focus`, `subtitle`, `insight`
+**Rules:** ranks are 1-based and unique per snapshot (a duplicate raises an
+error); `None` = absent in that snapshot.
+**Example:**
+```python
+b.add("bump", title="Legacy-http fell from first to last as teams moved to fetch-kit",
+      snapshots=["Q1", "Q2", "Q3", "Q4"],
+      series=[{"name": "legacy-http", "ranks": [1, 2, 4, 6]},
+              {"name": "fetch-kit", "ranks": [3, 1, 1, 1]},
+              {"name": "authx", "ranks": [2, 3, 2, 2]},
+              {"name": "queuelib", "ranks": [4, 4, 3, 4]},
+              {"name": "logfmt", "ranks": [5, 6, 5, 3]},
+              {"name": "schema-gen", "ranks": [6, 5, 6, 5]}],
+      focus="legacy-http", source="Internal package registry, downloads")
+```
+
+---
+
+## 79. Swimlane (`swimlane`)
+
+**Category:** Process — who does what, in order
+**Use when:** A process across 2–5 actors (functions, companies, systems) with
+hand-offs between them — operating model, order-to-cash, approval flows; the
+bottleneck or the new step is the point.
+**Don't use when:** One actor (use `process_flow`); timing matters (use
+`roadmap` / `gantt_timeline`).
+**Required inputs:** `lanes: [str]`, `steps: [{lane, title, body?, col?}]` in
+process order (≤ 12); `col` puts two steps in the same column (parallel work)
+**Optional inputs:** `focus` (the step the title is about), `focus_label`
+(tag text, e.g. "Bottleneck"), `subtitle`, `insight`
+**Example:**
+```python
+b.add("swimlane", title="Review is the bottleneck: every article waits on one editor",
+      lanes=["Author", "Editor", "Legal", "Web team"],
+      steps=[{"lane": "Author", "title": "Draft article"},
+             {"lane": "Author", "title": "Submit for review"},
+             {"lane": "Editor", "title": "Review content", "body": "avg. 4 days"},
+             {"lane": "Legal", "title": "Check claims", "col": 3},
+             {"lane": "Editor", "title": "Approve", "col": 4},
+             {"lane": "Web team", "title": "Publish"}],
+      focus="Review content", focus_label="Bottleneck", source="Workflow audit")
+```
+
+---
+
+## 80. Layer stack (`layer_stack`, alias `layers`)
+
+**Category:** Structure — stacked layers
+**Use when:** 3–6 layers that build on each other (tech stack, capability
+stack, operating-model levels, value layers) and one layer is where the
+differentiation, gap or investment sits.
+**Don't use when:** The parts are parallel, not stacked (use `card_grid`);
+a ranked hierarchy (use `funnel` / `composite` pyramid).
+**Required inputs:** `layers: [{name, note? | items?}]` top to bottom
+**Optional inputs:** `axis: (top caption, bottom caption)`, `focus`,
+`focus_label`, `subtitle`, `insight`
+**Example:**
+```python
+b.add("layer_stack", title="Our differentiation sits in the orchestration layer, not the model",
+      axis=["Closer to the user", "Foundations"],
+      layers=[{"name": "User interface", "note": "Chat, editor, canvas"},
+              {"name": "Orchestration", "note": "Tools, memory and the loop that ties them together"},
+              {"name": "Prompt layer", "note": "System prompts, few-shot examples, caching"},
+              {"name": "SDK / client", "note": "Auth, retries, streaming"},
+              {"name": "Model", "note": "Licensed from a provider"}],
+      focus="Orchestration", focus_label="Where we win", source="")
 ```
 
 ---

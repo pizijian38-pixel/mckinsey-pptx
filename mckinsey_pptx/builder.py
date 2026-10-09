@@ -22,7 +22,7 @@ from .slides import (
     table_slides, card_slides, native_chart, ladder_slides,
     finance_slides, plan_slides, matrix_slides, composite_slides,
     evaluation_slides, logic_slides, analysis_slides, framework_slides,
-    share_slides, change_slides, diagram_slides,
+    share_slides, change_slides, diagram_slides, grid_slides, flow_slides,
 )
 
 
@@ -129,6 +129,16 @@ _REGISTRY = {
     "ishikawa": diagram_slides.add_fishbone,
     "journey": diagram_slides.add_journey,
     "customer_journey": diagram_slides.add_journey,
+    "heatmap": grid_slides.add_heatmap,
+    "heat_map": grid_slides.add_heatmap,
+    "radar": grid_slides.add_radar,
+    "spider": grid_slides.add_radar,
+    "venn": grid_slides.add_venn,
+    "bump": change_slides.add_bump,
+    "rank_chart": change_slides.add_bump,
+    "swimlane": flow_slides.add_swimlane,
+    "layer_stack": flow_slides.add_layer_stack,
+    "layers": flow_slides.add_layer_stack,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,
@@ -387,6 +397,19 @@ def focus_candidates(name: str, kw: Dict[str, Any]) -> List[str]:
             L += _labels(it)
     elif name == "dumbbell":
         for it in kw.get("rows", []):
+            L += _labels(it)
+    elif name == "heatmap":
+        L += list(kw.get("rows", [])) + list(kw.get("columns", []))
+    elif name in ("radar", "bump"):
+        for it in kw.get("series", []):
+            L += _labels(it)
+    elif name == "venn":
+        L += [s.get("name", "") for s in kw.get("sets", [])]
+    elif name == "swimlane":
+        for it in kw.get("steps", []):
+            L += _labels(it)
+    elif name == "layer_stack":
+        for it in kw.get("layers", []):
             L += _labels(it)
     elif name == "fishbone":
         for c in kw.get("causes", []):

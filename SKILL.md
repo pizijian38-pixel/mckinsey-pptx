@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 74 templates and a composite layout (marimekko, treemap, sankey, slopegraph, dumbbell, fishbone, customer journey, logic grids, strategic-challenge and storyline summary pages, flywheels, risk heat maps, positioning scales, value chains, phase grids, evaluation matrices, business model canvas, strategic triangle, hub-and-spoke, option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases and strategic analyses, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
+description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 80 templates and a composite layout (marimekko, treemap, sankey, slopegraph, dumbbell, bump charts, heat maps, radar, venn, swimlanes, layer stacks, fishbone, customer journey, logic grids, strategic-challenge and storyline summary pages, flywheels, risk heat maps, positioning scales, value chains, phase grids, evaluation matrices, business model canvas, strategic triangle, hub-and-spoke, option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases and strategic analyses, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -184,7 +184,8 @@ programme is in its *build* phase"), pass that item as `focus=` — on
 `growth_share`, `matrix_2x2`, `prioritization_matrix`, `cycle`,
 `risk_heatmap`, `process_flow`, `funnel`, `issue_tree`, `org_chart`,
 `hub_spoke`, `marimekko`, `treemap`, `sankey`, `slopegraph`, `dumbbell`,
-`fishbone`, `journey`. The focal item gets the accent and everything else turns
+`fishbone`, `journey`, `heatmap`, `radar`, `venn`, `bump`, `swimlane`,
+`layer_stack`. The focal item gets the accent and everything else turns
 neutral; one or two focal items per slide, never more. Write the focal item
 next to the template in the plan ("growth_share · focus Batteries"). If the
 title makes no claim about one item, leave `focus` out (or `focus=[]` to
@@ -458,6 +459,9 @@ vs categorical) and audience. Common mistakes:
 - Causes of one observed problem → `fishbone`; decomposing a goal → `issue_tree`.
 - Steps a customer goes through *and how they feel* → `journey`; without feelings → `process_flow`.
 - Area and width charts take values >= 0 only; for gains and losses use `waterfall`.
+- One measure over two categorical dimensions → `heatmap`; risks on probability × impact → `risk_heatmap`.
+- Options profiled on 3–8 criteria of one scale → `radar`; with a reason per cell → `evaluation_matrix`.
+- Rank over 3–6 periods → `bump`; a process across several actors → `swimlane`; stacked layers → `layer_stack`; 2–3 overlapping conditions → `venn`.
 
 ## Theme
 
