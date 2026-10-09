@@ -178,6 +178,17 @@ workstreams are behind plan"), not a topic ("EMEA results", "Project
 status"). Take the claim from the source's own key message;
 keep the source's section name as the `section_marker` or subtitle if useful.
 
+**Focus follows the title.** When the title singles out one item of a
+diagram ("*Batteries* are the only question mark worth funding", "the
+programme is in its *build* phase"), pass that item as `focus=` — on
+`growth_share`, `matrix_2x2`, `prioritization_matrix`, `cycle`,
+`risk_heatmap`, `process_flow`, `funnel`, `issue_tree`, `org_chart`,
+`hub_spoke`. The focal item gets the accent and everything else turns
+neutral; one or two focal items per slide, never more. Write the focal item
+next to the template in the plan ("growth_share · focus Batteries"). If the
+title makes no claim about one item, leave `focus` out (or `focus=[]` to
+silence the build warning).
+
 ## Step 4 — Fill each slide to the right density
 
 **Slide anatomy for content slides:** action title → optional subtitle →
@@ -389,6 +400,8 @@ The checker reports:
 7. **Small body text (< 12pt)** → shorten the longest bullets, drop the
    subtitle or the insight bar, or split the slide. The build also prints
    `[mckinsey_pptx] WARNING ... text fitted at Npt` — treat it the same way.
+   The build also warns when a title names a diagram item but `focus` is not
+   set, or when `focus` matches no item — fix the call, don't ignore it.
 8. **Footer source line** → wrong-language label (fix `make_theme(lang=)`)
    or a caption used as a source (use `source=""`).
 9. **Insight restates a table row** → replace with a bullet that compares or

@@ -314,6 +314,87 @@ def add_nav(slide, sections, current, theme):
         x += w + 0.02
 
 
+# ---------- focus check ----------
+
+def _labels(v):
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, dict):
+        return [v.get(k) for k in ("title", "label", "name", "head") if v.get(k)][:1]
+    return []
+
+
+def focus_candidates(name: str, kw: Dict[str, Any]) -> List[str]:
+    """Item labels of a focus-capable template (None: template has no focus)."""
+    L: List[str] = []
+    if name == "growth_share":
+        for b in kw.get("bus", []):
+            L += _labels(b)
+    elif name == "matrix_2x2":
+        for q in kw.get("quadrants", []):
+            L += _labels(q)
+        for p in kw.get("points", []):
+            L += _labels(p)
+    elif name == "prioritization_matrix":
+        for it in kw.get("items", []):
+            L += _labels(it)
+    elif name == "cycle":
+        for st in kw.get("steps") or [x for p in kw.get("paths", []) for x in p]:
+            L += _labels(st)
+    elif name == "risk_heatmap":
+        for r in kw.get("risks", []):
+            L += _labels(r)
+    elif name in ("process_flow_horizontal", "funnel"):
+        for st in kw.get("steps", kw.get("stages", [])):
+            L += _labels(st)
+    elif name == "issue_tree":
+        for m in kw.get("main_drivers", []):
+            L += _labels(m)
+            for s2 in m.get("secondaries", []) or []:
+                L += _labels(s2)
+                for u in s2.get("underlying", []) or []:
+                    L += _labels(u)
+    elif name == "org_chart":
+        for b in kw.get("branches", []):
+            L += _labels(b) + list(b.get("reports", []) or [])
+    elif name == "hub_spoke":
+        for sp in kw.get("spokes", []):
+            L += _labels(sp)
+    else:
+        return None
+    return [str(x) for x in L if x]
+
+
+def title_names(title: str, labels: Sequence[str]) -> List[str]:
+    """Labels the action title mentions (whole words for Latin, substrings for CJK)."""
+    import re
+    from .metrics import _CJK, plain
+    t = plain(title).lower()
+    hits = []
+    for lab in labels:
+        l_ = plain(lab).strip().lower()
+        if not l_:
+            continue
+        if _CJK.search(l_):
+            if len(l_) >= 2 and l_ in t:
+                hits.append(lab)
+        elif len(l_) >= 3 and re.search(r"(?<!\w)" + re.escape(l_) + r"(?!\w)", t):
+            hits.append(lab)
+    return hits
+
+
+def _check_title_focus(name, kw):
+    labels = focus_candidates(name, kw)
+    if labels is None or kw.get("focus") is not None or kw.get("highlight") is not None:
+        return
+    hits = title_names(kw.get("title", ""), labels)
+    if hits:
+        import sys
+        print(f"[mckinsey_pptx] WARNING {name} \"{str(kw.get('title', ''))[:50]}\": the title "
+              f"names {hits[0]!r} — pass focus={hits[0]!r} so that item carries the accent "
+              f"(or focus=[] if the slide deliberately has no focal item).", file=sys.stderr)
+
+
 def template_name(fn) -> str:
     """Canonical template name for a registry callable (aliases collapse)."""
     canon = {v: k for k, v in reversed(list(_REGISTRY.items()))}
@@ -352,9 +433,10 @@ class PresentationBuilder:
         kicker = kwargs.pop("kicker", None)
         group = kwargs.pop("group", None)
         nav = kwargs.pop("nav", None)
+        name = template_name(fn)
+        _check_title_focus(name, kwargs)
         out = fn(self.prs, **kwargs)
         slide = self.prs.slides[-1]
-        name = template_name(fn)
         if nav is not None and self.nav and name not in _FULL_BLEED:
             # one line of space above the title: the breadcrumb replaces the kicker
             add_nav(slide, self.nav, nav, kwargs["theme"])

@@ -14,6 +14,16 @@ For every template you'll find:
 All templates accept these common optional kwargs (omit unless useful):
 `title`, `page_number`, `section_marker`, `source`, `footnote`, `theme`.
 
+**Focus — one accent per slide.** The diagram templates `growth_share`,
+`matrix_2x2`, `prioritization_matrix`, `cycle`, `risk_heatmap`,
+`process_flow`, `funnel`, `issue_tree`, `org_chart` and `hub_spoke` take
+`focus=`: the label (or 0-based index, or a list) of the item the action
+title is about. That item carries the accent; everything else is drawn
+neutral, so the eye lands where the title points. Without `focus` every item
+keeps the house navy. If the title names an item and `focus` is missing, the
+build prints a WARNING; pass `focus=[]` when a slide deliberately has no
+focal item. A `focus` that matches no item also prints a WARNING.
+
 ---
 
 ## 1. Executive summary — paragraph (`executive_summary_paragraph`)
@@ -180,6 +190,12 @@ bands rather than a 2x2 split — use `prioritization_matrix`.
 - `bus: list[{name: str, x: float (0-100, share %), y: float (0-50, growth %), size: float}]`
 **Optional inputs:**
 - `x_max, y_max` — defaults 100 and 50
+- `x_label, y_label` — axis titles (default relative market share / market growth)
+- `focus` — the unit(s) the title is about: accent bubble, the rest muted
+- `focus_note` — one-line annotation next to the focal bubble
+- `size_label` — what bubble area encodes ("revenue"), shown in the legend
+- `label_pos` per bubble: `right` (default) | `left` | `top` | `bottom`
+Bubble **area** is proportional to `size`.
 **Example:**
 ```python
 b.add("growth_share",
@@ -188,7 +204,9 @@ b.add("growth_share",
       bus=[{"name": "Batteries", "x": 12, "y": 37, "size": 4},
            {"name": "Inverters", "x": 55, "y": 28, "size": 3},
            {"name": "Cables", "x": 70, "y": 6, "size": 5},
-           {"name": "Lighting", "x": 20, "y": 4, "size": 2}])
+           {"name": "Lighting", "x": 20, "y": 4, "size": 2}],
+      focus="Batteries", focus_note="Fastest growth; share gap closable in 3 years",
+      size_label="revenue")
 ```
 
 ---
@@ -198,7 +216,7 @@ b.add("growth_share",
 **Category:** 3x3 matrix
 **Use when:** Plotting initiatives on Time-to-impact (Long/Medium/Short) ×
 Level-of-impact (Low/Medium/High), with color-coded status (green/amber/red)
-per item. Top-right cell is highlighted.
+per item. The short-time × high-impact cell is tinted as the priority zone.
 **Don't use when:** You have continuous axes — use `bubble_chart`. You have
 2x2 BCG axes — use `growth_share`.
 **Required inputs:**
@@ -209,7 +227,8 @@ per item. Top-right cell is highlighted.
 - `ox, oy: float (0-1)` — within-cell offset for tighter layout
 - `d: float` — bubble diameter override
 - `description: str` — bold label above the matrix (top-left)
-- `legend: (str, str, str)` — labels for the green / amber / red dots
+- `legend: (str, str, str)` — labels for the green / amber / red dots (bottom strip)
+- `focus` — the item(s) the title is about: ringed in navy, the rest lighter
 **Example:**
 ```python
 b.add("prioritization_matrix",
@@ -219,7 +238,7 @@ b.add("prioritization_matrix",
              {"name": "Sourcing", "x_band": 1, "y_band": 1, "status": "amber"},
              {"name": "New plant", "x_band": 2, "y_band": 2, "status": "red"}],
       description="Initiatives by impact and time to impact",
-      legend=("On track", "At risk", "Delayed"))
+      legend=("On track", "At risk", "Delayed"), focus="Pricing")
 ```
 
 ---
@@ -450,7 +469,21 @@ Secondary → Underlying). Standard problem-solving framework slide.
 **Required inputs:**
 - `root: str` — the main issue
 - `main_drivers: list[{label: str, secondaries: list[{label: str, underlying: list[str]}]}]`
-**Example:** see demo_korean.py slide 12.
+**Optional inputs:** `subtitle`, `focus` (the driver the title is about, at any
+level — filled in the accent, with its branch from the root in the accent)
+**Example:**
+```python
+b.add("issue_tree", title="Margin fell mainly on raw-material cost", subtitle=None,
+      root="Why did EBIT margin fall 3 pts?", section_marker=None, source=None, footnote=None,
+      main_drivers=[
+          {"label": "Revenue", "secondaries": [
+              {"label": "Price", "underlying": ["List price flat", "Deeper discounts"]},
+              {"label": "Volume", "underlying": ["Lost two key accounts"]}]},
+          {"label": "Cost", "secondaries": [
+              {"label": "Raw materials", "underlying": ["Resin +18%", "Freight +40%"]},
+              {"label": "Labour", "underlying": ["Wage round +4%"]}]}],
+      focus="Raw materials")
+```
 
 ---
 
@@ -463,6 +496,17 @@ Boxes with names/titles.
 **Required inputs:**
 - `ceo: str`
 - `branches: list[{head: str, reports: list[str]}]`
+**Optional inputs:** `subtitle`, `focus` (a head or report — filled in the
+accent, with its reporting line in the accent)
+**Example:**
+```python
+b.add("org_chart", title="Sales operations moves under the CCO", subtitle=None,
+      ceo="CEO", section_marker=None, source=None, footnote=None,
+      branches=[{"head": "CFO", "reports": ["Controlling", "Treasury"]},
+                {"head": "CCO", "reports": ["Key accounts", "Sales operations", "Marketing"]},
+                {"head": "COO", "reports": ["Plants", "Supply chain"]}],
+      focus="Sales operations")
+```
 
 ---
 
@@ -805,22 +849,28 @@ b.add("line_chart",
 ## 38. Process flow horizontal (`process_flow_horizontal`, alias `process_flow`)
 
 **Category:** Process / sequence
-**Use when:** A 4–6 step sequential process with a one-line description per
-step. Numbered chevron tiles in alternating navy/bright-blue.
+**Use when:** A 3–6 step sequential process with a short description (and
+optionally 1–3 bullets) per step. One row of navy chevrons with numbered
+step labels; columns separated by hairlines.
 **Don't use when:** Phases need full sub-content (use `phases_chevron_3` or
 `phases_table_4`); process is iterative not linear.
 **Required inputs:**
-- `steps: list[{name: str, description: str}]`
+- `steps: list[{name: str, description: str, items?: list[str]}]`
+**Optional inputs:** `subtitle`, `focus` (the current / critical step: stays
+navy with a tag, the others turn grey), `focus_label` (tag text, default
+"We are here")
 **Example:**
 ```python
 b.add("process_flow_horizontal",
+      title="The programme is in its build phase",
       steps=[
           {"name":"Discover","description":"Market & customer research"},
           {"name":"Design",  "description":"Strategy & operating model"},
-          {"name":"Build",   "description":"Capability & infrastructure"},
+          {"name":"Build",   "description":"Capability & infrastructure",
+           "items": ["ERP + data platform", "Hire 40 sales FTE"]},
           {"name":"Launch",  "description":"Go-to-market execution"},
           {"name":"Scale",   "description":"Continuous optimization"},
-      ])
+      ], focus="Build")
 ```
 
 ---
@@ -834,9 +884,11 @@ sequence. Each band shows name + headline value; descriptions on the right.
 **Don't use when:** No clear narrowing logic (use `process_flow_horizontal`).
 **Required inputs:**
 - `stages: list[{name: str, value: str | None, description: str | None}]`
+**Optional inputs:** `subtitle`, `focus` (the stage the title is about: stays
+navy, the other bands turn grey)
 **Example:**
 ```python
-b.add("funnel",
+b.add("funnel", title="We can win $3B of a $50B market in five years", focus="SOM",
       stages=[
           {"name":"TAM","value":"$50B","description":"Total addressable market"},
           {"name":"SAM","value":"$20B","description":"Realistic serve set"},
@@ -1172,17 +1224,19 @@ plotted points.
 **Required inputs:** `x_label`, `y_label`, and `quadrants` (order: top-left,
 top-right, bottom-left, bottom-right: `[{title, items?, tone?}]`) and/or
 `points: [{label, x: 0-1, y: 0-1, tone?}]`
-**Optional inputs:** `x_ends`, `y_ends` (default Low / High), `highlight`
-(quadrant index to tint), `subtitle`, `insight`
+**Optional inputs:** `x_ends`, `y_ends` (default Low / High), `focus` (a
+quadrant — index 0–3 or its title — tinted and outlined in the accent; and/or
+point labels, drawn in the accent with the other points muted; `highlight`
+is the older name for a quadrant index), `subtitle`, `insight`
 **Example:**
 ```python
 b.add("matrix_2x2", title="Automate high-volume, rule-based processes first",
       x_label="Process volume", y_label="Rule-based",
       quadrants=[{"title": "Standardise first", "items": ["Vendor onboarding"]},
-                 {"title": "Automate now", "tone": "green", "items": ["Invoice matching", "Expense audit"]},
-                 {"title": "Leave as is", "tone": "gray", "items": ["Board reporting"]},
+                 {"title": "Automate now", "items": ["Invoice matching", "Expense audit"]},
+                 {"title": "Leave as is", "items": ["Board reporting"]},
                  {"title": "Assist with tools", "items": ["Credit decisions"]}],
-      highlight=1)
+      focus="Automate now")
 ```
 
 ---
@@ -1490,7 +1544,9 @@ cycle (`kind="vicious"`, red) or a self-reinforcing loop.
 (each str or `{title, body?, icon?}`); loop: `steps: [str | {title, body?}]`
 **Optional inputs:** `connector_label` ("leads to …"), `feedback: bool | str`,
 `center` (loop), `kind: virtuous | vicious`, `conclusion` (bold statement
-under the diagram), `subtitle`, `insight`
+under the diagram), `focus` (the step the title is about — loop: drawn dark
+with a tag, `focus_label` default "Break point" / "Key lever"; branch: outlined
+in the accent), `subtitle`, `insight`
 **Example:**
 ```python
 b.add("cycle", title="A larger customer base starts a virtuous cycle",
@@ -1500,8 +1556,9 @@ b.add("cycle", title="A larger customer base starts a virtuous cycle",
       end="Sales grow", connector_label="leads to …",
       conclusion="Losing the customer base stops the flywheel")
 b.add("cycle", title="Falling bookings may set off a revenue spiral", kind="vicious",
-      steps=["Revenue depends on ad fees", "Fewer customers book", "Advertisers cut budgets"],
-      center="Revenue decline")
+      steps=["Revenue depends on ad fees", "Fewer customers book", "Advertisers cut budgets",
+             "Less content investment"],
+      center="Revenue decline", focus="Less content investment")
 ```
 
 ---
@@ -1517,7 +1574,8 @@ probability and impact, mitigations listed by number on the right.
 **Required inputs:** `risks: [{title, probability, impact, mitigation?}]` —
 levels as `"low" | "medium" | "high"`, 1–3, 1–5 or 0–1
 **Optional inputs:** `zones: blue | traffic`, `x_label`, `y_label`, `ends`,
-`map_label`, `mitigation_label`, `insight`
+`map_label`, `mitigation_label`, `focus` (the risk(s) the title is about —
+filled navy, their mitigations outlined), `insight`
 **Example:**
 ```python
 b.add("risk_heatmap", title="Two of five risks need action before launch",
@@ -1526,7 +1584,8 @@ b.add("risk_heatmap", title="Two of five risks need action before launch",
              {"title": "New segment grows slowly", "probability": "medium", "impact": "medium",
               "mitigation": "Educate customers"},
              {"title": "Cost overrun", "probability": "low", "impact": "medium",
-              "mitigation": "Phase the investment"}])
+              "mitigation": "Phase the investment"}],
+      focus=["Leader cuts prices"])
 ```
 
 ---
@@ -1697,7 +1756,8 @@ that means (`side` panel).
 need detail (use `card_grid`).
 **Required inputs:** `center: str`, `spokes: [{title, note?, icon?}]` (3–6)
 **Optional inputs:** `direction: in | out`, `heading` (caption above the
-diagram), `side: {title, bullets}`, `insight`
+diagram), `side: {title, bullets}`, `focus` (the spoke the title is about —
+filled in the accent with its arrow), `insight`
 **Rules:** spoke titles 1–2 words, notes one short line.
 **Example:**
 ```python

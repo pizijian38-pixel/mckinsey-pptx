@@ -119,12 +119,17 @@ def test_catalog_examples_run():
                 if "b.add(" not in blk and "make_theme(" not in blk:
                     continue
                 env = {"b": shared}
+                err = io.StringIO()
                 try:
-                    with contextlib.redirect_stderr(io.StringIO()), \
+                    with contextlib.redirect_stderr(err), \
                             contextlib.redirect_stdout(io.StringIO()):
                         exec(blk, env)
                 except Exception as e:  # noqa: BLE001
                     failures.append(f"{type(e).__name__}: {e} :: {blk[:70]!r}")
+                # examples are copied as-is: they must also build without warnings
+                warns = [w for w in err.getvalue().splitlines() if "WARNING" in w]
+                if warns:
+                    failures.append(f"warning: {warns[0][:160]} :: {blk[:70]!r}")
             shared.save("output/all_examples.pptx")
         finally:
             os.chdir(cwd)
@@ -144,6 +149,43 @@ def test_no_theme_shadows():
             hits = [n for n in z.namelist() if n.endswith(".xml")
                     and b"outerShdw" in z.read(n)]
     assert not hits, f"shadow effects in: {hits}"
+
+
+def _warnings(**kw):
+    b = PresentationBuilder()
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        b.add("growth_share", **kw)
+    return [w for w in err.getvalue().splitlines() if "WARNING" in w]
+
+
+def test_focus_follows_title():
+    """A title that names one diagram item should put the accent on it: the
+    build warns when focus is missing, and when focus names no item."""
+    bus = [{"name": "Batteries", "x": 12, "y": 37, "size": 4},
+           {"name": "Cables", "x": 70, "y": 6, "size": 5}]
+    t = "Batteries are the only question mark worth funding"
+    w = _warnings(title=t, bus=bus)
+    assert w and "focus='Batteries'" in w[0], w
+    assert not _warnings(title=t, bus=bus, focus="Batteries")
+    assert not _warnings(title=t, bus=bus, focus=[])          # deliberate opt-out
+    assert not _warnings(title="Portfolio is balanced", bus=bus)
+    w = _warnings(title=t, bus=bus, focus="Battery")
+    assert w and "matches no item" in w[0], w
+
+
+def test_focus_draws_one_accent():
+    """With focus set, exactly the focal bubble is filled in the accent colour."""
+    from mckinsey_pptx.theme import DEFAULT_THEME
+    acc = str(DEFAULT_THEME.palette.bright_blue)
+    bus = [{"name": n, "x": 10 + 15 * i, "y": 5 + 8 * i, "size": 1 + i}
+           for i, n in enumerate(["A1", "B2", "C3", "D4"])]
+    b = PresentationBuilder()
+    b.add("growth_share", title="x", bus=bus, focus="C3")
+    fills = [str(sh.fill.fore_color.rgb) for sh in b.prs.slides[0].shapes
+             if sh.shape_type == 1 and sh.fill.type == 1 and sh.width == sh.height]
+    # one accent bubble (+ one legend dot)
+    assert fills.count(acc) == 2, fills
 
 
 if __name__ == "__main__":
