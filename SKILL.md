@@ -23,19 +23,34 @@ communicates**, and you can defend each choice.
      waits for the PDF, writes PNGs + `contact_sheet.png`).
 2. **Attachments are files on disk — read them, never retype them.** When the
    user attaches or names a file, find its path in the conversation context
-   (Antigravity keeps uploads in the conversation's `.user_uploaded/` folder;
-   other hosts give an absolute path) and pass that path to `--source`. A
-   hand-typed copy loses tables and numbers, and the checker then compares
-   the deck against your copy instead of the real source. Can't find it? Ask
-   the user for the path — don't search the whole disk, don't reconstruct it.
-3. **The checker is a reviewer, not a score.** Don't open `deck_check.py` or
-   the package source to learn how findings are computed; read the report and
-   fix the deck. Coverage ([2]) exists to show source facts you missed —
+   (Antigravity: the attachment / media entry of the request, a path like
+   `…\brain\<id>\.user_uploaded\media_….docx`; other hosts give an absolute
+   path) and pass that path to `--source`. **The attachment is the source even
+   when a similar file already sits in the workspace** (an older outline copy,
+   `source_outline.md`, a previous export). A hand-typed copy loses tables and
+   numbers, and the checker then compares the deck against your copy instead
+   of the real source. Can't find it? Ask the user for the path — don't
+   search the whole disk, don't reconstruct it.
+3. **A new request builds a new deck.** Write a new plan and a new build
+   script from the source. Plans, build scripts and decks already in
+   `output/` from an earlier conversation are not your draft: don't open or
+   reuse them, and save under a new slug if the name is taken. Edit an
+   existing build script only when the user asks to change that deck
+   (see Iterating).
+4. **Everything you need is in this file and `catalog.py`.** Don't read,
+   grep or `Select-String` the package source, `deck_check.py` or the
+   `assets/` folder: template arguments → `catalog.py <name>`; icon names,
+   tones and `**bold**` / `{red|…}` markup → `catalog.py --icons`;
+   slide-level options → `catalog.py --options`. A chart inside a
+   `composite` counts as a chart for the checker. If something you need
+   isn't there, say so in the report instead of reverse-engineering it.
+5. **The checker is a reviewer, not a score.** Read the report and fix the
+   deck. Coverage ([2]) exists to show source facts you missed —
    never add numbers, words or phrases (e.g. "10-slide") to raise it or to
    shorten the vocabulary list. Advisory sections ([2] [3] [5c] [11]) never
    require changing a correct slide. If a finding is wrong, say so in the
    report.
-4. **Pick the template from the relationship, not the topic** (table below).
+6. **Pick the template from the relationship, not the topic** (table below).
 
 ## Pick the template by the relationship
 
@@ -319,7 +334,7 @@ silence the build warning).
   see per card or panel — key numbers in `**bold**`, problems / declines in
   `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
 - **Icons:** give each `card_grid` card an `icon` that matches its meaning
-  (names in CATALOG, e.g. `alert` for risks, `money` for cost, `users` for
+  (`catalog.py --icons` lists the names, e.g. `alert` for risks, `money` for cost, `users` for
   customers or people, `trend_up` for growth, `clock` for time,
   `settings` for operations). Use `tone` for meaning, not decoration.
 - Use the source's numbers inside the text ("from 12.4% to 9.8% in two
@@ -509,7 +524,7 @@ The checker reports:
 
 Fix and rebuild until the checker is clean or every remaining item is
 explained in the report. Fix the deck, not the report: never reword a
-correct point or add words just to clear a finding (working rule 3).
+correct point or add words just to clear a finding (working rule 5).
 
 ## Step 7 — Inspect the previews (mandatory when they rendered)
 
@@ -530,6 +545,10 @@ missing, say the deck was not visually verified.
 - Numbered slide list: template + one-line rationale (from the plan).
 - Source mode: section coverage ("20/20 sections, 7/7 tables"), checker
   results, every `[待补充]` slot, any source data left out and why.
+- If the checker printed a [11] layout-mix reminder: one line per listed
+  slide — the relationship it shows and why a text layout is still right
+  (from the plan's "Why not text cards" column). Slides you can't justify
+  get a diagram before you report.
 - Brief mode: which numbers came from the user and which are illustrative.
 - An offer to iterate ("要把第 4 页换成别的版式吗？").
 
@@ -587,6 +606,9 @@ make_theme("<company>", lang="ko")                   # Korean slides
 
 ## Iterating
 
-The first deck is a draft. When the user asks to change a slide ("第 4 页换个
-版式", "把第 2 页第三条改成 …", "做一份英文版"), edit `output/build_<slug>.py`
-and the plan, rebuild, and re-run the checker — don't start over.
+The first deck is a draft. When the user asks — in this conversation, or by
+naming the existing deck — to change a slide ("第 4 页换个版式", "把第 2 页第三条
+改成 …", "做一份英文版"), edit `output/build_<slug>.py` and the plan, rebuild,
+and re-run the checker — don't start over. A fresh request for a deck ("做一个
+…演讲", "make a deck on …") is not an iteration, even if an older deck on the
+same topic is in `output/` (working rule 3).

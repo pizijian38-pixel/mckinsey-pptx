@@ -394,6 +394,10 @@ def test_catalog_lookup():
     with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
         assert catalog.main(["sankee"]) == 1
     assert "sankey" in err.getvalue()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        catalog.main(["--icons"])
+    assert "`trend_up`" in out.getvalue() and "{red|" in out.getvalue()
 
 
 def _check(path, *sources):

@@ -984,7 +984,8 @@ empty boxes. Preferred over `executive_summary_takeaways`,
 chart (use `chart`).
 **Required inputs:**
 - `cards: list[{title, body?, bullets?, icon?, tone?, value?}]`
-  - `icon`: a bundled icon name (list below) or 1–2 characters (`"1"`, `"A"`)
+  - `icon`: a bundled icon name (`python scripts/catalog.py --icons` lists them)
+    or 1–2 characters (`"1"`, `"A"`)
   - `tone`: `navy` | `blue` | `mid_blue` | `light_blue` | `red` (problem / risk)
     | `green` (opportunity / target met) | `amber` (watch) | `gray`
   - `value`: big number at the top of the card (objectives, KPIs)

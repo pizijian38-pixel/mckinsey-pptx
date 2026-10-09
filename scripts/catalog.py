@@ -6,6 +6,7 @@
     python scripts/catalog.py --guide         # "Choosing between similar templates"
     python scripts/catalog.py --options       # slide-level options + common arguments
     python scripts/catalog.py --focus         # the focus= rule and which templates take it
+    python scripts/catalog.py --icons         # icon names, tones and **bold** / {red|...} markup
 
 Names may be template names or aliases (case-insensitive). Unknown names list the
 closest matches and exit with status 1.
@@ -84,6 +85,8 @@ def print_index(templates):
         use = _field(t["body"], "Use when")
         a = f" [{', '.join(alias)}]" if alias else ""
         print(f"{t['num']:>2}. {main}{a} — {_short(cat, 40)} — {_short(use)}")
+    print("\nAlso: --icons (icon names, tones, markup)  --guide (similar templates)  "
+          "--options (slide-level options)  --focus (focus= rule)")
 
 
 def find(templates, key):
@@ -102,7 +105,10 @@ def main(argv):
     if not argv:
         print_index(templates)
         return 0
+    rich = next((k for k in named if k.startswith("Rich text, tones and icons")), None)
     flags = {"--guide": ["Choosing between similar templates"],
+             "--icons": [rich] if rich else [],
+             "--rich": [rich] if rich else [],
              "--options": ["Slide-level options (every template)", "Common arguments"],
              "--focus": None}
     status = 0
@@ -131,6 +137,9 @@ def main(argv):
         for t in hits:
             print("\n".join([t["head"]] + t["body"]))
             print("\n---\n")
+    if any(a not in flags for a in argv):
+        print("(Icon names, tones and markup: catalog.py --icons. Don't look them up in the "
+              "package source.)")
     return status
 
 
