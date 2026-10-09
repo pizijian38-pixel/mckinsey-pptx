@@ -236,11 +236,25 @@ git clone https://github.com/pizijian38-pixel/mckinsey-pptx.git .agent/skills/mc
 Antigravity 会根据 skill 的描述自动启用它。如果没有触发，可以明确说
 "使用 mckinsey-pptx skill 做……"。生成的文件在项目的 `output/` 文件夹里。
 
-模型按 skill 的流程只用两个固定命令：`scripts/catalog.py`（按名称查模板）和
-`scripts/run_deck.py`（构建 + 检查 + 渲染预览，一条命令），不再临时拼写
-`python -c` 命令，所以需要审批的命令种类大幅减少；如果终端设置支持允许列表，
-把这两个脚本加进去即可。附件请直接拖进对话，
-模型会按附件路径读取，不再手抄大纲。
+模型按 skill 的流程只用三个固定命令：`scripts/read_source.py`（读附件，表格完整保留）、
+`scripts/catalog.py`（按名称查模板，一次查完）和 `scripts/run_deck.py`（构建 + 检查 +
+渲染预览）。整份 deck 大约 6–10 条命令，不再临时拼写多行 `python -c`。附件请直接拖进
+对话，模型会按附件路径读取，不再手抄大纲。
+
+#### 减少审批弹窗（Antigravity 权限设置）
+
+Antigravity 按 [官方权限规则](https://antigravity.google/docs/permissions) 决定是否弹窗。
+skill 能做的是只用上面三条固定命令；下面三项只能在设置里解决：
+
+1. **权限预设**：Settings → General → Permission Settings。本地自用、低风险的项目选
+   **Turbo**（命令不受限、可访问全部文件）。注意 **项目级设置会覆盖全局设置**——
+   在 `ppt_test` 这类项目的项目设置里也确认一遍。
+2. **不想用 Turbo 时**，保留 Default，并添加：
+   - 命令允许规则 `command(python)`；
+   - 文件读取规则：skill 目录（如 `~/.gemini/antigravity/skills/mckinsey-pptx`）和附件目录
+     `~/.gemini/antigravity/brain`——这两个都在项目之外，默认每次读取都会询问。
+3. **已知 bug**：多位用户报告"Always Proceed"在重启后不生效（[论坛](https://discuss.ai.google.dev/t/bug-antigravity-still-ask-permission-even-command-is-already-on-allowed-list/118636)）。
+   设置正确仍弹窗时，在弹窗的下拉框里重新选一次 "Always Proceed"。
 
 ### 更新
 

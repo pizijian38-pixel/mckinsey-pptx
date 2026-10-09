@@ -12,20 +12,28 @@ communicates**, and you can defend each choice.
 
 ## Working rules (read first)
 
-1. **Two commands do the mechanics** — use them instead of ad-hoc
-   `python -c` one-liners (each one-off command may need the user's
-   approval; these two are the approved path):
-   - `python SKILL_DIR/scripts/catalog.py` — one-line index of all templates;
-     `python SKILL_DIR/scripts/catalog.py sankey slopegraph venn` — the full
-     entries (arguments + runnable example) for just those templates.
-   - `python SKILL_DIR/scripts/run_deck.py output/build_<slug>.py --source <file>`
-     — builds, checks and renders in one go (finds LibreOffice on Windows,
-     waits for the PDF, writes PNGs + `contact_sheet.png`).
+1. **Run only these terminal commands** — every other command (a
+   `python -c` snippet, `Get-ChildItem`/`dir`/`ls` over folders,
+   `Test-Path`, `pip list`, `New-Item`, `where`) stops the run for the
+   user's approval, and a multi-line `python -c` can never be pre-approved.
+   - `python "SKILL_DIR/scripts/read_source.py" "<attachment path>"` — the
+     source as text, every table as a Markdown table (docx / xlsx / pptx /
+     pdf / md / csv).
+   - `python "SKILL_DIR/scripts/catalog.py"` — index of all templates; then
+     **one** call with every name and flag you need:
+     `python "SKILL_DIR/scripts/catalog.py" data_table chart fishbone --icons`.
+   - `python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source "<path>"`
+     — builds, checks and renders (finds LibreOffice, writes PNGs +
+     `contact_sheet.png`). `run_deck.py --env` reports what is installed.
+   Write files with your file tool (it creates `output/` itself), view PNGs
+   with your file viewer. `SKILL_DIR` is the folder of this SKILL.md — don't
+   search the disk for it. Expect about 6–10 commands for a whole deck.
 2. **Attachments are files on disk — read them, never retype them.** When the
    user attaches or names a file, find its path in the conversation context
    (Antigravity: the attachment / media entry of the request, a path like
    `…\brain\<id>\.user_uploaded\media_….docx`; other hosts give an absolute
-   path) and pass that path to `--source`. **The attachment is the source even
+   path), read it with `read_source.py` and pass the same path to
+   `--source`. **The attachment is the source even
    when a similar file already sits in the workspace** (an older outline copy,
    `source_outline.md`, a previous export). A hand-typed copy loses tables and
    numbers, and the checker then compares the deck against your copy instead
@@ -104,6 +112,7 @@ prompt to look at those slides again, not a rule to satisfy.
   use the absolute path everywhere below.
 - Python package: `SKILL_DIR/mckinsey_pptx/`
 - Template catalog (API of every template): `SKILL_DIR/mckinsey_pptx/agent/CATALOG.md`
+- Source reader: `SKILL_DIR/scripts/read_source.py` (attachments → text + tables)
 - Template lookup: `SKILL_DIR/scripts/catalog.py` (index / named entries)
 - Build + check + render: `SKILL_DIR/scripts/run_deck.py`
 - Deck checker (run by `run_deck.py`): `SKILL_DIR/scripts/deck_check.py`
@@ -114,11 +123,9 @@ prompt to look at those slides again, not a rule to satisfy.
 
 Use `python3` on macOS/Linux and `python` on Windows (whichever exists).
 
-```bash
-python -m pip install -r "SKILL_DIR/requirements.txt"
-```
-
-(Safe to re-run: pip skips what is installed.) Write every command as a single
+Run `python "SKILL_DIR/scripts/run_deck.py" --env` once. Only if it reports
+`python-pptx : MISSING`, run `python -m pip install -r "SKILL_DIR/requirements.txt"`.
+Write every command as a single
 command — Windows PowerShell 5 rejects `&&` and `||`; run two commands as two
 steps instead of chaining them.
 
@@ -243,17 +250,20 @@ the deck's content.
 - **Attribution**: the company/team name for the footer — only if the user
   gave one or it is in their files.
 - If the user points to or attaches files (`.xlsx`, `.csv`, `.docx`, `.pdf`,
-  `.md`), read them fully from their real path, including tables (working
-  rule 2). These paths are the `--source` files in step 6.
+  `.md`), read them fully with `read_source.py` from their real path,
+  including tables (working rules 1–2). These paths are the `--source` files
+  in step 6.
 
 ## Step 2 — Look up the templates
 
 1. Run `python SKILL_DIR/scripts/catalog.py` once — the index of every
    template with its *Use when* line.
 2. For each slide, name the relationship (table above) and 1–3 candidate
-   templates; then run `catalog.py <candidates…>` for their full entries
-   (arguments, *Don't use when*, a runnable example).
-   `catalog.py --guide` prints "Choosing between similar templates".
+   templates. Then fetch the full entries for **all** candidates of the deck
+   in one call: `catalog.py <every candidate…> --icons` (arguments, *Don't
+   use when*, a runnable example). Add `--guide` for "Choosing between
+   similar templates". Look up a template again only if the build reports an
+   argument error.
 
 The catalog (`CATALOG.md`) is the source of truth for names and arguments —
 never invent template names or argument shapes. Don't page through

@@ -3,6 +3,7 @@
     python scripts/run_deck.py output/build_<slug>.py --source <outline.docx> [--source ...]
     python scripts/run_deck.py output/build_<slug>.py --no-render      # skip the previews
     python scripts/run_deck.py output/build_<slug>.py --deck output/<slug>.pptx
+    python scripts/run_deck.py --env                                   # what is installed
 
 1. build  - runs the build script with this Python; prints its WARNING lines.
 2. check  - runs deck_check.py on the .pptx the build wrote (with the sources).
@@ -193,6 +194,31 @@ def render(deck: Path, dpi: int):
     return outdir, pngs, sheet, err
 
 
+# ---------------------------------------------------------------- env
+
+def report_env() -> int:
+    """One-shot environment check (replaces pip list / Test-Path / where calls)."""
+    ok = True
+    try:
+        import pptx
+        print(f"python-pptx : {pptx.__version__}")
+    except ImportError:
+        ok = False
+        print(f"python-pptx : MISSING — run once: {Path(sys.executable).name} -m pip install python-pptx")
+    so = find_soffice()
+    print(f"LibreOffice : {so or 'not found — previews will be skipped (the .pptx is unaffected)'}")
+    png = shutil.which("pdftoppm")
+    if not png:
+        try:
+            import fitz  # noqa: F401
+            png = "PyMuPDF"
+        except ImportError:
+            png = None
+    print(f"PDF -> PNG  : {png or 'none — pip install pymupdf to get slide previews'}")
+    print(f"python      : {sys.executable}")
+    return 0 if ok else 1
+
+
 # ---------------------------------------------------------------- main
 
 def main(argv=None) -> int:
@@ -202,7 +228,9 @@ def main(argv=None) -> int:
     except (AttributeError, ValueError):
         pass
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("build_script")
+    ap.add_argument("build_script", nargs="?")
+    ap.add_argument("--env", action="store_true",
+                    help="report python-pptx, LibreOffice and the PNG converter, then exit")
     ap.add_argument("--source", action="append", default=[],
                     help="source file the deck is built from (repeatable)")
     ap.add_argument("--deck", help="the .pptx the build writes (found automatically if omitted)")
@@ -210,6 +238,10 @@ def main(argv=None) -> int:
     ap.add_argument("--dpi", type=int, default=80)
     args = ap.parse_args(argv)
 
+    if args.env:
+        return report_env()
+    if not args.build_script:
+        ap.error("give the build script (or --env)")
     script = Path(args.build_script)
     if not script.exists():
         print(f"[run_deck] build script not found: {script}")

@@ -577,6 +577,38 @@ def test_line_end_names_do_not_collide():
     assert pos["Saky"] == P.RIGHT and pos["Colgate"] == P.BELOW, pos    # 5.5 / 4.9
 
 
+def test_read_source_keeps_tables():
+    """read_source.py replaces the agent's python -c snippets: paragraphs in
+    order and every table cell, so no source number is lost."""
+    import read_source
+    with tempfile.TemporaryDirectory() as d:
+        src = Path(d) / "outline.docx"
+        row = lambda vals: "<w:tr>" + "".join(
+            f"<w:tc><w:p><w:r><w:t>{v}</w:t></w:r></w:p></w:tc>" for v in vals) + "</w:tr>"
+        xml = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+               '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+               '<w:body><w:p><w:r><w:t>Slide 3: Competitive landscape</w:t></w:r></w:p>'
+               f'<w:tbl>{row(["Brand", "2022", "2025 Est"])}{row(["YNBY", "24.4", "25.0"])}</w:tbl>'
+               '<w:p><w:r><w:t>Slide 4: Strengths</w:t></w:r></w:p></w:body></w:document>')
+        with zipfile.ZipFile(src, "w") as z:
+            z.writestr("word/document.xml", xml)
+        out = read_source.read_any(src)
+        assert out.index("Slide 3") < out.index("| YNBY | 24.4 | 25.0 |") < out.index("Slide 4"), out
+        assert "| Brand | 2022 | 2025 Est |" in out
+        csvp = Path(d) / "t.csv"
+        csvp.write_text("a,b\n1,2.5\n", encoding="utf-8")
+        assert "| 1 | 2.5 |" in read_source.read_any(csvp)
+
+
+def test_run_deck_env_report():
+    import run_deck
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        assert run_deck.main(["--env"]) == 0
+    text = out.getvalue()
+    assert "python-pptx :" in text and "LibreOffice :" in text and "PDF -> PNG  :" in text
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
