@@ -245,7 +245,7 @@ Antigravity 会根据 skill 的描述自动启用它。如果没有触发，可�
 ### 更新
 
 ```bash
-cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
+git -C "$HOME/.gemini/antigravity/skills/mckinsey-pptx" pull
 ```
 
 ---

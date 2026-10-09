@@ -92,8 +92,12 @@ prompt to look at those slides again, not a rule to satisfy.
 Use `python3` on macOS/Linux and `python` on Windows (whichever exists).
 
 ```bash
-python3 -c "import pptx" || python3 -m pip install -r "SKILL_DIR/requirements.txt"
+python -m pip install -r "SKILL_DIR/requirements.txt"
 ```
+
+(Safe to re-run: pip skips what is installed.) Write every command as a single
+command — Windows PowerShell 5 rejects `&&` and `||`; run two commands as two
+steps instead of chaining them.
 
 The only dependency is `python-pptx`. The package itself is not installed
 with pip — build scripts add `SKILL_DIR` to `sys.path` (see step 5).
