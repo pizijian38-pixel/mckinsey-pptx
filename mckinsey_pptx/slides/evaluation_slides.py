@@ -223,6 +223,7 @@ def add_decision_matrix(prs, *,
                     total_row=True, font_size=13 if len(rows) <= 8 else 12)
     if scale_note:
         tb = add_textbox(slide, left, top + th + 0.05, table_w, 0.28)
+        tb.name = "chrome:note"          # a caption, not body text
         write_paragraph(tb.text_frame, scale_note, size=10, italic=True,
                         color=pal.footer_gray, family=theme.typography.family, first=True)
     if has_panel:

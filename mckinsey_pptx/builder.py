@@ -442,15 +442,21 @@ def _check_title_focus(name, kw):
     if labels is None or kw.get("focus") is not None or kw.get("highlight") is not None:
         return
     hits = title_names(kw.get("title", ""), labels)
+    # A title that names several items ("A, B and C constrain growth") makes no
+    # claim about one of them: no focal item, so no warning. Labels nested in
+    # another hit ("Scale" in "Scale-up") count as one item.
+    low = [h.lower() for h in set(hits)]
+    distinct = [h for h in low if not any(h != o and h in o for o in low)]
+    if len(distinct) > 1:
+        return
     if hits:
         import sys
         from .metrics import plain
         t = plain(kw.get("title", "")).lower()
         # the item named first is usually the subject; longer label wins a tie
         hits = sorted(set(hits), key=lambda h: (t.find(plain(h).lower()), -len(h)))
-        also = f" (also matches {', '.join(map(repr, hits[1:]))})" if hits[1:] else ""
         print(f"[mckinsey_pptx] WARNING {name} \"{str(kw.get('title', ''))[:50]}\": the title "
-              f"names {hits[0]!r}{also} — pass focus={hits[0]!r} so that item carries the "
+              f"names {hits[0]!r} — pass focus={hits[0]!r} so that item carries the "
               f"accent, or focus=[] if the word is incidental and no item is focal.",
               file=sys.stderr)
 

@@ -1058,7 +1058,10 @@ Preferred over the shape-drawn chart templates (`column_*`, `line_chart`,
 - `number_format`: label format, e.g. `'0.0'`, `'0"%"'`, `'#,##0'`
 - `insight: str`, `insight_bullets: list[str]`, `insight_title: str`
 - `subtitle: str` (put the unit here: "Market share, %"), `show_values`, `y_max`
-- Line charts with 3+ series label only the highlighted / toned series.
+- Line charts with 3+ series name every line at its right end (no legend) and
+  label values only on the highlighted / toned series — so players × years
+  data (6 brands × 4 years) reads directly: `highlight` the subject, give one
+  rival `"tone": "navy"`, leave the rest gray.
 **Example:**
 ```python
 # Revenue trend with the focus segment highlighted
@@ -2206,9 +2209,12 @@ Quick decision rules to avoid common confusions:
 - **Matrix / 2D:** two continuous axes → `bubble_chart` /
   `bubble_chart_takeaways`; market-share × growth quadrants → `growth_share`;
   impact × time bands → `prioritization_matrix`.
-- **Any table from the source:** → `data_table` (keep every row and column).
-  More than 4 series over time → `data_table` with `highlight_rows`, or a
-  `line_chart` of the 4 most relevant series *plus* the full table elsewhere.
+- **A table from the source:** numbers by period (players × years, segments ×
+  quarters) → `chart` `line` with every series, the focal one in `highlight`
+  (up to ~8 series; beyond that, the focal series plus the top few, and the
+  full table as a `data_table` in the appendix). Two periods only →
+  `slopegraph` / `dumbbell`. Text or mixed tables → `data_table` (keep every
+  row and column).
 - **Comparison of options:** 2–4 options × criteria with Harvey balls →
   `comparison_table` (only when the source gives ratings); options × text
   features → `data_table` with `highlight_col`; one option's +/− → `pros_cons`; before/after or

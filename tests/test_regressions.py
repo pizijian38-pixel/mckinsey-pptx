@@ -98,6 +98,26 @@ def test_docx_source_entities_are_decoded():
         assert " amp" not in report, report
 
 
+def test_table_decimals_survive_numbering_strip():
+    """A docx table cell holding only "24.4" sits on its own line; the regex that
+    strips list numbering ("3. Market") ate "24." and left "4", so every decimal
+    in a source table was reported as invented (Crest deck, slide 3)."""
+    with tempfile.TemporaryDirectory() as d:
+        src = Path(d) / "outline.docx"
+        cells = "".join(f"<w:tc><w:p><w:r><w:t>{v}</w:t></w:r></w:p></w:tc>"
+                        for v in ["YNBY", "24.4", "24.6", "8.0", "1.", "2)"])
+        xml = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+               '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+               '<w:body><w:p><w:r><w:t>3. Market share</w:t></w:r></w:p>'
+               f'<w:tbl><w:tr>{cells}</w:tr></w:tbl></w:body></w:document>')
+        with zipfile.ZipFile(src, "w") as z:
+            z.writestr("word/document.xml", xml)
+        nums = deck_check.numbers(deck_check.source_text(src))
+        assert {"24.4", "24.6", "8"} <= nums or {"24.4", "24.6", "8.0"} <= nums, nums
+        assert "4" not in nums and "6" not in nums, nums
+        assert "3" not in nums, "heading numbering must still be stripped"
+
+
 def test_catalog_examples_run():
     """Every python example in CATALOG.md must run as written: the agent copies
     them. Old examples used `...` as a placeholder (TypeError / AttributeError)."""
@@ -131,6 +151,16 @@ def test_catalog_examples_run():
                 if warns:
                     failures.append(f"warning: {warns[0][:160]} :: {blk[:70]!r}")
             shared.save("output/all_examples.pptx")
+            # every example must also pass the checker's readable-size rule [7]:
+            # a template whose own example fails it fails every deck that uses it
+            prs = Presentation("output/all_examples.pptx")
+            for i, sl in enumerate(prs.slides, start=1):
+                bs = deck_check.body_size(sl, prs.slide_height)
+                tpl = deck_check.template_of(sl)
+                floor = (deck_check.LABEL_MIN_PT if tpl in deck_check._LABEL_TEMPLATES
+                         else deck_check.BODY_MIN_PT)
+                if bs is not None and bs < floor and i > 1:
+                    failures.append(f"[7] {tpl}: {bs:g}pt < {floor}pt")
         finally:
             os.chdir(cwd)
     assert not failures, "\n".join(failures)
@@ -172,6 +202,8 @@ def test_focus_follows_title():
     assert not _warnings(title="Portfolio is balanced", bus=bus)
     w = _warnings(title=t, bus=bus, focus="Battery")
     assert w and "matches no item" in w[0], w
+    # several items named = no single focal claim: no nudge to highlight the first
+    assert not _warnings(title="Batteries and Cables both lose share", bus=bus)
 
 
 def test_focus_draws_one_accent():
@@ -481,6 +513,49 @@ def test_run_deck_builds_checks_and_renders():
         with contextlib.redirect_stdout(io.StringIO()) as log:
             assert run_deck.main([str(script), "--no-render"]) == 1
         assert "FAILED" in log.getvalue()
+
+
+_SHARE = {"YNBY": [24.4, 24.6, 25.1, 25.0], "DARLIE": [19.4, 18.6, 18.0, 17.2],
+          "Crest": [8.8, 8.9, 8.5, 8.0], "LSL": [7.3, 8.0, 8.6, 9.0]}
+
+
+def test_players_by_period_table_gets_a_reminder():
+    """Players x years copied as a table (Crest deck, slide 3): [11] reminds that a
+    line chart shows the trend - advisory only, the check still passes."""
+    with tempfile.TemporaryDirectory() as d:
+        b = PresentationBuilder()
+        b.add("data_table", title="Crest has slipped to 8.0% share",
+              columns=["Brand", "2022", "2023", "2024", "2025 Est"],
+              rows=[[k] + [f"{v:.1f}" for v in vals] for k, vals in _SHARE.items()], source="")
+        b.add("chart", chart_type="line", title="Same data as a chart",
+              categories=["2022", "2023", "2024", "2025E"],
+              series=[{"name": k, "values": v} for k, v in _SHARE.items()],
+              highlight={"series": "Crest"}, number_format="0.0", source="")
+        path = Path(d) / "t.pptx"
+        b.save(str(path))
+        code, text = _check(path)
+        block = text.split("[11]")[1]
+        assert "slide(s) 1 show numbers by period" in block, block
+        assert code == 0
+
+
+def test_multi_line_chart_names_lines_at_the_end():
+    """3+ lines: no legend to decode; each line is named at its last point, the
+    focal line with its value."""
+    b = PresentationBuilder()
+    b.add("chart", chart_type="line", title="Crest slipped as LSL rose",
+          categories=["2022", "2023", "2024", "2025E"],
+          series=[{"name": k, "values": v, **({"tone": "navy"} if k == "LSL" else {})}
+                  for k, v in _SHARE.items()],
+          highlight={"series": "Crest"}, number_format="0.0", source="")
+    gf = [sh for sh in b.prs.slides[0].shapes if sh.has_chart][0]
+    assert not gf.chart.has_legend
+    ends = {}
+    for ser in gf.chart.plots[0].series:
+        dl = ser.points[3].data_label
+        ends[ser.name] = dl.text_frame.text if dl.has_text_frame else ""
+    assert ends["Crest"] == "Crest 8.0" and ends["LSL"] == "LSL 9.0", ends
+    assert ends["YNBY"] == "YNBY", ends
 
 
 if __name__ == "__main__":

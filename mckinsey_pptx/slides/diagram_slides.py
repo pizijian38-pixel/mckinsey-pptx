@@ -17,7 +17,7 @@ from pptx.util import Pt
 
 from ..base import add_line, add_oval, add_rect, add_textbox, write_paragraph
 from ..design import (HAIRLINE_PT, add_arrow, check_focus, eyebrow, fit_size, focus_tag,
-                      has_focus, is_focus, set_dashed, text_height_in, tint, warn_small,
+                      has_focus, is_focus, set_dashed, text_height_in, text_width_pt, tint, warn_small,
                       write_rich_paragraph)
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
@@ -67,8 +67,20 @@ def add_fishbone(prs, *,
     bh = (bottom - top) / 2 - tag_h - 0.05
     dx = bh * math.tan(math.radians(30))
     tag_w = min(slot - 0.25, 2.2)
-    size = typo.chart_label_size + 1
     lab_w = slot - dx * 0.15 - 0.4
+    # Cause labels are sentences, so they get body size (12-13pt): the largest
+    # size at which every label fits between its neighbours on the bone.
+    def fits(sz):
+        for c in causes:
+            items = list(c.get("items", []))
+            gap = bh / (len(items) + 1)
+            if any(text_height_in([it], lab_w, sz) > gap * 0.95 for it in items):
+                return False
+            if text_width_pt(c.get("category", ""), sz, True) / 72 > tag_w - 0.15:
+                return False
+        return True
+    size = next((sz for sz in (13, 12, 11, 10) if fits(sz)), 10)
+    warn_small("fishbone", title, size, "Shorten the cause labels or use fewer causes per bone.")
 
     add_line(slide, left, cy, head_x - 0.04, cy, color=pal.text_dark, width_pt=1.5)
     add_arrow(slide, head_x - 0.3, cy, head_x - 0.02, cy, color=pal.text_dark, width_pt=1.5)

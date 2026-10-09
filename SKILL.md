@@ -62,17 +62,19 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | A whole split into parts (one split) | `treemap`; ≤ 5 parts → `chart` doughnut | cards listing segments |
 | A whole split two ways (segment × player, region × channel) | `marimekko` | a numeric `data_table` |
 | Volume moving through stages, splitting or merging | `sankey` | `process_flow`, `funnel` |
+| **Several players / segments over 3+ periods** (share, sales, price) | `chart` `line` with every series; `highlight={"series": <the one the title is about>}`, a `tone` on one rival; ≤ ~8 lines | the source table copied as a `data_table` |
 | Several items at two points in time — direction of change | `slopegraph` | before/after table |
 | Several items — the gap between two values (now vs target, us vs best) | `dumbbell` | two-column text |
 | Rank order over 3–6 periods | `bump` | a table of ranks |
 | One measure over two categorical dimensions | `heatmap` | a numeric `data_table` |
 | Options profiled on 3–8 criteria on one scale | `radar`; with weights → `decision_matrix` | cards per option |
-| Causes of one observed problem | `fishbone` | cards of causes |
+| Causes of one observed problem — **the source names the effect and says these cause it** | `fishbone` | cards of causes |
+| Weaknesses, issues or barriers to address (no stated effect) | `logic_grid` (issue → evidence → what fixes it) or `card_rows` | a `fishbone` with a borrowed effect |
 | Steps across several actors / hand-offs | `swimlane` | `process_flow` |
 | Customer steps with feelings or pain points | `journey` | `process_flow` |
 | Layers that build on each other (stack, operating model) | `layer_stack` | `card_rows` |
 | 2–3 overlapping conditions or groups | `venn` | cards |
-| Trend or magnitude by period / category | `chart` (line / column / bar) | a numeric `data_table` |
+| Trend or magnitude of one series by period / category | `chart` (line / column / bar) | a numeric `data_table` |
 | A change between two totals, explained by drivers | `waterfall` | cards of drivers |
 | Reinforcing loop, flywheel, vicious cycle | `cycle` | `card_rows` |
 | One concept and its 3–6 parts or stakeholders | `hub_spoke` | `card_grid` |
@@ -84,6 +86,12 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | Plan over time; KPIs vs target | `roadmap` / `timeline` / `phase_grid`; `scorecard` | tables |
 | **Really a list** of parallel points with detail | `card_grid` / `card_rows` — the right choice | — |
 | A text table (options × facets, as-is / to-be) | `data_table` | — |
+
+**A diagram asserts a relationship.** Cause → effect, sequence, flow,
+overlap, hierarchy or one focal item: draw it only when the source states it.
+If you infer it, either list it under "Inferences added" in the plan or use a
+list layout — never borrow an effect or a priority from another section to
+fill a diagram.
 
 Text layouts are correct when the content is a list. The checker's section
 [11] reminds you when they fill more than half of the content slides — a
@@ -146,8 +154,12 @@ the deck's content.
    stated use (e.g. 40 sections for a 10-minute talk), ask the user before
    cutting.
 2. **Every table and every number in the source appears in the deck** —
-   as a `data_table`, a chart, a KPI tile or inside the text. A 6-brand ×
-   4-year table stays 6 × 4; don't reduce it to one year.
+   as a chart, a `data_table`, a KPI tile or inside the text. A source
+   table is data, not a layout: a 6-brand × 4-year table becomes a line
+   chart with all 6 brands and all 4 years (don't reduce it to one year);
+   a text table stays a `data_table`. Numbers inside a native chart count as
+   shown — they are in the chart's data and the checker reads them — even
+   when only the focal series carries value labels.
 3. **Numbers come only from the source.** No invented metrics, baselines,
    deltas, revenue splits, store counts, dates or rankings. If a template
    slot needs a number the source doesn't have, leave the slot out, or write
@@ -290,8 +302,10 @@ programme is in its *build* phase"), pass that item as `focus=` — on
 `layer_stack`. The focal item gets the accent and everything else turns
 neutral; one or two focal items per slide, never more. Write the focal item
 next to the template in the plan ("growth_share · focus Batteries"). If the
-title makes no claim about one item, leave `focus` out (or `focus=[]` to
-silence the build warning).
+title makes no claim about one item — including titles that name several
+items side by side ("A, B and C constrain growth") — leave `focus` out (or
+`focus=[]` to silence the build warning). Never pick one of several named
+items as the focus: that is a priority the source didn't give.
 
 ## Step 4 — Fill each slide to the right density
 
@@ -506,7 +520,7 @@ The checker reports:
    row (outside a `group`), a mostly numeric table shown with no chart in
    the deck, or a `group` whose slides use different templates → fix the
    layout (parallel slides share one template; other runs get re-expressed).
-7. **Small body text (< 12pt)** → shorten the longest bullets, drop the
+7. **Small text** (body < 12pt; labels on diagrams < 10pt) → shorten the longest bullets, drop the
    subtitle or the insight bar, or split the slide. The build also prints
    `[mckinsey_pptx] WARNING ... text fitted at Npt` — treat it the same way.
    The build also warns when a title names a diagram item but `focus` is not
@@ -519,8 +533,9 @@ The checker reports:
    `make_theme(lang=...)` (the slide language) so default labels are
    translated, or pass the labels yourself.
 11. **Layout mix** (advisory, never fails) → text layouts on more than half
-   of the content slides. Re-check those slides against the relationship
-   table; keep the ones that really are lists.
+   of the content slides, and tables that hold numbers by period. Re-check
+   those slides against the relationship table; keep the ones that really
+   are lists or where exact values per cell are the point.
 
 Fix and rebuild until the checker is clean or every remaining item is
 explained in the report. Fix the deck, not the report: never reword a
@@ -545,6 +560,9 @@ missing, say the deck was not visually verified.
 - Numbered slide list: template + one-line rationale (from the plan).
 - Source mode: section coverage ("20/20 sections, 7/7 tables"), checker
   results, every `[待补充]` slot, any source data left out and why.
+- Checker result: copy the `== summary` lines of the last `run_deck.py` run
+  verbatim. If `check` is not `clean`, list each remaining item and why it
+  stays. Never describe a run with open items as passed.
 - If the checker printed a [11] layout-mix reminder: one line per listed
   slide — the relationship it shows and why a text layout is still right
   (from the plan's "Why not text cards" column). Slides you can't justify
@@ -558,7 +576,8 @@ Start from the relationship table at the top. For each slide list 1–3 candidat
 when* clauses, then pick by item count (3 vs 5 vs 7), axis type (continuous
 vs categorical) and audience. Common mistakes:
 
-- Cutting a multi-year, multi-entity table down to one year → `data_table` / `line_chart`.
+- Cutting a multi-year, multi-entity table down to one year, or copying it as a
+  table → `chart` line with every entity and year, focal entity highlighted.
 - Text features in `comparison_table` Harvey balls → `data_table`.
 - `column_simple_growth` when forecast bars are needed → `column_historic_forecast`.
 - `bubble_chart` when there are quadrant labels → `growth_share` / `prioritization_matrix`.
@@ -567,7 +586,8 @@ vs categorical) and audience. Common mistakes:
 - A market split by segment *and* by player → `marimekko`; split one way → `treemap`.
 - Volume that splits into several outcomes → `sankey`; one narrowing quantity → `funnel`.
 - Two points in time for several series → `slopegraph`; a gap per category → `dumbbell`.
-- Causes of one observed problem → `fishbone`; decomposing a goal → `issue_tree`.
+- Causes of one observed problem (stated in the source) → `fishbone`; a list of
+  weaknesses to fix → `logic_grid` / `card_rows`; decomposing a goal → `issue_tree`.
 - Steps a customer goes through *and how they feel* → `journey`; without feelings → `process_flow`.
 - Area and width charts take values >= 0 only; for gains and losses use `waterfall`.
 - One measure over two categorical dimensions → `heatmap`; risks on probability × impact → `risk_heatmap`.

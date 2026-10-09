@@ -10,7 +10,7 @@ Reports, per deck:
   5. Claims / quoted terms / vocabulary not in the sources -> possible invention
   6. Same template many slides in a row, no chart, or a parallel group
      (group=) whose slides use different templates          -> layout issues
-  7. Body text below 12pt                                  -> hard to read
+  7. Body text below 12pt (diagram labels below 10pt)     -> hard to read
   8. Footer "Source:" misuse (caption as source, wrong language)
   9. Insight bullets that only restate a table row
  10. English default labels ("Key insight", "Weighted total" ...) left in a
@@ -84,7 +84,10 @@ def _pdf_text(path: Path) -> str:
     return "\n".join(p.extract_text() or "" for p in pypdf.PdfReader(str(path)).pages)
 
 
-_NUMBERING = re.compile(r"(?m)^\s*#{0,6}\s*\d{1,2}(?:\.\d{1,2})*[.)、]\s*")
+# List / heading numbering ("3. Market", "2) Risks", "1.2. Scope", "4、").
+# The marker must be followed by a space or the line end, so a table cell that
+# holds only "24.4" or "8.0" keeps its number.
+_NUMBERING = re.compile(r"(?m)^[ \t]*#{0,6}[ \t]*\d{1,2}(?:\.\d{1,2})*(?:[.)](?=[ \t]|$)|、)[ \t]*")
 
 
 def source_text(path: Path) -> str:
@@ -338,12 +341,42 @@ _NON_CONTENT = {"cover_slide", "cover", "section_divider", "agenda", "executive_
                 "stat_hero", "big_number", "strategic_challenge", "key_question"}
 TEXT_SHARE_REMINDER = 0.5
 
+# [7] Diagrams whose text is short labels on marks (bubbles, nodes, blocks,
+# axis ends) are held to a 10pt floor; body text everywhere else to 12pt.
+_LABEL_TEMPLATES = {
+    "bubble_chart", "bubble_chart_takeaways", "growth_share", "bcg_matrix",
+    "prioritization_matrix", "matrix_2x2", "matrix", "issue_tree", "org_chart",
+    "marimekko", "mekko", "treemap", "sankey", "slopegraph", "slope", "dumbbell",
+    "heatmap", "heat_map", "radar", "spider", "venn", "bump", "rank_chart",
+    "cycle", "flywheel", "risk_heatmap", "risk_matrix", "hub_spoke", "swimlane",
+    "layer_stack", "layers", "journey", "customer_journey", "funnel",
+    "process_flow", "process_flow_horizontal"}
+LABEL_MIN_PT, BODY_MIN_PT = 10, 12
+
 
 def layout_mix(templates):
     """(text-layout slide numbers, content slide count) — slides 1-based."""
     content = [(i, t) for i, t in enumerate(templates, start=1)
                if t and t not in _NON_CONTENT]
     return [i for i, t in content if t in _TEXT_LAYOUTS], len(content)
+
+
+_PERIOD = re.compile(r"^\s*(?:(?:19|20)\d{2}\s*[A-Za-z]{0,4}|FY\s?\d{2,4}|[QH][1-4](?:\s?\d{2,4})?"
+                     r"|\d{4}\s*(?:Est\.?|E|F|A))\s*$", re.I)
+
+
+def period_table(slide) -> bool:
+    """A table whose columns (or rows) are 3+ periods and whose cells are numbers:
+    a time series laid out as a table."""
+    for sh in _iter_shapes(slide.shapes):
+        if getattr(sh, "has_table", False) and sh.has_table:
+            rows = list(sh.table.rows)
+            head = [c.text for c in rows[0].cells] if rows else []
+            first_col = [r.cells[0].text for r in rows]
+            if (sum(bool(_PERIOD.match(h)) for h in head) >= 3
+                    or sum(bool(_PERIOD.match(h)) for h in first_col) >= 3):
+                return numeric_share(slide) >= 0.6
+    return False
 
 
 def _record(slide):
@@ -388,6 +421,8 @@ def body_size(slide, slide_h) -> float | None:
     top_cut, bottom_cut = Emu(int(slide_h * 0.14)), Emu(int(slide_h * 0.93))
     for sh in _iter_shapes(slide.shapes):
         if not sh.has_text_frame or sh.top is None:
+            continue
+        if (sh.name or "").startswith("chrome:"):     # step numbers, captions
             continue
         if sh.top < top_cut or sh.top > bottom_cut:
             continue
@@ -497,8 +532,9 @@ def main(argv=None) -> int:
         if rr:
             restates.append((i, rr))
         bs = body_size(slide, sh)
-        if bs is not None and bs < 12 and i > 1:
-            small.append((i, bs))
+        floor = LABEL_MIN_PT if template_of(slide) in _LABEL_TEMPLATES else BODY_MIN_PT
+        if bs is not None and bs < floor and i > 1:
+            small.append((i, bs, floor))
         if deck_is_cjk and _EN_LABELS:
             hits = sorted(english_labels(slide))
             if hits:
@@ -610,11 +646,12 @@ def main(argv=None) -> int:
         if not runs and not bad_groups and not (n_charts == 0 and numeric_tables):
             print(f"  ok ({n_charts} chart slide(s))")
 
-    print("\n[7] Small body text (< 12pt):")
+    print("\n[7] Small text (body < 12pt; diagram labels < 10pt):")
     if small:
         flagged = True
-        for i, bs in small:
-            print(f"  slide {i}: {bs:g}pt — shorten bullets, drop subtitle/insight, or split")
+        for i, bs, floor in small:
+            print(f"  slide {i}: {bs:g}pt (min {floor}pt) — shorten bullets, drop "
+                  "subtitle/insight, or split")
     else:
         print("  none")
 
@@ -656,6 +693,11 @@ def main(argv=None) -> int:
               "Keep text where the content really is a list.")
     else:
         print(f"  ok ({len(text_slides)} of {n_content} content slides use text layouts)")
+    series_tables = [i for i, s_ in enumerate(prs.slides, start=1) if period_table(s_)]
+    if series_tables:
+        print(f"  reminder: slide(s) {', '.join(map(str, series_tables))} show numbers by period "
+              "as a table — a line chart (every series, the focal one highlighted) shows the "
+              "trend; keep the table only if exact values per cell are the point.")
 
     return 1 if flagged else 0
 

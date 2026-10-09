@@ -30,6 +30,19 @@ _TYPES = {
 _DEFAULT_SERIES_TONES = ("navy", "blue", "mid_blue", "light_blue", "amber", "gray")
 
 
+def _excel_fmt(v, fmt: str) -> str:
+    """Format a value with a simple Excel number format ('0.0', '#,##0', '0"%"')."""
+    import re
+    suffix = "".join(re.findall(r'"([^"]*)"', fmt or "")) + ("%" if (fmt or "").endswith("%") else "")
+    core = re.sub(r'"[^"]*"|%', "", fmt or "")
+    dec = len(core.split(".")[1]) if "." in core else 0
+    if fmt in (None, "", "General"):
+        dec = 0 if float(v).is_integer() else 1
+    from decimal import ROUND_HALF_UP, Decimal
+    q = Decimal(str(v)).quantize(Decimal(1).scaleb(-dec), rounding=ROUND_HALF_UP)
+    return f"{q:{',' if ',' in core else ''}.{dec}f}{suffix}"
+
+
 def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
                categories: Sequence, series: Sequence[Dict],
                number_format: str = "General", show_values: bool = True,
@@ -71,8 +84,10 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
         ca.format.line.color.rgb = pal.rule_gray
 
     multi = len(series) > 1 or is_pie
-    chart.has_legend = multi
-    if multi:
+    # 3+ lines: each line is named at its right end instead of in a legend
+    end_named = chart_type == "line" and len(series) > 2
+    chart.has_legend = multi and not end_named
+    if chart.has_legend:
         chart.legend.position = XL_LEGEND_POSITION.TOP
         chart.legend.include_in_layout = False
         chart.legend.font.size = Pt(12)
@@ -121,9 +136,29 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
             dl.font.bold = True
             dl.font.color.rgb = tone_rgb(theme, hl_tone if s["name"] == hl_series
                                          else s.get("tone"))
-            dl.position = XL_LABEL_POSITION.ABOVE
+            # focal line labels above, a toned rival's below: close lines don't collide
+            dl.position = (XL_LABEL_POSITION.ABOVE if s["name"] == hl_series or not hl_series
+                           else XL_LABEL_POSITION.BELOW)
             dl.show_value = True
-    elif show_values:
+    if end_named:
+        for s, ps in zip(series, plot.series):
+            vals = [v for v in s["values"]]
+            last = max((k for k, v in enumerate(vals) if v is not None), default=None)
+            if last is None:
+                continue
+            dl = ps.points[last].data_label
+            dl.position = XL_LABEL_POSITION.RIGHT
+            tf = dl.text_frame
+            labelled = show_values and label_only and s["name"] in label_only
+            tf.text = (f"{s['name']} {_excel_fmt(vals[last], number_format)}" if labelled
+                       else str(s["name"]))
+            r = tf.paragraphs[0].runs[0]
+            r.font.size = Pt(11)
+            focal = s["name"] == hl_series or bool(s.get("tone"))
+            r.font.bold = focal
+            r.font.color.rgb = (tone_rgb(theme, hl_tone) if s["name"] == hl_series else
+                                tone_rgb(theme, s.get("tone")) if s.get("tone") else pal.footer_gray)
+    elif show_values and not label_only:
         plot.has_data_labels = True
         dl = plot.data_labels
         dl.number_format = number_format

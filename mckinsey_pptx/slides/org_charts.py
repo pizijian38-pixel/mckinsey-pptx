@@ -301,7 +301,7 @@ def add_org_chart(prs, *,
             _box(slide, theme, hx, ry, box_w, rh, text=r,
                  fill=pal.bright_blue if rf else pal.soft_gray,
                  color=pal.white if rf else pal.text_dark,
-                 bold=rf, size=typo.body_size - 3)
+                 bold=rf, size=typo.body_size - 2)
             ry += rh + rg
     return slide
 

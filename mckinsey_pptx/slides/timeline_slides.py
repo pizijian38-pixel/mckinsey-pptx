@@ -523,7 +523,7 @@ def add_overview_areas(prs, *,
                          card_w - 0.20, card_h - head_h - 0.10)
         first = True
         for b in area.get("bullets", []):
-            write_paragraph(tb.text_frame, b, size=typo.body_size - 2,
+            write_paragraph(tb.text_frame, b, size=typo.body_size,
                             color=pal.text_dark, family=typo.family,
                             bullet=True, space_after=2, first=first)
             first = False
