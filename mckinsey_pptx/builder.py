@@ -22,6 +22,7 @@ from .slides import (
     table_slides, card_slides, native_chart, ladder_slides,
     finance_slides, plan_slides, matrix_slides, composite_slides,
     evaluation_slides, logic_slides, analysis_slides, framework_slides,
+    share_slides, change_slides, diagram_slides,
 )
 
 
@@ -115,6 +116,19 @@ _REGISTRY = {
     "bmc": framework_slides.add_business_model_canvas,
     "strategic_triangle": framework_slides.add_strategic_triangle,
     "hub_spoke": framework_slides.add_hub_spoke,
+
+    # Part-of-whole, flows, change, qualitative diagrams
+    "marimekko": share_slides.add_marimekko,
+    "mekko": share_slides.add_marimekko,
+    "treemap": share_slides.add_treemap,
+    "sankey": share_slides.add_sankey,
+    "slopegraph": change_slides.add_slopegraph,
+    "slope": change_slides.add_slopegraph,
+    "dumbbell": change_slides.add_dumbbell,
+    "fishbone": diagram_slides.add_fishbone,
+    "ishikawa": diagram_slides.add_fishbone,
+    "journey": diagram_slides.add_journey,
+    "customer_journey": diagram_slides.add_journey,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,
@@ -360,6 +374,23 @@ def focus_candidates(name: str, kw: Dict[str, Any]) -> List[str]:
     elif name == "hub_spoke":
         for sp in kw.get("spokes", []):
             L += _labels(sp)
+    elif name == "marimekko":
+        L += [c.get("name", "") for c in kw.get("columns", [])] + list(kw.get("series", []))
+    elif name == "treemap":
+        for it in kw.get("items", []):
+            L += _labels(it)
+    elif name == "sankey":
+        for f in kw.get("flows", []):
+            L += [f.get("from", ""), f.get("to", "")]
+    elif name in ("slopegraph", "journey"):
+        for it in kw.get("series", kw.get("stages", [])):
+            L += _labels(it)
+    elif name == "dumbbell":
+        for it in kw.get("rows", []):
+            L += _labels(it)
+    elif name == "fishbone":
+        for c in kw.get("causes", []):
+            L += [c.get("category", "")] + list(c.get("items", []))
     else:
         return None
     return [str(x) for x in L if x]

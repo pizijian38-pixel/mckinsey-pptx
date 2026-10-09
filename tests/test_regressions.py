@@ -188,6 +188,112 @@ def test_focus_draws_one_accent():
     assert fills.count(acc) == 2, fills
 
 
+# ---------- data fidelity of the area / width / position charts ----------
+
+def _marks(slide, prefix):
+    return {sh.name[len(prefix):]: sh for sh in slide.shapes if sh.name.startswith(prefix)}
+
+
+def _rel(a, b):
+    return abs(a - b) / max(abs(b), 1e-9)
+
+
+def test_marimekko_area_is_share_of_total():
+    """Each segment's area must be its share of the grand total (column width =
+    column share, height = share within column)."""
+    series = ["A", "B", "C"]
+    cols = [{"name": "X", "values": [10, 30, 0]}, {"name": "Y", "values": [5, 5, 5]},
+            {"name": "Z", "values": [1, 2, 42]}]
+    b = PresentationBuilder()
+    b.add("marimekko", title="t", series=series, columns=cols)
+    m = _marks(b.prs.slides[0], "mekko:")
+    grand = sum(sum(c["values"]) for c in cols)
+    assert "X|C" not in m, "zero segment must be omitted, not drawn"
+    areas = {k: sh.width * sh.height for k, sh in m.items()}
+    tot = sum(areas.values())
+    for c in cols:
+        for s_, v in zip(series, c["values"]):
+            if v:
+                assert _rel(areas[f"{c['name']}|{s_}"] / tot, v / grand) < 0.01, (c, s_)
+
+
+def test_treemap_area_is_value():
+    items = [{"name": n, "value": v} for n, v in
+             [("a", 50), ("b", 20), ("c", 12), ("d", 9), ("e", 6), ("f", 3)]]
+    b = PresentationBuilder()
+    b.add("treemap", title="t", items=items)
+    m = _marks(b.prs.slides[0], "treemap:")
+    tot = sum(sh.width * sh.height for sh in m.values())
+    for it in items:
+        sh = m[it["name"]]
+        assert _rel(sh.width * sh.height / tot, it["value"] / 100) < 0.01, it
+
+
+def _ribbon_ends(shp):
+    """Ribbon thickness at its source and target ends, in EMU."""
+    from pptx.oxml.ns import qn
+    path = shp._element.find(".//" + qn("a:path"))
+    ys = [int(pt.get("y")) for pt in path.iter(qn("a:pt"))]
+    sy = shp.height / int(path.get("h"))
+    half = len(ys) // 2
+    return (ys[-1] - ys[0]) * sy, (ys[half] - ys[half - 1]) * sy
+
+
+def test_sankey_width_is_value_and_conserved():
+    """Node height and ribbon width share one scale; a ribbon is equally thick at
+    both ends; a node that loses volume is reported."""
+    flows = [{"from": "In", "to": "A", "value": 60}, {"from": "In", "to": "B", "value": 40},
+             {"from": "A", "to": "Win", "value": 45}, {"from": "A", "to": "Lose", "value": 15},
+             {"from": "B", "to": "Win", "value": 10}, {"from": "B", "to": "Lose", "value": 30}]
+    b = PresentationBuilder()
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        b.add("sankey", title="t", flows=flows)
+    assert "WARNING" not in err.getvalue(), err.getvalue()
+    s = b.prs.slides[0]
+    nodes = _marks(s, "sankey-node:")
+    k = nodes["In"].height / 100
+    assert _rel(nodes["Win"].height, 55 * k) < 0.01 and _rel(nodes["A"].height, 60 * k) < 0.01
+    ribbons = _marks(s, "sankey:")
+    for f in flows:
+        src, dst = _ribbon_ends(ribbons[f"{f['from']} → {f['to']}"])
+        assert _rel(src, f["value"] * k) < 0.01 and _rel(dst, f["value"] * k) < 0.01, f
+    leak = flows[:-1]                       # B sends on 10 of its 40
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        PresentationBuilder().add("sankey", title="t", flows=leak)
+    assert "'B' takes in 40 but sends on 10" in err.getvalue(), err.getvalue()
+
+
+def test_area_charts_reject_negative_values():
+    for kind, kw in (("treemap", {"items": [{"name": "a", "value": 5},
+                                             {"name": "b", "value": -1}]}),
+                     ("marimekko", {"series": ["s", "t"],
+                                    "columns": [{"name": "x", "values": [1, -2]}]}),
+                     ("sankey", {"flows": [{"from": "a", "to": "b", "value": -3}]})):
+        try:
+            PresentationBuilder().add(kind, title="t", **kw)
+        except ValueError:
+            continue
+        raise AssertionError(f"{kind} accepted a negative value")
+
+
+def test_slopegraph_axes_share_one_scale():
+    """Every endpoint, on either axis, sits on one linear value -> y mapping."""
+    series = [{"name": n, "start": a, "end": e} for n, a, e in
+              [("p", 512, 288), ("q", 376, 264), ("r", 238, 431), ("s", 164, 121)]]
+    b = PresentationBuilder()
+    b.add("slopegraph", title="t", series=series)
+    lines = _marks(b.prs.slides[0], "slope:")
+    pts = []
+    for sr in series:
+        ln = lines[sr["name"]]
+        pts += [(sr["start"], ln.begin_y), (sr["end"], ln.end_y)]
+    (v0, y0), (v1, y1) = pts[0], pts[2]
+    slope = (y1 - y0) / (v1 - v0)
+    assert all(abs(y - (y0 + (v - v0) * slope)) < 2000 for v, y in pts), pts  # < 0.002 in
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

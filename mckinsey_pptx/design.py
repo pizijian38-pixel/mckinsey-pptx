@@ -453,3 +453,44 @@ def legend_strip(slide, theme: Theme, items, y, *, x=None, w=None, note=None):
                         color=pal.footer_gray, family=theme.typography.family,
                         align=PP_ALIGN.RIGHT, first=True)
     return 0.4
+
+
+def set_alpha(shape, opacity: float):
+    """Make a solid-filled shape partly transparent (0 = clear, 1 = opaque)."""
+    from pptx.oxml.ns import qn
+    from lxml import etree
+    clr = shape.fill._xPr.find(qn("a:solidFill"))
+    if clr is None or not len(clr):
+        return
+    c = clr[0]
+    for old in c.findall(qn("a:alpha")):
+        c.remove(old)
+    etree.SubElement(c, qn("a:alpha")).set("val", str(int(round(opacity * 100000))))
+
+
+def fmt_num(v, fmt: Optional[str] = None) -> str:
+    """Format a data value: `fmt` is a format string ("${:,.1f}B"), else a plain
+    number with thousands separators and at most one decimal."""
+    if fmt:
+        return fmt.format(v)
+    v = float(v)
+    if abs(v - round(v)) < 1e-9 or abs(v) >= 100:
+        return f"{v:,.0f}"
+    return f"{v:,.1f}"
+
+
+def pct(v: float) -> str:
+    return f"{v * 100:.0f}%"
+
+
+def nice_bounds(lo: float, hi: float, n: int = 5, include_zero=False):
+    """Round axis bounds and a step that contain [lo, hi]."""
+    import math as _m
+    if include_zero:
+        lo, hi = min(lo, 0.0), max(hi, 0.0)
+    if hi <= lo:
+        hi = lo + 1
+    raw = (hi - lo) / n
+    mag = 10 ** _m.floor(_m.log10(raw))
+    step = next(s * mag for s in (1, 2, 2.5, 5, 10) if s * mag >= raw)
+    return _m.floor(lo / step) * step, _m.ceil(hi / step) * step, step

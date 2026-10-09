@@ -16,7 +16,9 @@ All templates accept these common optional kwargs (omit unless useful):
 
 **Focus — one accent per slide.** The diagram templates `growth_share`,
 `matrix_2x2`, `prioritization_matrix`, `cycle`, `risk_heatmap`,
-`process_flow`, `funnel`, `issue_tree`, `org_chart` and `hub_spoke` take
+`process_flow`, `funnel`, `issue_tree`, `org_chart`, `hub_spoke` and the data
+diagrams `marimekko`, `treemap`, `sankey`, `slopegraph`, `dumbbell`,
+`fishbone`, `journey` take
 `focus=`: the label (or 0-based index, or a list) of the item the action
 title is about. That item carries the accent; everything else is drawn
 neutral, so the eye lands where the title points. Without `focus` every item
@@ -1769,6 +1771,195 @@ b.add("hub_spoke", title="The product combines four disciplines; the weakest set
               {"title": "Manufacturing", "note": "3D printing at scale"}],
       side={"title": "Partnerships and talent are critical",
             "bullets": ["A gap in one discipline weakens the whole product"]})
+```
+
+---
+
+## 68. Marimekko (`marimekko`, alias `mekko`)
+
+**Category:** Data — two-way part-of-whole
+**Use when:** A market split two ways where both splits matter (segment ×
+player, region × channel): "where do we win, and how big is it?". Column width
+= the column's share of the total; segment height = share within the column;
+so every block's area is its share of the whole.
+**Don't use when:** Only one split (use `treemap` or a bar chart); a series
+over time (use `stacked_column_chart`); more than ~8 columns or 5 series.
+**Required inputs:** `series: [str]` (top to bottom, 2–5), `columns: [{name,
+values: [one per series, >= 0]}]` (3–8)
+**Optional inputs:** `fmt` (value format, e.g. `"${:,.1f}B"`), `cell_label:
+share | value | both | none`, `show_totals`, `focus` (a column, a series, or one
+cell as `"Column / Series"`), `subtitle`, `insight`
+**Rules:** values must be ≥ 0 (a negative raises an error). A zero segment is
+left out, not drawn flat.
+**Example:**
+```python
+b.add("marimekko", title="Premium is the only segment where we lead, and it is the smallest",
+      series=["Us", "Leader", "Challenger", "Others"],
+      columns=[{"name": "Mass", "values": [14, 30, 20, 16]},
+               {"name": "Mid-price", "values": [12, 15, 9, 9]},
+               {"name": "Premium", "values": [11, 5, 2, 2]},
+               {"name": "Online-only", "values": [3, 4, 8, 5]}],
+      fmt="${:,.0f}B", focus="Premium / Us", source="Company estimates, 2025")
+```
+
+---
+
+## 69. Treemap (`treemap`)
+
+**Category:** Data — one-way part-of-whole
+**Use when:** One total split into 4–8 parts where the relative sizes are the
+story (revenue by product, spend by category, population by region).
+Squarified cells; area = value.
+**Don't use when:** Exact values or ranking matter more than proportion (use a
+bar chart); two splits (use `marimekko`); a hierarchy to trace (use `issue_tree`).
+**Required inputs:** `items: [{name, value >= 0}]`
+**Optional inputs:** `fmt`, `max_cells` (default 8 — the smallest items beyond
+it fold into one "Other" cell, named in the note), `other_label`, `focus`,
+`subtitle`, `insight`
+**Rules:** cells too small for a label are listed in the note under the map,
+never dropped.
+**Example:**
+```python
+b.add("treemap", title="Asia is three-fifths of the world's population",
+      items=[{"name": "Asia", "value": 4780}, {"name": "Africa", "value": 1460},
+             {"name": "Europe", "value": 745}, {"name": "Latin America", "value": 665},
+             {"name": "North America", "value": 380}, {"name": "Oceania", "value": 46}],
+      fmt="{:,.0f}M", focus="Asia", source="UN World Population Prospects, 2024")
+```
+
+---
+
+## 70. Sankey (`sankey`)
+
+**Category:** Data — flows that split and merge
+**Use when:** A quantity moves through 2–4 stages and splits or merges on the
+way (conversion with several outcomes, budget allocation, customer flows
+between segments). Node height and ribbon width share one scale.
+**Don't use when:** A single narrowing quantity with no splits (use `funnel`);
+steps without quantities (use `process_flow`).
+**Required inputs:** `flows: [{from, to, value >= 0}]` — stages follow from the
+links (sources left; each node one column right of its furthest source)
+**Optional inputs:** `stages: [str]` (column headers), `fmt`, `focus` (a node,
+or one flow as `"A → B"`), `subtitle`, `insight`
+**Rules:** volume is conserved — a middle node whose inflow and outflow differ
+prints a WARNING; add the missing flow (an "Other" / "Lost" node). Keep to
+≤ 10 nodes and ≤ 14 flows.
+**Example:**
+```python
+b.add("sankey", title="One in five trial users never activates; onboarding loses the most",
+      stages=["Sign-ups", "First week", "Month 3"],
+      flows=[{"from": "Trial sign-ups", "to": "Activated", "value": 8000},
+             {"from": "Trial sign-ups", "to": "Never activated", "value": 2000},
+             {"from": "Activated", "to": "Paying", "value": 3000},
+             {"from": "Activated", "to": "Free tier", "value": 3500},
+             {"from": "Activated", "to": "Churned", "value": 1500}],
+      fmt="{:,.0f}", focus="Never activated", source="Product analytics, Q2")
+```
+
+---
+
+## 71. Slopegraph (`slopegraph`, alias `slope`)
+
+**Category:** Data — change between two states
+**Use when:** 4–10 series compared at exactly two points (before / after, two
+years, two scenarios): who rose, who fell, who changed rank.
+**Don't use when:** Three or more points in time (use `line_chart`); one series
+(write the sentence); two different units.
+**Required inputs:** `series: [{name, start, end}]`
+**Optional inputs:** `states` (the two captions), `fmt`, `include_zero` (the
+shared scale is rounded around the data by default — say so in the source if it
+does not start at 0), `focus`, `subtitle`, `insight`
+**Example:**
+```python
+b.add("slopegraph", title="Recommender was the only service to get slower after the migration",
+      states=["Before migration", "After migration"],
+      series=[{"name": "Search", "start": 512, "end": 288},
+              {"name": "Catalog", "start": 376, "end": 264},
+              {"name": "Checkout", "start": 291, "end": 243},
+              {"name": "Recommender", "start": 238, "end": 431},
+              {"name": "Auth", "start": 164, "end": 121}],
+      fmt="{:,.0f} ms", focus="Recommender", source="APM p95 latency, 30-day windows")
+```
+
+---
+
+## 72. Dumbbell (`dumbbell`)
+
+**Category:** Data — gap between two values per category
+**Use when:** 3–12 categories each with two values on one scale (us vs. leader,
+target vs. actual, 2020 vs. 2025) and the gap is the point.
+**Don't use when:** The two values are different units; only totals matter
+(use a bar chart).
+**Required inputs:** `rows: [{name, a, b}]` — `a` is the ring, `b` the dot
+**Optional inputs:** `labels` (legend for a / b), `sort: None | "b" | "gap"`,
+`fmt`, `include_zero` (off by default: dots encode position, not length),
+`focus`, `subtitle`, `insight`
+**Example:**
+```python
+b.add("dumbbell", title="Our price gap to the leader is widest in Jakarta",
+      labels=["Leader price", "Our price"], sort="gap",
+      rows=[{"name": "Bangkok", "a": 42, "b": 48}, {"name": "Jakarta", "a": 35, "b": 47},
+            {"name": "Manila", "a": 39, "b": 44}, {"name": "Ho Chi Minh City", "a": 37, "b": 40},
+            {"name": "Kuala Lumpur", "a": 45, "b": 46}],
+      fmt="${:,.0f}", focus="Jakarta", source="Store checks, March")
+```
+
+---
+
+## 73. Fishbone / Ishikawa (`fishbone`, alias `ishikawa`)
+
+**Category:** Logic — causes of one observed effect
+**Use when:** Root-cause analysis: one problem that was observed, causes
+grouped into 3–6 categories with 1–3 causes each, one confirmed root cause.
+**Don't use when:** Decomposing a goal or a metric (use `issue_tree`); events
+in order (use `timeline`); the categories would be an empty 6M checklist.
+**Required inputs:** `effect: str` (a symptom, not a fix), `causes:
+[{category, items: [str]}]`
+**Optional inputs:** `focus` (the root cause — a category or one item),
+`subtitle`, `insight`
+**Example:**
+```python
+b.add("fishbone", title="Late deliveries trace back to the warehouse system, not the carriers",
+      effect="On-time delivery fell from 95% to 82%",
+      causes=[{"category": "Carriers", "items": ["Peak-season capacity", "Two new regional partners"]},
+              {"category": "Warehouse system", "items": ["Pick lists batch every 4 hours",
+                                                         "Stock counts lag 1 day"]},
+              {"category": "Demand", "items": ["Promo spikes not forecast"]},
+              {"category": "People", "items": ["Night shift understaffed", "New pickers untrained"]},
+              {"category": "Orders", "items": ["Split shipments up 30%"]}],
+      focus="Warehouse system", source="Ops review, May")
+```
+
+---
+
+## 74. Customer journey (`journey`, alias `customer_journey`)
+
+**Category:** Framework — one persona across stages, with sentiment
+**Use when:** What one customer does across 3–6 stages and how it feels; the
+sentiment line carries the message (where the experience breaks).
+**Don't use when:** Nobody's feeling changes (use `process_flow`); several
+personas (one slide each); an internal process with no customer.
+**Required inputs:** `stages: [{name, sentiment, action?, touchpoint?, pain?}]` —
+sentiment as -2..2 or "very negative" … "very positive" (named levels)
+**Optional inputs:** `persona` (line under the title), `row_labels`, `focus`
+(the stage the title is about, usually the trough), `focus_label`, `subtitle`,
+`insight`
+**Rules:** at most 2 pain points per journey.
+**Example:**
+```python
+b.add("journey", title="Trial users love setup but stall when they hit the plan limit",
+      persona="Persona: small-business owner on a 14-day trial",
+      stages=[{"name": "Sign up", "sentiment": "positive", "action": "Creates workspace",
+               "touchpoint": "Sign-up form"},
+              {"name": "First run", "sentiment": "neutral", "action": "Imports first dataset",
+               "touchpoint": "Onboarding wizard"},
+              {"name": "Invite team", "sentiment": "very positive", "action": "Adds 3 teammates",
+               "touchpoint": "Email invites"},
+              {"name": "Hit the limit", "sentiment": "very negative", "action": "Export blocked mid-report",
+               "touchpoint": "In-app modal", "pain": "Limit appears with no warning"},
+              {"name": "Upgrade", "sentiment": "neutral", "action": "Picks annual plan",
+               "touchpoint": "Billing page"}],
+      focus="Hit the limit", source="12 user interviews, June")
 ```
 
 ---
