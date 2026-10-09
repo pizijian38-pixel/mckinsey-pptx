@@ -131,6 +131,21 @@ def test_catalog_examples_run():
     assert not failures, "\n".join(failures)
 
 
+def test_no_theme_shadows():
+    """Connectors reference theme effect style 1, which python-pptx's default
+    theme defines as an outer shadow: every rule and arrow had a drop shadow
+    in PowerPoint. The saved deck must contain no shadow effect anywhere."""
+    b = PresentationBuilder()
+    b.add("cycle", title="Shadows", kind="vicious", steps=["A", "B", "C"], center="X")
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "s.pptx"
+        b.save(str(path))
+        with zipfile.ZipFile(path) as z:
+            hits = [n for n in z.namelist() if n.endswith(".xml")
+                    and b"outerShdw" in z.read(n)]
+    assert not hits, f"shadow effects in: {hits}"
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
