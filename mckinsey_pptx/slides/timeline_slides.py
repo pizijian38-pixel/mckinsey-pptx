@@ -21,6 +21,7 @@ from ..base import (
 )
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
+from ..design import mark_index
 
 
 # ---------- shared chevron primitive ----------
@@ -110,7 +111,7 @@ def add_phases_chevron_3(prs, *,
         nx = x + 0.18
         ny = chev_y + (chev_h - n_d) / 2
         add_oval(slide, nx, ny, n_d, n_d, fill=pal.white)
-        tb = add_textbox(slide, nx, ny, n_d, n_d, anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_index(add_textbox(slide, nx, ny, n_d, n_d, anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, str(i + 1), size=typo.body_size,
                         bold=True, color=pal.deep_navy, family=typo.family,
                         align=PP_ALIGN.CENTER, first=True)
@@ -511,8 +512,8 @@ def add_overview_areas(prs, *,
         by = body_top
         add_oval(slide, bx, by, badge_d, badge_d, fill=pal.white,
                  line=pal.deep_navy, line_width=1.0)
-        tb = add_textbox(slide, bx, by, badge_d, badge_d,
-                         anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_index(add_textbox(slide, bx, by, badge_d, badge_d,
+                                    anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, letters[i] if i < len(letters)
                         else str(i + 1),
                         size=typo.body_size, bold=True, color=pal.deep_navy,

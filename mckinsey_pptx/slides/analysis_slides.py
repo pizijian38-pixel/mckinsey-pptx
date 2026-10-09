@@ -30,6 +30,7 @@ from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
 from .evaluation_slides import _frame
 from .logic_slides import _cell, _cell_h, _write_cell
+from ..design import mark_index
 
 MIN_PT = 10
 
@@ -275,8 +276,8 @@ def _loop(slide, theme, left, top, width, bottom, steps, center, kind, where, fo
               fill=pal.deep_navy if f else pal.white,
               line=pal.deep_navy if f else pal.rule_gray,
               line_w=1.0 if f else HAIRLINE_PT, color=pal.white if f else None)
-        eyebrow(slide, theme, x + 0.1, y + 0.03, 0.6, f"{i + 1:02d}",
-                color=pal.light_blue if f else pal.footer_gray, size=9, h=0.2)
+        mark_index(eyebrow(slide, theme, x + 0.1, y + 0.03, 0.6, f"{i + 1:02d}",
+                           color=pal.light_blue if f else pal.footer_gray, size=9, h=0.2))
         if f and focus_label:
             focus_tag(slide, theme, x + nw - 0.08, y - 0.13, focus_label, h=0.26,
                       anchor="right")

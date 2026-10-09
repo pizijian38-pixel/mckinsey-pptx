@@ -10,6 +10,70 @@ that ships inside this skill folder, and turn the user's material into a real
 `.pptx` in which **every slide uses the right template for what it
 communicates**, and you can defend each choice.
 
+## Working rules (read first)
+
+1. **Two commands do the mechanics** — use them instead of ad-hoc
+   `python -c` one-liners (each one-off command may need the user's
+   approval; these two are the approved path):
+   - `python SKILL_DIR/scripts/catalog.py` — one-line index of all templates;
+     `python SKILL_DIR/scripts/catalog.py sankey slopegraph venn` — the full
+     entries (arguments + runnable example) for just those templates.
+   - `python SKILL_DIR/scripts/run_deck.py output/build_<slug>.py --source <file>`
+     — builds, checks and renders in one go (finds LibreOffice on Windows,
+     waits for the PDF, writes PNGs + `contact_sheet.png`).
+2. **Attachments are files on disk — read them, never retype them.** When the
+   user attaches or names a file, find its path in the conversation context
+   (Antigravity keeps uploads in the conversation's `.user_uploaded/` folder;
+   other hosts give an absolute path) and pass that path to `--source`. A
+   hand-typed copy loses tables and numbers, and the checker then compares
+   the deck against your copy instead of the real source. Can't find it? Ask
+   the user for the path — don't search the whole disk, don't reconstruct it.
+3. **The checker is a reviewer, not a score.** Don't open `deck_check.py` or
+   the package source to learn how findings are computed; read the report and
+   fix the deck. Coverage ([2]) exists to show source facts you missed —
+   never add numbers, words or phrases (e.g. "10-slide") to raise it or to
+   shorten the vocabulary list. Advisory sections ([2] [3] [5c] [11]) never
+   require changing a correct slide. If a finding is wrong, say so in the
+   report.
+4. **Pick the template from the relationship, not the topic** (table below).
+
+## Pick the template by the relationship
+
+Ask of every content slide: *what relationship does it show?* Then start
+from this table (newest templates first). Get the API with `catalog.py <name>`.
+
+| The content is… | Use | Instead of |
+|---|---|---|
+| A whole split into parts (one split) | `treemap`; ≤ 5 parts → `chart` doughnut | cards listing segments |
+| A whole split two ways (segment × player, region × channel) | `marimekko` | a numeric `data_table` |
+| Volume moving through stages, splitting or merging | `sankey` | `process_flow`, `funnel` |
+| Several items at two points in time — direction of change | `slopegraph` | before/after table |
+| Several items — the gap between two values (now vs target, us vs best) | `dumbbell` | two-column text |
+| Rank order over 3–6 periods | `bump` | a table of ranks |
+| One measure over two categorical dimensions | `heatmap` | a numeric `data_table` |
+| Options profiled on 3–8 criteria on one scale | `radar`; with weights → `decision_matrix` | cards per option |
+| Causes of one observed problem | `fishbone` | cards of causes |
+| Steps across several actors / hand-offs | `swimlane` | `process_flow` |
+| Customer steps with feelings or pain points | `journey` | `process_flow` |
+| Layers that build on each other (stack, operating model) | `layer_stack` | `card_rows` |
+| 2–3 overlapping conditions or groups | `venn` | cards |
+| Trend or magnitude by period / category | `chart` (line / column / bar) | a numeric `data_table` |
+| A change between two totals, explained by drivers | `waterfall` | cards of drivers |
+| Reinforcing loop, flywheel, vicious cycle | `cycle` | `card_rows` |
+| One concept and its 3–6 parts or stakeholders | `hub_spoke` | `card_grid` |
+| Positioning / prioritising on two dimensions | `matrix_2x2`, `growth_share`, `prioritization_matrix` | cards |
+| Risks by probability × impact | `risk_heatmap` (owners → `risk_register`) | `card_rows` |
+| Factor → impact → implication, per topic | `logic_grid` | cards |
+| Decomposing a goal or question | `issue_tree` | bullets |
+| Sequence of steps, one actor; narrowing quantity | `process_flow`; `funnel` | `card_rows` |
+| Plan over time; KPIs vs target | `roadmap` / `timeline` / `phase_grid`; `scorecard` | tables |
+| **Really a list** of parallel points with detail | `card_grid` / `card_rows` — the right choice | — |
+| A text table (options × facets, as-is / to-be) | `data_table` | — |
+
+Text layouts are correct when the content is a list. The checker's section
+[11] reminds you when they fill more than half of the content slides — a
+prompt to look at those slides again, not a rule to satisfy.
+
 ## Paths
 
 - `SKILL_DIR` = the absolute path of the folder containing this `SKILL.md`
@@ -17,7 +81,9 @@ communicates**, and you can defend each choice.
   use the absolute path everywhere below.
 - Python package: `SKILL_DIR/mckinsey_pptx/`
 - Template catalog (API of every template): `SKILL_DIR/mckinsey_pptx/agent/CATALOG.md`
-- Deck checker: `SKILL_DIR/scripts/deck_check.py`
+- Template lookup: `SKILL_DIR/scripts/catalog.py` (index / named entries)
+- Build + check + render: `SKILL_DIR/scripts/run_deck.py`
+- Deck checker (run by `run_deck.py`): `SKILL_DIR/scripts/deck_check.py`
 - Working example of a Chinese deck: `SKILL_DIR/examples/demo_chinese.py`
 - Output: the user's **workspace** under `output/`. Never write into `SKILL_DIR`.
 
@@ -32,10 +98,11 @@ python3 -c "import pptx" || python3 -m pip install -r "SKILL_DIR/requirements.tx
 The only dependency is `python-pptx`. The package itself is not installed
 with pip — build scripts add `SKILL_DIR` to `sys.path` (see step 5).
 
-Optional, for visual verification: LibreOffice (`soffice`) and poppler
-(`pdftoppm`). On Windows `soffice` usually lives at
-`C:\Program Files\LibreOffice\program\soffice.exe`. Don't block the build on
-these; the `.pptx` doesn't need them.
+Optional, for visual verification: LibreOffice, plus poppler (`pdftoppm`)
+or PyMuPDF (`pip install pymupdf`) for the PNGs. `run_deck.py` finds them
+itself (including `C:\Program Files\LibreOffice\program\soffice.exe`) and
+says what is missing. Don't block the build on these; the `.pptx` doesn't
+need them.
 
 ---
 
@@ -144,25 +211,41 @@ the deck's content.
   - Brief mode: 5–10 slides unless told otherwise.
 - **Attribution**: the company/team name for the footer — only if the user
   gave one or it is in their files.
-- If the user points to files (`.xlsx`, `.csv`, `.docx`, `.pdf`, `.md`), read
-  them fully, including tables.
+- If the user points to or attaches files (`.xlsx`, `.csv`, `.docx`, `.pdf`,
+  `.md`), read them fully from their real path, including tables (working
+  rule 2). These paths are the `--source` files in step 6.
 
-## Step 2 — Read the catalog
+## Step 2 — Look up the templates
 
-Load `SKILL_DIR/mckinsey_pptx/agent/CATALOG.md`. It is the source of truth
-for every template's name, arguments, *Use when* and *Don't use when*. Never
-invent template names or argument shapes.
+1. Run `python SKILL_DIR/scripts/catalog.py` once — the index of every
+   template with its *Use when* line.
+2. For each slide, name the relationship (table above) and 1–3 candidate
+   templates; then run `catalog.py <candidates…>` for their full entries
+   (arguments, *Don't use when*, a runnable example).
+   `catalog.py --guide` prints "Choosing between similar templates".
+
+The catalog (`CATALOG.md`) is the source of truth for names and arguments —
+never invent template names or argument shapes. Don't page through
+CATALOG.md by line ranges or grep it for templates you already know; the
+newer diagram templates sit at the end and get missed that way.
 
 ## Step 3 — Write the slide plan first
 
 Before writing any build code, write `output/<slug>_plan.md` — a table with
 one row per slide:
 
-| # | Source section | Required elements (from the request) | Message (action title) | Template | Source data used | Inferences added |
-|---|---|---|---|---|---|---|
+| # | Source section | Required elements (from the request) | Message (action title) | Relationship | Template | Why not text cards | Source data used | Inferences added |
+|---|---|---|---|---|---|---|---|---|
 
 "Required elements" copies what the user asked that slide to contain
 (or "—"); after building, tick each one off against the rendered slide.
+
+"Relationship" names what the slide shows, in the words of the table above
+("whole split two ways", "gap per item", "causes of one problem", "list").
+"Why not text cards": for a diagram or chart, "—"; for `card_grid`,
+`card_rows`, `data_table` or `swot`, say in a few words why the content is
+really a list ("4 parallel initiatives, no order or quantity"). If you
+can't, pick the diagram.
 
 "Inferences added" lists every supporting point or insight that is a
 consequence you drew rather than a sentence from the source — so the user
@@ -240,7 +323,8 @@ silence the build warning).
 
 **Data → template rules:**
 
-Default to the **rich templates** (41–67); they use larger type, fit text to
+The relationship table at the top comes first; this table covers the
+remaining cases. Default to the **rich templates** (41–80); they use larger type, fit text to
 the space, support emphasis and icons, and produce editable tables and
 charts. Use the older templates (1–40) for what they uniquely cover. When no
 single template fits a slide that mixes content types, build it with
@@ -367,12 +451,16 @@ b.save(str(OUT / "<slug>.pptx"))
 Only use `b.add(<template>, ...)` — never draw PowerPoint shapes by hand,
 and never edit files under `SKILL_DIR`.
 
-## Step 6 — Build and check against the source
+## Step 6 — Build, check and render (one command)
 
 ```bash
-python3 output/build_<slug>.py
-python3 "SKILL_DIR/scripts/deck_check.py" output/<slug>.pptx --source <each source file>
+python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source <each source file>
 ```
+
+It runs the build, prints build WARNINGs, runs the checker on the deck the
+build wrote, renders PNGs into `output/preview_<slug>/` and ends with a
+summary (build / check / render). Exit status 0 = nothing to fix. Brief mode:
+no `--source`. Add `--no-render` while iterating on fixes.
 
 The checker reports:
 1. **Numbers not found in the sources** → in source mode, remove each one or
@@ -411,23 +499,23 @@ The checker reports:
 10. **English default labels in a CJK deck** → build the theme with
    `make_theme(lang=...)` (the slide language) so default labels are
    translated, or pass the labels yourself.
+11. **Layout mix** (advisory, never fails) → text layouts on more than half
+   of the content slides. Re-check those slides against the relationship
+   table; keep the ones that really are lists.
 
 Fix and rebuild until the checker is clean or every remaining item is
-explained in the report.
+explained in the report. Fix the deck, not the report: never reword a
+correct point or add words just to clear a finding (working rule 3).
 
-## Step 7 — Render and inspect (mandatory when the tools exist)
+## Step 7 — Inspect the previews (mandatory when they rendered)
 
-```bash
-soffice --headless --convert-to pdf --outdir output/preview_<slug> output/<slug>.pptx
-pdftoppm -png -r 80 output/preview_<slug>/<slug>.pdf output/preview_<slug>/slide
-```
+`run_deck.py` wrote `output/preview_<slug>/contact_sheet.png` (every slide
+on one image) and `slide-NN.png`. Look at the contact sheet first, then open
+single slides that look wrong. If the summary says the render was not done,
+install what it names (LibreOffice; `pip install pymupdf` if `pdftoppm` is
+missing) once — don't write your own conversion commands.
 
-On Windows: wait for `soffice` to finish before reading the PDF (it may
-return early; check the PDF exists and is non-empty, retry once). If
-`pdftoppm` is missing, convert with PyMuPDF (`pip install pymupdf`;
-`fitz.open(pdf)[i].get_pixmap(dpi=80).save(...)`).
-
-Look at every PNG and check: text running past boxes, labels hidden behind
+Check: text running past boxes, labels hidden behind
 shapes, titles wrapping into the underline, chart labels stacking, large
 empty areas, leftover `[...]` / `xx`. Fix and rebuild. If the tools are
 missing, say the deck was not visually verified.
@@ -443,7 +531,7 @@ missing, say the deck was not visually verified.
 
 ## Choosing between templates
 
-For each slide list 1–3 candidate templates, eliminate with their *Don't use
+Start from the relationship table at the top. For each slide list 1–3 candidate templates, eliminate with their *Don't use
 when* clauses, then pick by item count (3 vs 5 vs 7), axis type (continuous
 vs categorical) and audience. Common mistakes:
 

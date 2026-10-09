@@ -20,6 +20,7 @@ from ..design import (HAIRLINE_PT, add_arrow, check_focus, eyebrow, fit_size, fo
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
 from .evaluation_slides import _frame
+from ..design import mark_index
 
 MIN_PT = 10
 
@@ -181,8 +182,8 @@ def add_layer_stack(prs, *,
         r = add_rect(slide, x0, y, w, lh, fill=fill, line=pal.bright_blue if f else None,
                      line_width=2.0 if f else None)
         r.name = f"layer:{names[i]}"
-        eyebrow(slide, theme, x0 + 0.2, y + 0.06, 0.6, f"L{n - i}",
-                color=pal.mid_blue if f else pal.footer_gray, size=9, h=0.2)
+        mark_index(eyebrow(slide, theme, x0 + 0.2, y + 0.06, 0.6, f"L{n - i}",
+                           color=pal.mid_blue if f else pal.footer_gray, size=9, h=0.2))
         tb = add_textbox(slide, x0 + 0.2, y, name_w - 0.3, lh, anchor=MSO_ANCHOR.MIDDLE)
         write_paragraph(tb.text_frame, names[i], size=15, bold=True, color=pal.deep_navy,
                         family=typo.family, first=True)

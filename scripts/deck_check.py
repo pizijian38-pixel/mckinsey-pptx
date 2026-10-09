@@ -15,6 +15,8 @@ Reports, per deck:
   9. Insight bullets that only restate a table row
  10. English default labels ("Key insight", "Weighted total" ...) left in a
      Chinese / Korean / Japanese deck
+ 11. Layout mix (advisory, never fails): text layouts on more than half of the
+     content slides -> a reminder to check for relationships a diagram shows better
 
 Sources: .docx .pptx .md .txt .csv .xlsx (.pdf if pypdf is installed).
 Exit code 1 if anything is flagged, so a build script can gate on it.
@@ -140,8 +142,19 @@ def _chart_text(slide) -> str:
 _CHROME = re.compile(r"^\s*(?:ⓒ|©|copyright\b).*$", re.I | re.M)
 
 
+def _content_frames(slide):
+    """Text frames minus sequence-number chrome (shapes named 'chrome:*')."""
+    for sh in _iter_shapes(slide.shapes):
+        if sh.has_text_frame and not (sh.name or "").startswith("chrome:"):
+            yield sh.text_frame
+        if getattr(sh, "has_table", False) and sh.has_table:
+            for row in sh.table.rows:
+                for cell in row.cells:
+                    yield cell.text_frame
+
+
 def slide_text(slide) -> str:
-    text = "\n".join([tf.text for tf, _ in _frames(slide)] + [_chart_text(slide)])
+    text = "\n".join([tf.text for tf in _content_frames(slide)] + [_chart_text(slide)])
     return _CHROME.sub(" ", text)         # footer "ⓒ 2026 Acme  3" is chrome
 
 
@@ -311,6 +324,26 @@ _TEXT_TEMPLATES = {"card_grid", "card_rows", "swot", "executive_summary",
                    "executive_summary_takeaways", "three_trends_icons",
                    "three_trends_table", "three_trends_numbered", "five_key_areas",
                    "overview_areas", "two_column_compare", "pros_cons", "logic_grid"}
+
+
+# [11] Layout mix. Text layouts (cards, rows, tables, lists) vs everything else,
+# counted over content slides only (aliases included: the record keeps the name
+# the build used).
+_TEXT_LAYOUTS = (_TEXT_TEMPLATES - {"executive_summary", "executive_summary_takeaways"}) | {
+    "cards", "card_rows", "before_after", "logic_chain", "data_table", "table",
+    "phases_table_4", "process_activities", "three_trends_table"}
+_NON_CONTENT = {"cover_slide", "cover", "section_divider", "agenda", "executive_summary",
+                "executive_summary_paragraph", "executive_summary_takeaways",
+                "storyline_summary", "dark_navy_summary", "quote_slide", "quote",
+                "stat_hero", "big_number", "strategic_challenge", "key_question"}
+TEXT_SHARE_REMINDER = 0.5
+
+
+def layout_mix(templates):
+    """(text-layout slide numbers, content slide count) — slides 1-based."""
+    content = [(i, t) for i, t in enumerate(templates, start=1)
+               if t and t not in _NON_CONTENT]
+    return [i for i, t in content if t in _TEXT_LAYOUTS], len(content)
 
 
 def _record(slide):
@@ -610,6 +643,19 @@ def main(argv=None) -> int:
             print(f"  slide {i}: {', '.join(hits)}")
     else:
         print("  none")
+
+    # Advisory only: never sets `flagged`. Text layouts are right for lists; the
+    # reminder is to look again at slides whose content is a relationship.
+    print("\n[11] Layout mix (advisory — a reminder, never a failure):")
+    text_slides, n_content = layout_mix(templates)
+    if n_content and len(text_slides) / n_content > TEXT_SHARE_REMINDER:
+        print(f"  reminder: text layouts on {len(text_slides)} of {n_content} content slides "
+              f"({len(text_slides) / n_content:.0%}) — slides {', '.join(map(str, text_slides))}.")
+        print("  Check each: if it shows a flow, a share, a change, a ranking, causes or an "
+              "overlap, a diagram says it faster (python scripts/catalog.py for the index). "
+              "Keep text where the content really is a list.")
+    else:
+        print(f"  ok ({len(text_slides)} of {n_content} content slides use text layouts)")
 
     return 1 if flagged else 0
 

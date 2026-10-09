@@ -236,6 +236,12 @@ git clone https://github.com/pizijian38-pixel/mckinsey-pptx.git .agent/skills/mc
 Antigravity 会根据 skill 的描述自动启用它。如果没有触发，可以明确说
 "使用 mckinsey-pptx skill 做……"。生成的文件在项目的 `output/` 文件夹里。
 
+模型按 skill 的流程只用两个固定命令：`scripts/catalog.py`（按名称查模板）和
+`scripts/run_deck.py`（构建 + 检查 + 渲染预览，一条命令），不再临时拼写
+`python -c` 命令，所以需要审批的命令种类大幅减少；如果终端设置支持允许列表，
+把这两个脚本加进去即可。附件请直接拖进对话，
+模型会按附件路径读取，不再手抄大纲。
+
 ### 更新
 
 ```bash
@@ -286,7 +292,8 @@ cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
   产品形态、渠道、技术或医学主张。
 - **出稿后自检**：用 `scripts/deck_check.py` 把 PPT 和源文件逐项对照，报告：
   疑似编造的数字、源数据覆盖率、内容过稀的页面、残留占位符、
-  源文件里没有的主张或引号词、同一版式连续过多或缺少图表、字号过小、页脚来源写法错误。
+  源文件里没有的主张或引号词、同一版式连续过多或缺少图表、字号过小、页脚来源写法错误，
+  以及文字版式占比（仅提醒）。
 
 示例：
 
@@ -298,7 +305,12 @@ cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
 
 ```bash
 python scripts/deck_check.py output/xxx.pptx --source inputs/大纲.docx
+# 或一条命令完成构建 + 检查 + 预览图（Windows 自动找 LibreOffice）
+python scripts/run_deck.py output/build_xxx.py --source inputs/大纲.docx
 ```
+
+第 [11] 项"版式构成"只是提醒：文字版式（卡片、表格）超过内容页一半时提示你
+复查哪些页其实是关系（流向、占比、变化、排名、因果、交集），不会判为不通过。
 
 ---
 

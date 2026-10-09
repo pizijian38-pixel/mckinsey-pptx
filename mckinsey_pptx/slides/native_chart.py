@@ -78,10 +78,12 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
         chart.legend.font.size = Pt(12)
 
     hl_series = hl.get("series")
+    # Emphasis is the accent (bright blue). Red means "bad" - only when asked for.
+    hl_tone = hl.get("tone") or "blue"
     for i, (s, ps) in enumerate(zip(series, plot.series)):
         tone = s.get("tone") or _DEFAULT_SERIES_TONES[i % len(_DEFAULT_SERIES_TONES)]
         if hl_series is not None:
-            tone = "red" if s["name"] == hl_series else ("gray" if not s.get("tone") else tone)
+            tone = hl_tone if s["name"] == hl_series else ("gray" if not s.get("tone") else tone)
         rgb = tone_rgb(theme, tone)
         if chart_type == "line":
             ps.format.line.color.rgb = rgb
@@ -101,7 +103,7 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
         if hl.get("point") is not None and not is_pie and chart_type != "line":
             pt = ps.points[int(hl["point"])]
             pt.format.fill.solid()
-            pt.format.fill.fore_color.rgb = pal.status_red
+            pt.format.fill.fore_color.rgb = tone_rgb(theme, hl_tone)
 
     # Crowded line charts: label only the highlighted / explicitly toned series.
     label_only = None
@@ -117,7 +119,7 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
             dl.number_format_is_linked = False
             dl.font.size = Pt(11)
             dl.font.bold = True
-            dl.font.color.rgb = tone_rgb(theme, "red" if s["name"] == hl_series
+            dl.font.color.rgb = tone_rgb(theme, hl_tone if s["name"] == hl_series
                                          else s.get("tone"))
             dl.position = XL_LABEL_POSITION.ABOVE
             dl.show_value = True
@@ -163,8 +165,10 @@ def add_native_chart(prs, *,
     """chart_type: column | grouped_column | stacked_column | stacked_column_100
                    | bar | stacked_bar | line | pie | doughnut
     series: [{"name": str, "values": [num], "tone"?: str}]
-    highlight: {"series": name} -> that series in red, others muted (line/bar);
-               {"point": index} -> that category's bar in red (single series).
+    highlight: {"series": name} -> that series in the accent, others muted (line/bar);
+               {"point": index} -> that category's bar in the accent (single series).
+               Add "tone": "red" (or green / amber) only when the item is bad (good)
+               news - red is a judgement, not emphasis.
     number_format: Excel format for value labels, e.g. '0.0', '0"%"', '#,##0'.
     """
     slide = blank_slide(prs)

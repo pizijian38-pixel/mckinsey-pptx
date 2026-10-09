@@ -18,6 +18,7 @@ from ..theme import Theme, DEFAULT_THEME
 from ..design import (check_focus, eyebrow, fit_one_line, fit_size, focus_tag, has_focus,
                       is_focus, text_height_in, warn_small)
 from ..labels import loc
+from ..design import mark_index
 
 
 # ---------- Process flow (horizontal) ----------
@@ -74,9 +75,9 @@ def add_process_flow_horizontal(prs, *,
         f = is_focus(focus, i, names[i])
         dark = f or not focused
         fill = pal.deep_navy if dark else pal.soft_gray
-        eyebrow(slide, theme, x + (0.12 if i == 0 else 0.3), top, 1.3,
-                f"{loc(theme, 'Step')} {i + 1:02d}",
-                color=pal.bright_blue if f else pal.footer_gray, size=9)
+        mark_index(eyebrow(slide, theme, x + (0.12 if i == 0 else 0.3), top, 1.3,
+                           f"{loc(theme, 'Step')} {i + 1:02d}",
+                           color=pal.bright_blue if f else pal.footer_gray, size=9))
         if f and focus_label:
             focus_tag(slide, theme, x + (0.12 if i == 0 else 0.3) + 0.95, top, focus_label)
         shp = slide.shapes.add_shape(MSO_SHAPE.PENTAGON if i == 0 else MSO_SHAPE.CHEVRON,

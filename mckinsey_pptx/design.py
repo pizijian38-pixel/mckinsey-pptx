@@ -494,3 +494,14 @@ def nice_bounds(lo: float, hi: float, n: int = 5, include_zero=False):
     mag = 10 ** _m.floor(_m.log10(raw))
     step = next(s * mag for s in (1, 2, 2.5, 5, 10) if s * mag >= raw)
     return _m.floor(lo / step) * step, _m.ceil(hi / step) * step, step
+
+
+# Sequence numbers (01, Step 02, L3 ...) are layout, not data: name them so the
+# deck checker does not read them as numbers that need a source.
+INDEX_NAME = "chrome:index"
+
+
+def mark_index(shape):
+    """Tag a step / sequence-number shape as layout chrome; returns the shape."""
+    shape.name = INDEX_NAME
+    return shape

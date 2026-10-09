@@ -16,6 +16,7 @@ from ..base import (
     write_paragraph, enable_text_shrink,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..design import mark_index
 
 
 # ---------- Cover slide ----------
@@ -174,9 +175,9 @@ def add_agenda(prs, *,
         # Number circle
         add_oval(slide, layout.margin_left_in + 0.5,
                  cy - num_d / 2, num_d, num_d, fill=circle_fill)
-        tb = add_textbox(slide, layout.margin_left_in + 0.5,
-                         cy - num_d / 2, num_d, num_d,
-                         anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_index(add_textbox(slide, layout.margin_left_in + 0.5,
+                                    cy - num_d / 2, num_d, num_d,
+                                    anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, str(i + 1).zfill(2),
                         size=typo.body_size, bold=True, color=pal.white,
                         family=typo.family, align=PP_ALIGN.CENTER, first=True)

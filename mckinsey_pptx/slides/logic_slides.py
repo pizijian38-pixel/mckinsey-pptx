@@ -30,6 +30,7 @@ from ..design import (add_arrow, add_fade_wedge, add_icon, add_stage_banners, ad
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
 from .evaluation_slides import _frame
+from ..design import mark_index
 
 Cell = Union[None, str, Sequence[str], Dict]
 MAX_PT, MIN_PT = 16, 10
@@ -464,8 +465,8 @@ def add_strategic_challenge(prs, *,
         if has_res:
             bd = 0.38
             add_rect(slide, rx - bd - 0.06, y + (row_h - bd) / 2, bd, bd, fill=pal.deep_navy)
-            tb = add_textbox(slide, rx - bd - 0.06, y + (row_h - bd) / 2, bd, bd,
-                             anchor=MSO_ANCHOR.MIDDLE)
+            tb = mark_index(add_textbox(slide, rx - bd - 0.06, y + (row_h - bd) / 2, bd, bd,
+                                        anchor=MSO_ANCHOR.MIDDLE))
             write_paragraph(tb.text_frame, str(i + 1), size=13, bold=True, color=pal.white,
                             family=typo.family, align=PP_ALIGN.CENTER, first=True)
             if d.get("result"):

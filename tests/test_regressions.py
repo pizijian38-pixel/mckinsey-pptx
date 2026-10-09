@@ -349,6 +349,136 @@ def test_radar_is_native_and_on_one_scale():
     raise AssertionError("value off the shared scale accepted")
 
 
+# ---------- agent ergonomics (found on a Gemini / Antigravity run) ----------
+
+def test_chart_highlight_is_accent_not_red():
+    """Highlight is emphasis, so it uses the accent; red only when asked."""
+    from mckinsey_pptx.theme import DEFAULT_THEME
+    pal = DEFAULT_THEME.palette
+
+    def colours(chart_type, highlight):
+        b = PresentationBuilder()
+        b.add("chart", title="t", chart_type=chart_type, categories=["a", "b", "c"],
+              series=[{"name": "S1", "values": [1, 2, 3]}, {"name": "S2", "values": [3, 2, 1]}]
+              if chart_type == "line" else [{"name": "S1", "values": [1, 2, 3]}],
+              highlight=highlight, source="")
+        gf = [sh for sh in b.prs.slides[0].shapes if sh.has_chart][0]
+        ser = gf.chart.plots[0].series
+        if chart_type == "line":
+            return [str(s.format.line.color.rgb) for s in ser]
+        return [str(pt.format.fill.fore_color.rgb) for pt in [ser[0].points[1]]]
+
+    assert colours("line", {"series": "S2"})[1] == str(pal.bright_blue)
+    assert colours("line", {"series": "S2", "tone": "red"})[1] == str(pal.status_red)
+    assert colours("column", {"point": 1}) == [str(pal.bright_blue)]
+    assert colours("column", {"point": 1, "tone": "red"}) == [str(pal.status_red)]
+
+
+def test_catalog_lookup():
+    """scripts/catalog.py prints only the asked-for entries (by name, alias or
+    number), an index of every template, and near matches for typos."""
+    import catalog
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        assert catalog.main(["sankey", "mekko", "77"]) == 0
+    text = out.getvalue()
+    assert "## 70. Sankey" in text and "## 68. Marimekko" in text and "## 77. Venn" in text
+    assert "## 71." not in text and "## 1. " not in text
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        catalog.main([])
+    rows = [l for l in out.getvalue().splitlines() if l[:3].strip().rstrip(".").isdigit()]
+    _, templates, _ = catalog.load()
+    assert len(rows) == len(templates) >= 80, len(rows)
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+        assert catalog.main(["sankee"]) == 1
+    assert "sankey" in err.getvalue()
+
+
+def _check(path, *sources):
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = deck_check.main([str(path)] + sum((["--source", str(s)] for s in sources), []))
+    return code, out.getvalue()
+
+
+def test_text_layout_share_is_advisory():
+    """[11] reminds when text layouts fill most content slides, but never fails
+    the check (text is right for lists) - and stays quiet for a mixed deck."""
+    items = [{"title": f"Point {k}", "body": "Short supporting line"} for k in "ABC"]
+    with tempfile.TemporaryDirectory() as d:
+        b = PresentationBuilder()
+        b.add("cover_slide", title="Deck", subtitle="s", date="")
+        for i in range(3):
+            b.add("card_grid", title=f"Slide {i} makes a point", cards=items, source="")
+        b.add("chart", title="One chart", categories=["a", "b"],
+              series=[{"name": "s", "values": [1, 2]}], source="")
+        path = Path(d) / "t.pptx"
+        b.save(str(path))
+        code, text = _check(path)
+        assert "[11]" in text and "reminder: text layouts on 3 of 4" in text, text[-400:]
+        assert code == 0, "the advisory section must not flag the deck"
+        b = PresentationBuilder()
+        b.add("card_grid", title="One", cards=items, source="")
+        b.add("chart", title="Two", categories=["a", "b"],
+              series=[{"name": "s", "values": [1, 2]}], source="")
+        b.save(str(path))
+        assert "ok (1 of 2" in _check(path)[1]
+
+
+def test_step_numbers_are_not_data():
+    """Sequence numbers (01 ... 05, Step 03, L4) are layout: the checker must
+    not report them as numbers missing from the source."""
+    with tempfile.TemporaryDirectory() as d:
+        src = Path(d) / "src.md"
+        src.write_text("Plan, build, test, launch, scale. Five steps.", encoding="utf-8")
+        b = PresentationBuilder()
+        b.add("process_flow", title="Five steps take the product to scale", focus=[],
+              steps=[{"name": n, "items": [n]} for n in ["Plan", "Build", "Test", "Launch", "Scale"]],
+              source="")
+        b.add("cycle", title="The loop", steps=["Plan", "Build", "Test", "Launch", "Scale"],
+              center="Scale", focus=[], source="")
+        path = Path(d) / "t.pptx"
+        b.save(str(path))
+        text = _check(path, src)[1]
+        block = text.split("[1]")[1].split("[2]")[0]
+        assert block.strip().endswith("none"), block
+
+
+def test_run_deck_builds_checks_and_renders():
+    """One command: build script -> deck found -> checker -> previews."""
+    import shutil
+    import run_deck
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "output"
+        out.mkdir()
+        script = out / "build_demo.py"
+        script.write_text(
+            "import sys\nfrom pathlib import Path\n"
+            f"sys.path.insert(0, r'{ROOT}')\n"
+            "from mckinsey_pptx import PresentationBuilder\n"
+            "b = PresentationBuilder()\n"
+            "b.add('chart', title='Revenue doubled in two years', categories=['2023', '2025'],\n"
+            "      series=[{'name': 'Revenue', 'values': [10, 20]}], source='')\n"
+            "b.save(str(Path(__file__).resolve().parent / 'demo.pptx'))\n", encoding="utf-8")
+        render = shutil.which("soffice") or shutil.which("libreoffice")
+        log = io.StringIO()
+        with contextlib.redirect_stdout(log):
+            code = run_deck.main([str(script)] + ([] if render else ["--no-render"]))
+        text = log.getvalue()
+        assert code == 0, text[-800:]
+        assert "demo.pptx" in text and "build : ok" in text and "check : clean" in text
+        if render:
+            prev = out / "preview_demo"
+            assert (prev / "contact_sheet.png").exists() and list(prev.glob("slide-*.png")), text[-600:]
+        # a failing build is reported, not hidden
+        script.write_text("raise SystemExit(3)\n", encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            assert run_deck.main([str(script), "--no-render"]) == 1
+        assert "FAILED" in log.getvalue()
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

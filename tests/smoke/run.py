@@ -68,8 +68,8 @@ def main() -> int:
                 if not nums:
                     continue
                 line_s = line_s.split(":", 1)[0] + ": " + ", ".join(nums)
-            if section in ("[2]", "[3]") or line_s.startswith("Deck:") or line_s.startswith("("):
-                continue          # [2] coverage is shown in the summary; [3] is advisory
+            if section in ("[2]", "[3]", "[11]") or line_s.startswith("Deck:") or line_s.startswith("("):
+                continue          # [2] coverage is shown in the summary; [3] and [11] are advisory
             if section == "[6]" and line_s.startswith("ok"):
                 continue
             issues.append(f"{section} {line_s}")

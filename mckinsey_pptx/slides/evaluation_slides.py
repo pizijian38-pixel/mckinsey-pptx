@@ -21,6 +21,7 @@ from ..design import (add_callout_bar, add_icon, add_insight_panel, fit_one_line
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
 from .table_slides import draw_table
+from ..design import mark_index
 
 GAP = 0.25
 
@@ -116,7 +117,7 @@ def add_option_profiles(prs, *,
         rec = recommended == i
         add_rect(slide, x, top, cw, h_all, fill=pal.light_gray if rec else pal.soft_gray)
         y = top + pad
-        tb = add_textbox(slide, x + pad, y - 0.04, 1.2, 0.42, anchor=MSO_ANCHOR.TOP)
+        tb = mark_index(add_textbox(slide, x + pad, y - 0.04, 1.2, 0.42, anchor=MSO_ANCHOR.TOP))
         write_paragraph(tb.text_frame, f"{i + 1:02d}", size=22, bold=True,
                         color=pal.light_blue, family=typo.family, first=True)
         if o.get("icon"):

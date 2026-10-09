@@ -1050,8 +1050,10 @@ Preferred over the shape-drawn chart templates (`column_*`, `line_chart`,
   `stacked_column_100` | `bar` | `stacked_bar` | `line` | `pie` | `doughnut`
 - `categories: list`, `series: list[{name, values, tone?}]`
 **Optional inputs:**
-- `highlight`: `{"series": "Services"}` (that series red, others gray — line/bar)
-  or `{"point": 2}` (that bar red — single series)
+- `highlight`: `{"series": "Services"}` (that series in the accent blue, others
+  gray — line/bar) or `{"point": 2}` (that bar in the accent — single series).
+  Add `"tone": "red"` only when the highlighted item is bad news (a loss, a miss);
+  `"green"` for a clearly good result. Plain emphasis stays blue.
 - `number_format`: label format, e.g. `'0.0'`, `'0"%"'`, `'#,##0'`
 - `insight: str`, `insight_bullets: list[str]`, `insight_title: str`
 - `subtitle: str` (put the unit here: "Market share, %"), `show_values`, `y_max`
