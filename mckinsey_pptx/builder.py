@@ -15,6 +15,7 @@ from typing import Sequence, Optional, Dict, Any, Iterable, List
 
 from .base import init_presentation, apply_east_asian_font
 from .theme import Theme, DEFAULT_THEME
+from . import validate
 from .slides import (
     executive_summary, assessment_table, bubble_chart, column_chart,
     trends_slides, org_charts, timeline_slides, summary_slide,
@@ -467,15 +468,41 @@ def template_name(fn) -> str:
     return canon.get(fn, fn.__name__)
 
 
+class BuildErrors(Exception):
+    """Raised by PresentationBuilder.save() when slides failed to build; the
+    message lists every failure so they can be fixed in one pass."""
+
+
+def _where(exc: BaseException) -> str:
+    """Innermost frame inside this package: 'share_slides.py:147 add_treemap'."""
+    import os
+    import traceback
+    for fr in reversed(traceback.extract_tb(exc.__traceback__)):
+        if os.sep + "mckinsey_pptx" + os.sep in fr.filename:
+            return f"{os.path.basename(fr.filename)}:{fr.lineno} {fr.name}"
+    return ""
+
+
 class PresentationBuilder:
     """Compose a full deck of McKinsey-style slides."""
 
     def __init__(self, theme: Theme = DEFAULT_THEME, *,
                  auto_page_numbers: bool = True,
                  default_section_marker: Optional[str] = None,
-                 nav: Optional[Sequence[str]] = None):
+                 nav: Optional[Sequence[str]] = None,
+                 on_error: str = "collect"):
         """nav: the deck's chapters (["Overview", "Situation", ...]); a slide
-        added with nav="Situation" (or an index) shows the breadcrumb bar."""
+        added with nav="Situation" (or an index) shows the breadcrumb bar.
+
+        on_error: "collect" (default) - a slide that cannot be built is
+        recorded and the build goes on; save() then raises BuildErrors listing
+        every failure, so one run exposes all mistakes. "raise" - the first
+        failure raises from add() (library use, tests)."""
+        if on_error not in ("collect", "raise"):
+            raise ValueError("on_error must be 'collect' or 'raise'")
+        self.on_error = on_error
+        self.errors: List[Dict[str, Any]] = []
+        self._calls = 0                 # add() calls so far: the slide's position in the script
         self.theme = theme
         self.nav = list(nav) if nav else None
         self.auto_page_numbers = auto_page_numbers
@@ -485,10 +512,14 @@ class PresentationBuilder:
 
     # Direct add by type
     def add(self, slide_type: str, **kwargs):
+        self._calls += 1
         fn = _REGISTRY.get(slide_type)
         if fn is None:
-            raise ValueError(f"Unknown slide type: {slide_type}. "
-                             f"Available: {sorted(_REGISTRY)}")
+            if self.on_error == "raise":
+                raise ValueError(f"Unknown slide type: {slide_type}. "
+                                 f"Available: {sorted(_REGISTRY)}")
+            self._fail(slide_type, kwargs, [validate.unknown_template(slide_type, list(_REGISTRY))])
+            return None
         if self.auto_page_numbers:
             self._page += 1
             kwargs.setdefault("page_number", self._page)
@@ -500,8 +531,28 @@ class PresentationBuilder:
         group = kwargs.pop("group", None)
         nav = kwargs.pop("nav", None)
         name = template_name(fn)
+        found = validate.problems(name, fn, kwargs)
+        errs = [m for level, m in found if level == "error"]
+        for level, m in found:
+            if level == "warning":
+                import sys
+                print(f"[mckinsey_pptx] WARNING {name} \"{str(kwargs.get('title', ''))[:50]}\": {m}",
+                      file=sys.stderr)
+        if errs:
+            if self.on_error == "raise":
+                raise TypeError(f"{name}: " + "; ".join(errs))
+            self._fail(name, kwargs, errs)
+            return None
         _check_title_focus(name, kwargs)
-        out = fn(self.prs, **kwargs)
+        if self.on_error == "raise":
+            out = fn(self.prs, **kwargs)
+        else:
+            try:
+                out = fn(self.prs, **kwargs)
+            except Exception as e:  # noqa: BLE001 - reported together at save()
+                self._fail(name, kwargs, [f"{type(e).__name__}: {e}"
+                                          + (f"   [{_where(e)}]" if _where(e) else "")], hint=True)
+                return None
         slide = self.prs.slides[-1]
         if nav is not None and self.nav and name not in _FULL_BLEED:
             # one line of space above the title: the breadcrumb replaces the kicker
@@ -522,7 +573,25 @@ class PresentationBuilder:
     def add_specs(self, specs: Iterable[Dict[str, Any]]):
         return [self.add_spec(s) for s in specs]
 
+    def _fail(self, name, kwargs, messages, hint=False):
+        self.errors.append({"slide": self._calls, "template": name,
+                            "title": str(kwargs.get("title", ""))[:60],
+                            "messages": list(messages), "hint": hint})
+
+    def report(self) -> str:
+        lines = [f"BUILD FAILED - {len(self.errors)} slide(s) could not be built; "
+                 "fix all of them, then run again:"]
+        for e in self.errors:
+            lines.append(f"  slide {e['slide']} - {e['template']}"
+                         + (f" \"{e['title']}\"" if e["title"] else ""))
+            lines += [f"      {m}" for m in e["messages"]]
+            lines.append(f"      -> python scripts/catalog.py {e['template']}  "
+                         "(arguments and a runnable example)")
+        return "\n".join(lines)
+
     def save(self, path: str):
+        if self.errors:
+            raise BuildErrors(self.report())
         ea = self.theme.typography.east_asian_family
         if ea:
             apply_east_asian_font(self.prs, ea)

@@ -50,7 +50,8 @@ def run_build(script: Path):
     if p.stderr.strip():
         print(p.stderr.rstrip())
     warnings = [l for l in (p.stdout + "\n" + p.stderr).splitlines() if "WARNING" in l]
-    return p.returncode, warnings, t0
+    listed = "BUILD FAILED" in (p.stdout + p.stderr)       # PresentationBuilder.save() report
+    return p.returncode, warnings, t0, listed
 
 
 def _pptx_files(root: Path, depth: int):
@@ -253,9 +254,11 @@ def main(argv=None) -> int:
         return 1
 
     print("== 1. build " + "=" * 60)
-    code, warnings, t0 = run_build(script)
+    code, warnings, t0, listed = run_build(script)
     if code != 0:
-        print(f"\n== summary ==\nbuild : FAILED (exit {code}) — read the traceback above")
+        what = ("every slide that could not be built is listed above — fix them all, then re-run"
+                if listed else "read the traceback above")
+        print(f"\n== summary ==\nbuild : FAILED (exit {code}) — {what}")
         return 1
     if args.deck:
         deck = Path(args.deck)
@@ -289,9 +292,14 @@ def main(argv=None) -> int:
     print(f"deck  : {deck}")
     print("build : " + ("ok, no warnings" if not warnings else
                         f"{len(warnings)} WARNING(s) — fix each (see above)"))
-    print("check : " + ("clean" if not flagged else
-                        "items to fix — see sections [1] [4] [5a/b] [6]-[10] above") +
-          "  ([2] [3] [5c] [11] are advisory)")
+    if flagged:
+        where = " · ".join(
+            f"{sec} slide{'s' if len(sl) > 1 else ''} {', '.join(map(str, sorted(sl)))}"
+            for sec, sl in deck_check.FINDINGS.items())
+        check_line = f"items to fix — {where}" if where else "items to fix — see the sections above"
+    else:
+        check_line = "clean"
+    print("check : " + check_line + "  ([2] [3] [5c] [11] are advisory)")
     print(f"render: {render_line}")
     return 1 if (warnings or flagged) else 0
 

@@ -304,7 +304,7 @@ def test_area_charts_reject_negative_values():
                                     "columns": [{"name": "x", "values": [1, -2]}]}),
                      ("sankey", {"flows": [{"from": "a", "to": "b", "value": -3}]})):
         try:
-            PresentationBuilder().add(kind, title="t", **kw)
+            PresentationBuilder(on_error="raise").add(kind, title="t", **kw)
         except ValueError:
             continue
         raise AssertionError(f"{kind} accepted a negative value")
@@ -358,9 +358,9 @@ def test_bump_ranks_sit_on_fixed_rows():
     steps = {rows[i + 1] - rows[i] for i in range(len(rows) - 1)}
     assert len(steps) == 1 and steps.pop() > 0, rows          # equal pitch, rank 1 on top
     try:
-        PresentationBuilder().add("bump", title="t", snapshots=["a", "b", "c"],
-                                  series=[{"name": "x", "ranks": [1, 1, 1]},
-                                          {"name": "y", "ranks": [1, 2, 2]}])
+        PresentationBuilder(on_error="raise").add(
+            "bump", title="t", snapshots=["a", "b", "c"],
+            series=[{"name": "x", "ranks": [1, 1, 1]}, {"name": "y", "ranks": [1, 2, 2]}])
     except ValueError:
         return
     raise AssertionError("duplicate rank accepted")
@@ -374,8 +374,9 @@ def test_radar_is_native_and_on_one_scale():
     assert [list(s.values) for s in gf.chart.plots[0].series] == [[1, 5, 3], [4, 2, 2]]
     assert gf.chart.value_axis.maximum_scale == 5
     try:
-        PresentationBuilder().add("radar", title="t", criteria=["a", "b", "c"], scale_max=5,
-                                  series=[{"name": "x", "values": [1, 50, 3]}])
+        PresentationBuilder(on_error="raise").add(
+            "radar", title="t", criteria=["a", "b", "c"], scale_max=5,
+            series=[{"name": "x", "values": [1, 50, 3]}])
     except ValueError:
         return
     raise AssertionError("value off the shared scale accepted")
@@ -513,6 +514,35 @@ def test_run_deck_builds_checks_and_renders():
         with contextlib.redirect_stdout(io.StringIO()) as log:
             assert run_deck.main([str(script), "--no-render"]) == 1
         assert "FAILED" in log.getvalue()
+
+
+def test_run_deck_summary_names_failing_sections_and_slides():
+    """The summary used to say "see sections [1] [4] [5a/b] [6]-[10]" whatever
+    was wrong; it now names the sections that fired and their slides, and a
+    build that lists failed slides says so."""
+    import run_deck
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "output"
+        out.mkdir()
+        (out / "src.md").write_text("The market grew.", encoding="utf-8")
+        head = ("import sys\nfrom pathlib import Path\n"
+                f"sys.path.insert(0, r'{ROOT}')\n"
+                "from mckinsey_pptx import PresentationBuilder\n"
+                "b = PresentationBuilder()\n")
+        save = "b.save(str(Path(__file__).resolve().parent / 'd.pptx'))\n"
+        script = out / "build_d.py"
+        script.write_text(head + "b.add('card_grid', title='Market', source='', footnote='',\n"
+                          "      cards=[{'title': 'Size', 'bullets': ['Grew 37% in 2024']}])\n"
+                          + save, encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            code = run_deck.main([str(script), "--source", str(out / "src.md"), "--no-render"])
+        text = log.getvalue()
+        assert code == 1 and "check : items to fix — [1] slide 1" in text, text[-400:]
+        script.write_text(head + "b.add('dumbbell', title='t', rowz=[])\n" + save, encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            assert run_deck.main([str(script), "--no-render"]) == 1
+        text = log.getvalue()
+        assert "BUILD FAILED" in text and "listed above" in text, text[-500:]
 
 
 _SHARE = {"YNBY": [24.4, 24.6, 25.1, 25.0], "DARLIE": [19.4, 18.6, 18.0, 17.2],
@@ -674,6 +704,59 @@ def test_invented_numbers_are_still_flagged():
         s2 = by_slide.get("slide 2", set())
         assert {"5", "3", "4", "50"} <= s2, lines     # typed scores and weight ("2" = page no.)
         assert not ({"2.5", "1.5", "3.5", "4.5", "100"} & s2), lines      # computed cells
+
+
+def test_build_reports_every_failed_slide_at_once():
+    """One run used to expose one mistake (TypeError, then KeyError, ...): three
+    bad slides cost three round trips. save() now raises one BuildErrors that
+    lists every slide that failed, with the unknown argument's near match, the
+    accepted names and the template to look up."""
+    from mckinsey_pptx.builder import BuildErrors
+    b = PresentationBuilder()
+    b.add("cover_slide", title="T", subtitle="S", date="2026")
+    b.add("dumbbell", title="Gap", rowz=[{"name": "a", "a": 1, "b": 2}] * 3)
+    b.add("dumbell", title="Typo")
+    b.add("chart", title="C", chart_type="lines", categories=["a", "b"],
+          series=[{"name": "s", "values": [1, 2]}])
+    b.add("treemap", title="Negative", items=[{"name": "a", "value": 5}, {"name": "b", "value": -1}])
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            b.save(str(Path(d) / "x.pptx"))
+        except BuildErrors as e:
+            msg = str(e)
+        else:
+            raise AssertionError("save() wrote a deck with failed slides")
+        assert not list(Path(d).iterdir()), "no deck may be written when slides failed"
+    for needle in ("4 slide(s)", "slide 2 - dumbbell", "did you mean 'rows'?", "rows*",
+                   "slide 3 - ", "did you mean 'dumbbell'?", "slide 4 - chart",
+                   "did you mean 'line'?", "slide 5 - treemap", "must be >= 0",
+                   "catalog.py dumbbell"):
+        assert needle in msg, (needle, msg)
+
+
+def test_build_on_error_raise_keeps_first_failure():
+    for bad in (lambda b: b.add("dumbbell", title="t", rowz=[]),
+                lambda b: b.add("nope", title="t")):
+        try:
+            bad(PresentationBuilder(on_error="raise"))
+        except (TypeError, ValueError):
+            continue
+        raise AssertionError("on_error='raise' must raise from add()")
+
+
+def test_silent_argument_slips_become_warnings():
+    """A misspelled card key or a short table row used to build a slide with
+    blank cells and no message."""
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        b = PresentationBuilder()
+        b.add("card_grid", title="Cards",
+              cards=[{"titel": "x", "bullets": ["a"]}, {"title": "ok", "bullets": ["b"]}])
+        b.add("data_table", title="Table", columns=["a", "b", "c"], rows=[["1", "2"], ["1", "2", "3"]])
+    text = err.getvalue()
+    assert "key 'titel' is not used — did you mean 'title'?" in text, text
+    assert "data_table row 1 has 2 cells for 3 columns" in text, text
+    assert text.count("WARNING") == 2, text
 
 
 def test_csv_source_commas_are_delimiters():

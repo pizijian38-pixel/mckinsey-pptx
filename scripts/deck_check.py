@@ -499,6 +499,16 @@ def source_issues(slide, deck_is_cjk: bool):
     return out
 
 
+# Sections that flagged something, with the slides concerned: {"[1]": [3, 5], ...}.
+# run_deck prints it so an agent sees which sections to open, not a list of all of them.
+FINDINGS: dict = {}
+
+
+def _note(section: str, slides) -> None:
+    FINDINGS.setdefault(section, [])
+    FINDINGS[section] += [s for s in slides if s not in FINDINGS[section]]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("deck")
@@ -513,6 +523,7 @@ def main(argv=None) -> int:
     prs = Presentation(args.deck)
     sw, sh = prs.slide_width, prs.slide_height
     flagged = False
+    FINDINGS.clear()
 
     src_nums: set[str] = set()
     src_all = ""
@@ -582,6 +593,7 @@ def main(argv=None) -> int:
         print("\n[1] Numbers not found in the sources (verify or remove):")
         if invented:
             flagged = True
+            _note("[1]", [i for i, _ in invented])
             for i, ns in invented:
                 print(f"  slide {i}: {', '.join(ns)}")
         else:
@@ -604,6 +616,7 @@ def main(argv=None) -> int:
     print("\n[4] Leftover placeholders:")
     if leftovers:
         flagged = True
+        _note("[4]", [i for i, _ in leftovers])
         for i, hits in leftovers:
             print(f"  slide {i}: {hits}")
     else:
@@ -614,6 +627,7 @@ def main(argv=None) -> int:
         print("  a) forbidden claim types (new targets / partners / formats ...) — remove or trace:")
         if risky:
             flagged = True
+            _note("[5a]", [i for i, _ in risky])
             for i, r in risky:
                 print(f"     slide {i}: {', '.join(r)}")
         else:
@@ -621,6 +635,7 @@ def main(argv=None) -> int:
         print("  b) quoted terms not in the sources — remove or trace:")
         if quoted_new:
             flagged = True
+            _note("[5b]", [i for i, _ in quoted_new])
             for i, q in quoted_new:
                 print(f"     slide {i}: {'; '.join(q)}")
         else:
@@ -652,6 +667,7 @@ def main(argv=None) -> int:
                 run_key, run_n, start = key, 1, i
         for t, a, b in runs:
             flagged = True
+            _note("[6]", range(a, b + 1))
             print(f"  slides {a}-{b}: {b - a + 1} x {t} in a row (max 3) — re-express one, "
                   "or mark parallel slides with group=")
         mixed = {}
@@ -661,6 +677,7 @@ def main(argv=None) -> int:
         for g, members in mixed.items():
             if len({_FAMILY.get(t, t) for _, t in members}) > 1:
                 flagged = True
+                _note("[6]", [i for i, _ in members])
                 desc = ", ".join(f"{i} ({t})" for i, t in members)
                 print(f"  group '{g}' mixes templates: slides {desc} — parallel slides "
                       "should share one layout")
@@ -669,6 +686,7 @@ def main(argv=None) -> int:
                           if template_of(s_) in ("data_table", None) and numeric_share(s_) >= 0.5]
         if n_charts == 0 and numeric_tables:
             flagged = True
+            _note("[6]", numeric_tables)
             print(f"  no chart, but slide(s) {', '.join(map(str, numeric_tables))} show a mostly "
                   "numeric table — chart the series (scores / ratings may stay tables)")
         bad_groups = [g for g, m in mixed.items() if len({_FAMILY.get(t, t) for _, t in m}) > 1]
@@ -678,6 +696,7 @@ def main(argv=None) -> int:
     print("\n[7] Small text (body < 12pt; diagram labels < 10pt):")
     if small:
         flagged = True
+        _note("[7]", [i for i, _, _ in small])
         for i, bs, floor in small:
             print(f"  slide {i}: {bs:g}pt (min {floor}pt) — shorten bullets, drop "
                   "subtitle/insight, or split")
@@ -687,6 +706,7 @@ def main(argv=None) -> int:
     print("\n[8] Footer source line:")
     if src_bad:
         flagged = True
+        _note("[8]", [i for i, _ in src_bad])
         for i, iss in src_bad:
             for x in iss:
                 print(f"  slide {i}: {x}")
@@ -695,6 +715,7 @@ def main(argv=None) -> int:
     print("\n[9] Insight text that only restates a table row (synthesise instead):")
     if restates:
         flagged = True
+        _note("[9]", [i for i, _ in restates])
         for i, rr in restates:
             for t in rr:
                 print(f"  slide {i}: {t}")
@@ -705,6 +726,7 @@ def main(argv=None) -> int:
           " or pass translated labels):")
     if en_labels:
         flagged = True
+        _note("[10]", [i for i, _ in en_labels])
         for i, hits in en_labels:
             print(f"  slide {i}: {', '.join(hits)}")
     else:
