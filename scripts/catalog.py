@@ -96,6 +96,17 @@ def find(templates, key):
     return [t for t in templates if k in t["names"]]
 
 
+def _print_markup_scope():
+    sys.path.insert(0, str(CATALOG.parents[2]))
+    from mckinsey_pptx.design import MARKUP_FULL, MARKUP_PARTIAL
+    print("Where `**bold**` / `{tone|text}` markup renders (anywhere else it prints "
+          "literally, and the checker flags it in section [4]):")
+    print("- everywhere on the slide: " + ", ".join(f"`{n}`" for n in MARKUP_FULL))
+    print("- in body text only (labels, headings, categories stay literal): "
+          + ", ".join(f"`{n}`" for n in MARKUP_PARTIAL))
+    print()
+
+
 def main(argv):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -124,6 +135,8 @@ def main(argv):
                         head, body = named[name]
                         print("\n".join([head] + body))
                         print()
+                if arg in ("--icons", "--rich"):
+                    _print_markup_scope()
             continue
         hits = find(templates, arg)
         if not hits:

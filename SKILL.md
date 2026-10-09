@@ -82,7 +82,7 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | Customer steps with feelings or pain points | `journey` | `process_flow` |
 | Layers that build on each other (stack, operating model) | `layer_stack` | `card_rows` |
 | 2–3 overlapping conditions or groups | `venn` | cards |
-| Trend or magnitude of one series by period / category | `chart` (line / column / bar) | a numeric `data_table` |
+| Trend or magnitude of one series by period / category | `chart`: `line` trend · `column` / `bar` compare or rank · `grouped_column` two periods side by side · `stacked_column` composition; `highlight` the focus item and add an `insight` | a numeric `data_table` |
 | A change between two totals, explained by drivers | `waterfall` | cards of drivers |
 | Reinforcing loop, flywheel, vicious cycle | `cycle` | `card_rows` |
 | One concept and its 3–6 parts or stakeholders | `hub_spoke` | `card_grid` |
@@ -354,8 +354,9 @@ items as the focus: that is a priority the source didn't give.
 - **Name the bottom bar for its role** (`insight_label=`): "Bottom line",
   "Verdict", "Implication", "What it takes", "Preliminary view", "Decision
   needed" — not "Key insight" on every slide.
-- **Emphasis:** in the rich templates mark the 1–3 things the reader must
-  see per card or panel — key numbers in `**bold**`, problems / declines in
+- **Emphasis:** where the template renders markup (`catalog.py --icons`
+  lists them; elsewhere the characters print literally and the checker flags
+  them), mark the 1–3 things the reader must see per card or panel — key numbers in `**bold**`, problems / declines in
   `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
 - **Icons:** give each `card_grid` card an `icon` that matches its meaning
   (`catalog.py --icons` lists the names, e.g. `alert` for risks, `money` for cost, `users` for
@@ -367,9 +368,10 @@ items as the focus: that is a priority the source didn't give.
 **Data → template rules:**
 
 The relationship table at the top comes first; this table covers the
-remaining cases. Default to the **rich templates** (41–80); they use larger type, fit text to
-the space, support emphasis and icons, and produce editable tables and
-charts. Use the older templates (1–40) for what they uniquely cover. When no
+remaining cases. Default to templates 41–80: larger type, text fitted to the space, editable
+tables and charts. Use 1–40 only for what they uniquely cover (org chart,
+BCG / bubble chart, issue tree, funnel, process flow, cover, divider, agenda,
+quote, stat_hero). When no
 single template fits a slide that mixes content types, build it with
 `composite` regions instead of forcing it into one template.
 
@@ -383,28 +385,24 @@ single template fits a slide that mixes content types, build it with
 | PEST, five forces, stakeholders — each with "current situation" and "influence on us" | `logic_grid(direction="down")` |
 | Drivers that converge on one threat and the key question of the deck | `strategic_challenge` |
 | Executive summary of a problem-solving deck (situation → question → options → recommendation) | `storyline_summary` |
-| Effects that reinforce each other (flywheel, network effect, vicious cycle) | `cycle` (branch with feedback, or `steps` loop; `kind="vicious"`) |
-| Risks by probability × impact, one mitigation each | `risk_heatmap`; owners / several mitigations → `risk_register` |
 | Competitors' relative position on several indicators | `positioning_scale` |
 | Industry stages with KSFs, margins or prices; own stages marked | `value_chain` |
 | Implementation plan: same row types per stage (partners / actions / resources), bars across years, KPI rows, risk panel | `phase_grid` |
 | Option scores **with a reason per cell**, dot ratings, criteria grouped by dimension, or a "why these criteria" formula | `evaluation_matrix` (text-only with `rating=None`) |
 | Business model | `business_model_canvas`; internal alignment around a goal → `strategic_triangle`; one concept and its 3–6 parts → `hub_spoke` |
-| Risks with severity, owner or mitigation | `risk_register` |
-| **Numeric** series where *magnitude or trend* is the point (by period or category) | `chart`: `line` = trend, `column` / `bar` = compare or rank, `grouped_column` = two periods side by side, `stacked_column` = composition, `doughnut` = share of one total. `highlight` the focus item, add an `insight`. Full `data_table` on a following slide only if the chart can't show every value |
-| Change between two totals, explained by drivers (bridge, variance, price-volume-mix) | `waterfall` |
 | KPIs with target vs. actual and status | `scorecard` |
 | Headline numbers / targets (2–4) | `card_grid` with `value` per card |
 | **Text** table, or mixed text and numbers | `data_table` (all rows and columns; `highlight_rows` / `highlight_col`) |
 | Options × criteria, as-is vs. to-be, feature comparison | `data_table`; `comparison_table` only when the source gives ratings |
-| Executive summary (situation / complication / resolution / ask) | `card_grid` (2×2) with `insight` = the bottom line |
-| 2–8 parallel points with detail (drivers, initiatives, risks, segments, workstreams) | `card_grid` |
+| Executive summary of a problem-solving deck (strategy case, options paper, board proposal) | `storyline_summary` |
+| Short executive summary (situation / complication / resolution / ask) | `card_grid` (2×2) with `insight` = the bottom line |
+| Executive summary as prose; as 2–4 bold takeaways | `executive_summary_paragraph`; `executive_summary_takeaways` |
+| 2–8 parallel *qualitative* points with detail (initiatives, workstreams, principles, recommendations). Drivers with sizes → `waterfall`; risks → `risk_heatmap` / `risk_register`; segments with sizes → `treemap` / `marimekko` | `card_grid` |
 | 2–6 items needing a sentence each (decisions, recommendations, risks + mitigation) | `card_rows` |
-| Two-dimension prioritisation (impact × effort, likelihood × severity) | `matrix_2x2`; market-share × growth → `growth_share` |
 | SWOT or any S/W/O/T subset | `swot` |
 | Tiers that step up (service / price tiers, maturity levels) | `tier_ladder` |
 | Workstreams over time with milestones | `roadmap`; 3–7 dated events → `timeline`; weekly detail → `gantt_timeline` |
-| Linear process (4–6 steps), funnel, issue tree, org chart | `process_flow_horizontal`, `funnel`, `issue_tree`, `org_chart` |
+| Reporting lines; one leader + a team | `org_chart`; `project_team_circles` |
 | Single bold statement / chapter break | `dark_navy_summary`, `section_divider` |
 
 **Common deck types** — when the user has no outline (brief mode) or asks
@@ -413,12 +411,12 @@ for a type of deck, start from the matching spine and adapt it:
 | Deck type | Typical spine |
 |---|---|
 | Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
-| Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `data_table` → recommendation `card_grid` → `roadmap` |
+| Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `option_profiles` → scored on `decision_matrix` / `radar` → recommendation `card_grid` → `roadmap` |
 | Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
 | Strategy case / strategic analysis (MBA case, strategy review) | `storyline_summary` → situation `logic_grid`s (firm: need → what we do → performance → implication; competition and new entrants) + `chart`s, `cycle` for a flywheel → `strategic_challenge` → `option_profiles` → one `composite` per option (`headers` + `connectors`, `group="options"`) → `evaluation_matrix` (or `decision_matrix`) → recommendation (`card_grid` rationale + `phase_grid` / `roadmap`) → `risk_heatmap` / `risk_register` → appendix: `business_model_canvas`, `strategic_triangle`, `logic_grid(direction="down")` for PEST / five forces, `positioning_scale`, `value_chain`, `swot`, `data_table`. With 10+ slides, set chapters with `PresentationBuilder(nav=[...])` and pass `nav=` per slide |
 | Options evaluation / proposal | `option_profiles` (neutral) → one `composite` per option (`group="options"`, same regions each time) → `decision_matrix` → recommendation `card_grid` + `roadmap` → `risk_register` |
 | Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
-| Operations / process improvement | baseline `chart` → root causes `issue_tree` / `card_grid` → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
+| Operations / process improvement | baseline `chart` → root causes `fishbone` (the problem is stated in the source) or `issue_tree` (a goal to decompose) → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
 | Board / steering update | one-page summary → `scorecard` → decisions needed → appendix tables |
 | Marketing / product plan | market & customer → positioning `data_table` → offer / `tier_ladder` → channels & campaigns `card_grid` → targets & budget `chart` |
 
@@ -466,8 +464,8 @@ list of drivers as a `chart` of their sizes, a profile or option set as a
 - Templates default to `source="xx"` / `footnote="1. xx"`. Always pass
   `source=` (a real cited source, or `""`) and `footnote=""`.
 - `prioritization_matrix`: pass `description=` and `legend=(green, amber, red)`.
-- `**bold**` / `{tone|…}` markup works only in the rich templates (41–45);
-  older templates print it literally.
+- `**bold**` / `{tone|…}` markup renders only in the templates `catalog.py --icons`
+  lists; anywhere else it prints literally (checker section [4]).
 - `three_trends_icons` / `five_key_areas` / `three_trends_table`: labels
   render as-is — write `"Cost leadership"`, not `"[Cost leadership]"`.
 
@@ -584,25 +582,14 @@ missing, say the deck was not visually verified.
 
 Start from the relationship table at the top. For each slide list 1–3 candidate templates, eliminate with their *Don't use
 when* clauses, then pick by item count (3 vs 5 vs 7), axis type (continuous
-vs categorical) and audience. Common mistakes:
+vs categorical) and audience. Mistakes the table does not cover:
 
-- Cutting a multi-year, multi-entity table down to one year, or copying it as a
-  table → `chart` line with every entity and year, focal entity highlighted.
 - Text features in `comparison_table` Harvey balls → `data_table`.
 - `column_simple_growth` when forecast bars are needed → `column_historic_forecast`.
 - `bubble_chart` when there are quadrant labels → `growth_share` / `prioritization_matrix`.
 - `org_chart` for decomposing a problem → `issue_tree`.
 - 5+ trends in `three_trends_*` → `overview_areas`.
-- A market split by segment *and* by player → `marimekko`; split one way → `treemap`.
-- Volume that splits into several outcomes → `sankey`; one narrowing quantity → `funnel`.
-- Two points in time for several series → `slopegraph`; a gap per category → `dumbbell`.
-- Causes of one observed problem (stated in the source) → `fishbone`; a list of
-  weaknesses to fix → `logic_grid` / `card_rows`; decomposing a goal → `issue_tree`.
-- Steps a customer goes through *and how they feel* → `journey`; without feelings → `process_flow`.
 - Area and width charts take values >= 0 only; for gains and losses use `waterfall`.
-- One measure over two categorical dimensions → `heatmap`; risks on probability × impact → `risk_heatmap`.
-- Options profiled on 3–8 criteria of one scale → `radar`; with a reason per cell → `evaluation_matrix`.
-- Rank over 3–6 periods → `bump`; a process across several actors → `swimlane`; stacked layers → `layer_stack`; 2–3 overlapping conditions → `venn`.
 
 ## Theme
 

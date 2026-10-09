@@ -44,6 +44,19 @@ def tone_rgb(theme: Theme, tone: Optional[str]):
 
 _SPAN = re.compile(r"(\*\*.+?\*\*|\{(?:%s)\|.+?\})" % "|".join(TONE_NAMES))
 
+# Where `**bold**` / `{tone|text}` markup is drawn as emphasis. Measured, not
+# declared: tests/test_regressions.py::test_markup_scope_matches_templates
+# feeds markup to every catalog example and fails when these lists drift.
+# Any template not listed prints the characters literally.
+MARKUP_FULL = ("business_model_canvas", "card_grid", "card_rows", "cycle", "decision_matrix",
+               "evaluation_matrix", "hub_spoke", "option_profiles", "phase_grid", "risk_heatmap",
+               "risk_register", "storyline_summary", "strategic_challenge",
+               "strategic_triangle", "swot")
+# Body text renders it; labels, headings and categories print it literally.
+MARKUP_PARTIAL = ("chart", "composite", "data_table", "fishbone", "layer_stack", "logic_grid",
+                  "matrix_2x2", "positioning_scale", "radar", "roadmap", "scorecard",
+                  "swimlane", "tier_ladder", "timeline", "venn", "waterfall")
+
 
 def add_rich_runs(paragraph, text, *, size, color, family, theme: Theme,
                   bold=False):

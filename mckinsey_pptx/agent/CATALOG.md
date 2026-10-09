@@ -929,9 +929,10 @@ b.add("kpi_dashboard",
 ## 41. Data table (`data_table`, alias `table`)
 
 **Category:** Table — any rows × columns
-**Use when:** The source has a table (P&L by region, option × criteria,
-risk × owner × status, feature × competitor) or any grid of text /
-numbers that no specialised template fits. Native PowerPoint table, so the
+**Use when:** The content is a text table (option × criteria, risk × owner ×
+status, feature × competitor, as-is vs to-be) or a grid of mixed text and
+numbers that no specialised template fits. Numbers by period or category
+are a chart first. Native PowerPoint table, so the
 user can edit it. Optional Key-insight panel on the right.
 **Don't use when:** The data is a single series that reads better as a chart
 (use a column/line chart), or cells are ratings (use `comparison_table`).
@@ -946,8 +947,8 @@ Never force a text table into `comparison_table` Harvey balls.
 - `highlight_col: int` — column to tint (e.g. the proposed option)
 - `insight: str`, `insight_bullets: list[str]`, `insight_title: str` — right panel
 - `font_size: int` — default 14 for ≤ 7 rows, else 12
-- Cells, `insight` and `insight_bullets` accept `**bold**` spans (this
-  template only — other templates print the asterisks literally).
+- Column headers, cells, `insight` and `insight_bullets` accept `**bold**` /
+  `{tone|…}` spans; `subtitle` does not.
 Numeric tables (numbers by year / category) go to `chart` first; use
 `data_table` for text tables or as the full-detail companion of a chart.
 Insight bullets synthesise (≤ 3) — don't restate each row.
@@ -1102,13 +1103,14 @@ b.add("tier_ladder", title="Three service tiers move customers up the value curv
 
 ---
 
-## Rich text, tones and icons (templates 41–55)
+## Rich text, tones and icons
 
 - `**bold**` → bold; `{red|text}` → bold in that tone (`navy`, `blue`,
   `mid_blue`, `light_blue`, `red`, `green`, `amber`, `gray`, `gold` = neutral
   emphasis such as best-in-row). Use red for
   problems / declines, green for growth / targets, sparingly (1–3 spans per
-  card). Older templates (1–40) print the markup literally.
+  card). The list of templates that render it is printed under this section by
+  `catalog.py --icons`; elsewhere the characters print literally.
 - Bundled icons (white on a tone circle): `alert`, `arrow_right`, `arrows`, `atom`, `award`, `bag`, `book`, `bot`, `box`, `building`, `calculator`, `calendar`, `cart`, `chart`, `check`, `clipboard`, `clock`, `coins`, `compass`, `cpu`, `cross`, `crown`, `database`, `dna`, `droplet`, `eye`, `factory`, `file`, `filter`, `flag`, `gem`, `globe`, `handshake`, `heart`, `home`, `info`, `key`, `lab`, `layers`, `leaf`, `lightbulb`, `line_chart`, `link`, `lock`, `mail`, `map`, `medal`, `megaphone`, `message`, `microscope`, `money`, `moon`, `package`, `palette`, `pen`, `percent`, `phone`, `pie`, `pill`, `price`, `puzzle`, `question`, `refresh`, `rocket`, `scale`, `search`, `settings`, `share`, `shield`, `smile`, `sparkles`, `star`, `stethoscope`, `store`, `sun`, `target`, `team`, `thumbs_up`, `tooth`, `trend_down`, `trend_up`, `trophy`, `truck`, `user`, `users`, `video`, `wallet`, `zap`.
   Unknown names fall back to the first letter and print a warning.
 - Theme: `make_theme(company, lang="en"|"zh"|"ko"|"ja", brand="0B4DA2",
@@ -2183,7 +2185,7 @@ Quick decision rules to avoid common confusions:
 - **Options / evaluation decks:** options overview → `option_profiles`;
   one slide per option → `composite` (same regions for every option,
   `group="options"`); scoring → `decision_matrix`; risks → `risk_register`.
-- **New decks default to the rich templates (41–55):** structured points →
+- **New decks default to templates 41–80:** structured points →
   `card_grid` / `card_rows`; tables → `data_table`; numbers → `chart`;
   bridges → `waterfall`; KPIs vs. target → `scorecard`; plans → `roadmap`
   / `timeline`; 2×2 → `matrix_2x2`; SWOT → `swot`; tiers → `tier_ladder`.
@@ -2199,10 +2201,11 @@ Quick decision rules to avoid common confusions:
   bullets.
 - **Three vs five vs seven items?** → `three_trends_*` / `five_key_areas` /
   `overview_areas`.
-- **Time series (single metric):** flat trend + one growth label →
-  `column_simple_growth`; inflection → `column_split_growth`; forecast →
-  `column_historic_forecast`. Multi-series time series with continuous lines →
-  `line_chart`.
+- **Time series:** default to a native `chart` (`line` / `column`, editable);
+  several series → `line` with every series and the focal one in `highlight`.
+  `column_simple_growth` / `column_split_growth` / `column_historic_forecast`
+  only when the growth-rate callout, the inflection or the forecast bars are
+  the point; the legacy `line_chart` only for 1–4 lines without a highlight.
 - **Categorical bars:** sorted high-to-low with one focus → `column_comparison`.
   Two scenarios per category → `grouped_column_chart`. Parts-of-a-whole per
   category → `stacked_column_chart`.
@@ -2219,7 +2222,8 @@ Quick decision rules to avoid common confusions:
   `comparison_table` (only when the source gives ratings); options × text
   features → `data_table` with `highlight_col`; one option's +/− → `pros_cons`; before/after or
   current/future → `two_column_compare`.
-- **Hierarchy:** drivers of an issue → `issue_tree`; reporting lines →
+- **Hierarchy:** decomposing a goal or question into drivers → `issue_tree`
+  (causes of an observed problem the source states → `fishbone`); reporting lines →
   `org_chart`; one leader + N teammates → `project_team_circles`; function ×
   role grid → `team_chart`.
 - **Roadmap:** 3 phases → `phases_chevron_3`; 4 phases (text) →

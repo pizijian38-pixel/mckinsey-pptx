@@ -45,6 +45,9 @@ NUM = re.compile(r"(?:(?<![\w.%)])[-+−])?(?<![\w.])\d{1,3}(?:,\d{3})+(?:\.\d+)
                  r"|(?:(?<![\w.%)])[-+−])?(?<![\w.])\d+(?:\.\d+)?")
 # Outline scaffolding ("Slide 13:", "Table 2") is not data.
 SCAFFOLD = re.compile(r"\b(?:slide|table|chart|figure|page|section|第)\s*\d+\b", re.I)
+# Emphasis markup that reached the slide as characters: the template does not render it.
+LITERAL_MARKUP = re.compile(
+    r"\*\*[^*\n]+\*\*|\{(?:navy|blue|mid_blue|light_blue|red|green|amber|gray|gold)\|")
 PLACEHOLDER = re.compile(r"\[(?:insert|description|key takeaway|lorem)[^\]]*\]|\blorem ipsum\b|^xx$|\b1\. xx\b|Source: xx",
                          re.I)
 CJK = re.compile(r"[⺀-鿿가-힯＀-￯]")
@@ -585,7 +588,7 @@ def main(argv=None) -> int:
         templates.append(template_of(slide))
         groups.append(group_of(slide))
         hits = {m.group(0) for line in text.splitlines()
-                for m in [PLACEHOLDER.search(line.strip())] if m}
+                for m in [PLACEHOLDER.search(line.strip()) or LITERAL_MARKUP.search(line)] if m}
         if hits:
             leftovers.append((i, sorted(hits)))
 
@@ -613,7 +616,8 @@ def main(argv=None) -> int:
     else:
         print("  none")
 
-    print("\n[4] Leftover placeholders:")
+    print("\n[4] Leftover placeholders and literal markup (**bold** / {red|..} printed as "
+          "characters: remove it, this template does not render it):")
     if leftovers:
         flagged = True
         _note("[4]", [i for i, _ in leftovers])

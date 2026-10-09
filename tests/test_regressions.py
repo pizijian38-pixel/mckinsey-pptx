@@ -516,6 +516,104 @@ def test_run_deck_builds_checks_and_renders():
         assert "FAILED" in log.getvalue()
 
 
+_MARKUP_SKIP = {"icon", "tone", "type", "chart_type", "focus", "highlight", "kind", "direction",
+                "group", "kicker", "nav", "layout", "style", "header_style", "fmt", "number_format",
+                "sort", "cell_label", "rating", "mode", "from", "to", "legend", "source",
+                "footnote", "section_marker", "title", "insight_label", "persona", "lang",
+                "stages", "categories", "labels", "options", "series_names"}
+
+
+def _with_markup(v, key=None):
+    if key in _MARKUP_SKIP:
+        return v
+    if isinstance(v, str):
+        return v + " **zz**" if len(v) > 3 and not v.isdigit() else v
+    if isinstance(v, (list, tuple)):
+        return type(v)(_with_markup(x) for x in v)
+    if isinstance(v, dict):
+        return {k: _with_markup(x, k) for k, x in v.items()}
+    return v
+
+
+def test_markup_scope_matches_templates():
+    """SKILL.md, CATALOG.md and the old docs gave three different answers to
+    "which templates render **bold** / {red|..}" (41-45, 41-55, rich templates).
+    design.MARKUP_FULL / MARKUP_PARTIAL are the one answer; this measures it by
+    adding ` **zz**` to every text value of each catalog example and looking
+    for the asterisks on the slide."""
+    import re
+    from mckinsey_pptx import design
+
+    class Probe:
+        def __init__(self):
+            self.real = PresentationBuilder(on_error="raise")
+
+        def add(self, name, **kw):
+            return self.real.add(name, **_with_markup(kw))
+
+    cat = (ROOT / "mckinsey_pptx" / "agent" / "CATALOG.md").read_text(encoding="utf8")
+    full, partial, literal = set(), set(), set()
+    for part in re.split(r"\n## ", cat):
+        m = re.search(r"\(`(\w+)`", part.splitlines()[0])
+        blocks = [b for b in re.findall(r"```python\n(.*?)```", part, re.S) if "b.add(" in b]
+        if not m or not blocks:
+            continue
+        probe = Probe()
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            exec(blocks[0], {"b": probe})
+        text = deck_check.slide_text(probe.real.prs.slides[-1])
+        shown, raw = text.count("zz"), text.count("**zz**")
+        if not shown:
+            continue                    # the probe's text never reached the slide
+        (literal if raw == shown else partial if raw else full).add(m.group(1))
+    assert full == set(design.MARKUP_FULL), (sorted(full ^ set(design.MARKUP_FULL)))
+    assert partial == set(design.MARKUP_PARTIAL), (sorted(partial ^ set(design.MARKUP_PARTIAL)))
+    assert literal, "no template prints markup literally? the probe is broken"
+
+
+def test_literal_markup_is_flagged():
+    """issue_tree prints `**bold**` as characters; the checker reports it in [4]."""
+    with tempfile.TemporaryDirectory() as d:
+        b = PresentationBuilder()
+        b.add("issue_tree", title="Why margin fell",
+              root="Margin fell **3 pts**",
+              main_drivers=[{"label": "Freight", "secondaries": [
+                  {"label": "Rates", "underlying": ["Rates {red|doubled}"]}]}],
+              source="", footnote="")
+        b.add("card_grid", title="Rendered markup is fine",
+              cards=[{"title": "Cost", "bullets": ["Up **12%** in a year"]}], source="", footnote="")
+        deck = Path(d) / "d.pptx"
+        b.save(str(deck))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            deck_check.main([str(deck)])
+        lines = _section(out.getvalue(), "[4] Leftover", "[6] Layout")
+        assert any(l.startswith("slide 1") and "**3 pts**" in l for l in lines), lines
+        assert not any(l.startswith("slide 2") for l in lines), lines
+
+
+def test_selection_guidance_is_consistent():
+    """The same choice was written in five places and disagreed (operations spine
+    "issue_tree / card_grid" vs fishbone, "rich templates 41-55 / 41-80 / 41-45",
+    line_chart vs chart line). Keep every template name real and the retired
+    wordings out."""
+    import re
+    from mckinsey_pptx import builder
+    skill = (ROOT / "SKILL.md").read_text(encoding="utf8")
+    cat = (ROOT / "mckinsey_pptx" / "agent" / "CATALOG.md").read_text(encoding="utf8")
+    names = set(builder._REGISTRY)
+    not_templates = {"kv_table", "default_section_marker", "highlight_col", "highlight_rows",
+                     "insight_label", "make_brand_theme", "make_theme", "make_zh_theme",
+                     "mckinsey_pptx", "section_marker", "takeaway_header", "trend_up"}
+    stray = sorted(t for t in set(re.findall(r"`([a-z][a-z0-9_]+)(?:\(|`|=)", skill))
+                   if "_" in t and t not in names and t not in not_templates)
+    assert not stray, f"SKILL.md names templates that do not exist: {stray}"
+    for retired in ("(41–45)", "(41–55)", "templates 41–55", "root causes `issue_tree` / `card_grid`",
+                    "options `data_table` → recommendation", "this template only",
+                    "Multi-series time series with continuous lines"):
+        assert retired not in skill and retired not in cat, f"retired wording back: {retired!r}"
+
+
 def test_run_deck_summary_names_failing_sections_and_slides():
     """The summary used to say "see sections [1] [4] [5a/b] [6]-[10]" whatever
     was wrong; it now names the sections that fired and their slides, and a
