@@ -157,8 +157,7 @@ def test_catalog_examples_run():
             for i, sl in enumerate(prs.slides, start=1):
                 bs = deck_check.body_size(sl, prs.slide_height)
                 tpl = deck_check.template_of(sl)
-                floor = (deck_check.LABEL_MIN_PT if tpl in deck_check._LABEL_TEMPLATES
-                         else deck_check.BODY_MIN_PT)
+                floor = deck_check.size_floor(sl)
                 if bs is not None and bs < floor and i > 1:
                     failures.append(f"[7] {tpl}: {bs:g}pt < {floor}pt")
         finally:
@@ -516,7 +515,7 @@ def test_run_deck_builds_checks_and_renders():
         assert "FAILED" in log.getvalue()
 
 
-_MARKUP_SKIP = {"icon", "tone", "type", "chart_type", "focus", "highlight", "kind", "direction",
+_MARKUP_SKIP = {"icon", "tone", "type", "template", "chart_type", "focus", "highlight", "kind", "direction",
                 "group", "kicker", "nav", "layout", "style", "header_style", "fmt", "number_format",
                 "sort", "cell_label", "rating", "mode", "from", "to", "legend", "source",
                 "footnote", "section_marker", "title", "insight_label", "persona", "lang",
@@ -868,6 +867,127 @@ def test_csv_source_commas_are_delimiters():
         assert not any(len(n) > 4 for n in nums), nums
 
 
+def _catalog_first_calls():
+    """template -> keyword arguments of its first CATALOG example, chrome removed."""
+    import re
+    from mckinsey_pptx import builder
+    cat = (ROOT / "mckinsey_pptx" / "agent" / "CATALOG.md").read_text(encoding="utf8")
+
+    class Rec:
+        def __init__(self):
+            self.calls = []
+
+        def add(self, name, **kw):
+            self.calls.append((name, kw))
+
+    found = {}
+    for blk in re.findall(r"```python\n(.*?)```", cat, re.S):
+        if "b.add(" not in blk:
+            continue
+        r = Rec()
+        try:
+            exec(blk, {"b": r})
+        except Exception:      # noqa: BLE001 - examples that need other names
+            continue
+        for name, kw in r.calls:
+            kw = {k: v for k, v in kw.items() if k not in (
+                "title", "subtitle", "insight", "insight_label", "kicker", "group", "nav",
+                "source", "footnote", "section_marker")}
+            found.setdefault(builder.template_name(builder._REGISTRY[name]), kw)
+    return found
+
+
+def _draw_diagram(template, w, h, x=1.0, y=1.5):
+    """Draw a template's CATALOG example into a w x h region; return its shapes
+    (in inches) and the build warnings."""
+    from pptx.util import Emu
+    from mckinsey_pptx import builder
+    from mckinsey_pptx.base import blank_slide
+    from mckinsey_pptx.components import comp_diagram
+    from mckinsey_pptx.theme import DEFAULT_THEME
+    prs = PresentationBuilder().prs
+    slide = blank_slide(prs)
+    n0 = len(slide.shapes)
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        comp_diagram(slide, DEFAULT_THEME, x, y, w, h, template=template,
+                     **_catalog_first_calls()[template])
+    shapes = [tuple(Emu(v).inches for v in (sh.left, sh.top, sh.width, sh.height))
+              + (sh,) for sh in list(slide.shapes)[n0:]]
+    return shapes, [ln for ln in err.getvalue().splitlines() if "WARNING" in ln]
+
+
+def test_diagram_region_stays_inside_its_minimum():
+    """A `diagram` region promises that the template draws inside the box it is
+    given; DIAGRAM_MIN is the smallest box for which that was measured."""
+    from mckinsey_pptx.components import DIAGRAM_MIN
+    bad = []
+    for name, (w, h) in sorted(DIAGRAM_MIN.items()):
+        shapes, warns = _draw_diagram(name, w, h)
+        assert len(shapes) > 3, f"{name}: drew {len(shapes)} shapes"
+        out = [s for s in shapes
+               if s[0] < 1.0 - 0.15 or s[1] < 1.5 - 0.15
+               or s[0] + s[2] > 1.0 + w + 0.15 or s[1] + s[3] > 1.5 + h + 0.15]
+        small = [r.font.size.pt for *_, sh in shapes if sh.has_text_frame
+                 for p in sh.text_frame.paragraphs for r in p.runs
+                 if r.font.size and r.text.strip() and r.font.size.pt < 9]
+        if out or warns or small:
+            bad.append(f"{name} {w}x{h}: {len(out)} outside, {len(warns)} warnings, "
+                       f"fonts {sorted(set(small))}")
+    assert not bad, "\n".join(bad)
+
+
+def test_diagram_region_below_minimum_warns():
+    from mckinsey_pptx.components import DIAGRAM_MIN
+    w, h = DIAGRAM_MIN["radar"]
+    _, warns = _draw_diagram("radar", w - 1.0, h)
+    assert any("radar needs a region of at least" in x for x in warns), warns
+
+
+def test_diagram_region_rejects_unsupported_or_misused_templates():
+    b = PresentationBuilder()
+    kw = _catalog_first_calls()
+    for region in [
+        {"type": "diagram", "template": "cycle", **kw["cycle"]},
+        {"type": "diagram", "template": "radr", **kw["radar"]},
+        {"type": "diagram", "template": "radar", "title": "x", **kw["radar"]},
+        {"type": "diagram", "template": "radar", "bogus": 1, **kw["radar"]},
+    ]:
+        b.add("composite", title="t", columns=[region, {"type": "bullets", "items": ["a"]}])
+    msg = ""
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            b.save(str(Path(d) / "x.pptx"))
+    except Exception as e:      # noqa: BLE001
+        msg = str(e)
+    for expect in ("cannot be drawn into a region", "did you mean 'radar'",
+                   "belong on the composite", "unknown argument 'bogus'"):
+        assert expect in msg, (expect, msg)
+
+
+def test_composite_with_diagram_is_held_to_the_label_floor():
+    """Diagram labels are 10-11pt by design; the checker must not judge a
+    composite slide that carries one by the 12pt body floor."""
+    kw = _catalog_first_calls()
+    b = PresentationBuilder(on_error="raise")
+    b.add("cover_slide", title="Probe deck")
+    b.add("composite", title="Capability gap sits in speed, not price",
+          columns=[{"type": "diagram", "template": "heatmap", **kw["heatmap"]},
+                   [{"type": "bullets", "items": ["Payments peaks at 47%"]}]],
+          source="Source: probe")
+    with tempfile.TemporaryDirectory() as d:
+        deck = Path(d) / "d.pptx"
+        b.save(str(deck))
+        prs = Presentation(str(deck))
+        slide = prs.slides[1]
+        assert deck_check.diagrams_of(slide) == ["heatmap"]
+        assert deck_check.template_of(slide) == "composite"
+        assert deck_check.group_of(slide) is None
+        _, report = _check(deck)
+        assert not _section(report, "[7] Small text", "[8] Footer"), report
+
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
@@ -875,7 +995,7 @@ if __name__ == "__main__":
             try:
                 fn()
                 print(f"PASS  {name}")
-            except AssertionError as e:
+            except Exception as e:      # noqa: BLE001 - a crash is a failure, not a silent exit
                 failed += 1
-                print(f"FAIL  {name}: {str(e)[:300]}")
+                print(f"FAIL  {name}: {type(e).__name__}: {str(e)[:300]}")
     sys.exit(1 if failed else 0)

@@ -11,27 +11,7 @@ from ..base import add_chrome, add_line, add_oval, add_rect, add_textbox, blank_
 from ..design import (add_callout_bar, fit_one_line, fit_size, text_height_in, text_width_pt, tone_rgb,
                       warn_small, write_rich_paragraph)
 from ..theme import Theme, DEFAULT_THEME
-
-
-def _frame(prs, theme, title, subtitle, insight, insight_label, **chrome):
-    slide = blank_slide(prs)
-    add_chrome(slide, title=title, theme=theme, **chrome)
-    pal, typo, layout = theme.palette, theme.typography, theme.layout
-    left = layout.margin_left_in
-    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
-    top = layout.body_top_in + 0.05
-    bottom = layout.footer_top_in - 0.25
-    if subtitle:
-        tb = add_textbox(slide, left, top, width, 0.35)
-        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
-                        bold=True, color=pal.text_dark, family=typo.family, first=True)
-        top += 0.45
-    if insight:
-        h = 0.7
-        add_callout_bar(slide, theme, left, bottom - h, width, h, insight,
-                        label=insight_label)
-        bottom -= h + 0.25
-    return slide, left, top, width, bottom
+from .evaluation_slides import _frame
 
 
 def _diamond(slide, cx, cy, d, rgb):

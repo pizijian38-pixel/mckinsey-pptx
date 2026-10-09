@@ -434,11 +434,31 @@ def focus_tag(slide, theme: Theme, x, y, text, *, h=0.24, size=9, anchor="left")
     return w
 
 
+REGION = []        # (slide, x, y, w, h) while a template is drawn into a composite region
+
+
+class draw_into:
+    """Context manager: templates built on _frame() draw into this box of an
+    existing slide instead of creating a slide with title, subtitle and insight.
+    Used by the composite `diagram` region."""
+
+    def __init__(self, slide, x, y, w, h):
+        self.box = (slide, x, y, w, h)
+
+    def __enter__(self):
+        REGION.append(self.box)
+
+    def __exit__(self, *exc):
+        REGION.pop()
+
+
 def legend_strip(slide, theme: Theme, items, y, *, x=None, w=None, note=None):
     """One horizontal legend under the diagram, above the footer.
     items: [(kind, color, label)] with kind "dot" | "ring" | "box" | "line" | "dash"."""
     from .base import add_line
     pal, lay = theme.palette, theme.layout
+    if REGION and x is None:
+        x, w = REGION[-1][1], REGION[-1][3]
     x = lay.margin_left_in if x is None else x
     w = (lay.slide_width_in - lay.margin_right_in - x) if w is None else w
     add_line(slide, x, y, x + w, y, color=pal.grid_gray, width_pt=HAIRLINE_PT)

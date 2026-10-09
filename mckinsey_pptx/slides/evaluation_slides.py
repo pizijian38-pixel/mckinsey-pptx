@@ -21,12 +21,15 @@ from ..design import (add_callout_bar, add_icon, add_insight_panel, fit_one_line
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
 from .table_slides import draw_table
-from ..design import mark_derived, mark_index
+from ..design import REGION, draw_into, mark_derived, mark_index  # noqa: F401
 
 GAP = 0.25
 
 
 def _frame(prs, theme, title, subtitle, insight, insight_label, **chrome):
+    if REGION:
+        slide, x, y, w, h = REGION[-1]
+        return slide, x, y, w, y + h
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, **chrome)
     pal, typo, layout = theme.palette, theme.typography, theme.layout

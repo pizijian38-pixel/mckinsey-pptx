@@ -561,7 +561,13 @@ class PresentationBuilder:
             add_kicker(slide, kicker, kwargs["theme"])
         # Record template (+ parallel group) on the slide (<p:cSld name>) so
         # scripts/deck_check.py can check layout variety and consistency.
-        slide._element.cSld.set("name", "mp:" + name + (f"|{group}" if group else ""))
+        rec = "mp:" + name + (f"|{group}" if group else "")
+        if name == "composite":
+            from .components import diagram_templates
+            drawn = diagram_templates(kwargs.get("columns"))
+            if drawn:     # the checker holds diagram labels to the 10pt floor
+                rec += ("" if group else "|") + "|d=" + ",".join(drawn)
+        slide._element.cSld.set("name", rec)
         return out
 
     # Adaptive add (type optional)

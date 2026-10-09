@@ -550,12 +550,69 @@ def comp_table(slide, theme, x, y, w, h, *, where="", **kw):
     draw_table(slide, theme, x, y, w, h, **kw)
 
 
+# Diagram templates that draw cleanly into a region: template -> smallest region
+# (width, height in inches). Measured with the CATALOG example of each template:
+# every shape inside the region, text >= 9 pt, no word broken mid-word
+# (tests/test_regressions.py re-checks this). Denser content needs more room.
+# Not listed: cycle, swimlane, hub_spoke, risk_heatmap and venn draw labels outside
+# their plot or overflow a short region - use them as full slides.
+DIAGRAM_MIN = {
+    "bump": (6.0, 3.8), "dumbbell": (4.4, 3.4), "fishbone": (8.0, 4.5),
+    "heatmap": (4.4, 3.4), "journey": (7.0, 4.4), "layer_stack": (5.2, 3.8),
+    "marimekko": (6.0, 4.0), "positioning_scale": (6.0, 4.0), "radar": (6.0, 3.8),
+    "sankey": (4.4, 3.4), "slopegraph": (4.4, 3.4), "timeline": (6.0, 3.4),
+    "treemap": (6.0, 3.8), "value_chain": (7.0, 4.4),
+}
+
+
+def diagram_templates(columns) -> list:
+    """Names of the diagram templates used in a composite's columns."""
+    found = []
+    for col in columns or []:
+        for region in (col if isinstance(col, (list, tuple)) else [col]):
+            if isinstance(region, dict) and region.get("type") == "diagram":
+                found.append(str(region.get("template")))
+    return found
+
+
+def comp_diagram(slide, theme, x, y, w, h, *, template, where="", **kw):
+    """Draw a diagram template (`template`: its name) into the region. The
+    template's own arguments go alongside; title / subtitle / insight / source
+    belong to the composite, not here."""
+    from . import builder, validate
+    from .design import draw_into, warn_small
+    fn = builder._REGISTRY.get(template)
+    if fn is None:
+        raise ValueError(validate.unknown_template(template, sorted(DIAGRAM_MIN)))
+    name = builder.template_name(fn)
+    if name not in DIAGRAM_MIN:
+        raise ValueError(f"diagram: {template!r} cannot be drawn into a region. "
+                         f"Use one of: {', '.join(sorted(DIAGRAM_MIN))}")
+    chrome = [k for k in ("title", "subtitle", "insight", "insight_label", "source",
+                          "footnote", "page_number", "section_marker") if k in kw]
+    if chrome:
+        raise ValueError(f"diagram {name}: {', '.join(chrome)} belong on the composite, "
+                         "not on the diagram region")
+    errs = [m for lv, m in validate.signature_problems(fn, kw) if lv == "error"]
+    if errs:
+        raise ValueError(f"diagram {name}: " + "; ".join(errs))
+    min_w, min_h = DIAGRAM_MIN[name]
+    if w < min_w or h < min_h:
+        warn_small("diagram", where or name, 0,
+                   f"{name} needs a region of at least {min_w:.1f} x {min_h:.1f} in "
+                   f"(got {w:.1f} x {h:.1f}); give it a wider column or more height.")
+    prs = slide.part.package.presentation_part.presentation
+    with draw_into(slide, x, y, w, h):
+        fn(prs, title=where or name, theme=theme, **kw)
+
+
 COMPONENTS = {
     "flow": comp_flow, "kv_table": comp_kv_table, "metrics": comp_metrics,
     "cards": comp_cards, "pros_cons": comp_pros_cons, "list": comp_list,
     "bullets": comp_bullets, "text": comp_text, "chart": comp_chart,
     "table": comp_table, "phases": comp_phases,
     "callout": comp_callout, "pyramid": comp_pyramid, "sections": comp_sections,
+    "diagram": comp_diagram,
 }
 
 

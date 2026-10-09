@@ -373,7 +373,8 @@ _NON_CONTENT = {"cover_slide", "cover", "section_divider", "agenda", "executive_
 TEXT_SHARE_REMINDER = 0.5
 
 # [7] Diagrams whose text is short labels on marks (bubbles, nodes, blocks,
-# axis ends) are held to a 10pt floor; body text everywhere else to 12pt.
+# axis ends) are held to a 10pt floor, and so are composite slides with a diagram
+# region; body text everywhere else to 12pt.
 _LABEL_TEMPLATES = {
     "bubble_chart", "bubble_chart_takeaways", "growth_share", "bcg_matrix",
     "prioritization_matrix", "matrix_2x2", "matrix", "issue_tree", "org_chart",
@@ -383,6 +384,12 @@ _LABEL_TEMPLATES = {
     "layer_stack", "layers", "journey", "customer_journey", "funnel",
     "process_flow", "process_flow_horizontal"}
 LABEL_MIN_PT, BODY_MIN_PT = 10, 12
+
+
+def size_floor(slide) -> int:
+    """Smallest dominant body size [7] accepts on this slide."""
+    return LABEL_MIN_PT if template_of(slide) in _LABEL_TEMPLATES or diagrams_of(slide) \
+        else BODY_MIN_PT
 
 
 def layout_mix(templates):
@@ -414,8 +421,19 @@ def _record(slide):
     name = slide._element.cSld.get("name") or ""
     if not name.startswith("mp:"):
         return None, None
-    tpl, _, group = name[3:].partition("|")
-    return tpl, (group or None)
+    parts = name[3:].split("|")      # mp:<template>[|<group>][|d=<diagram>,...]
+    group = parts[1] if len(parts) > 1 else ""
+    return parts[0], (group or None)
+
+
+def diagrams_of(slide):
+    """Diagram templates drawn inside a composite slide (empty for other slides)."""
+    name = slide._element.cSld.get("name") or ""
+    _, _, rest = name.partition("|")
+    for part in rest.split("|"):
+        if part.startswith("d="):
+            return part[2:].split(",")
+    return []
 
 
 def template_of(slide):
@@ -575,7 +593,7 @@ def main(argv=None) -> int:
         if rr:
             restates.append((i, rr))
         bs = body_size(slide, sh)
-        floor = LABEL_MIN_PT if template_of(slide) in _LABEL_TEMPLATES else BODY_MIN_PT
+        floor = size_floor(slide)
         if bs is not None and bs < floor and i > 1:
             small.append((i, bs, floor))
         if deck_is_cjk and _EN_LABELS:

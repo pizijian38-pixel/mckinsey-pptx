@@ -1289,6 +1289,15 @@ dedicated template when one fits the whole slide.
   `boxed: bool` — stacked titled groups with a ruled header, e.g.
   Feasibility / Pros / Cons; `tone: green` → ✓ marks, `red` → ✗ marks
   (`mark: check | cross | dot` to override). Use `boxed: False` inside a `panel`.
+- `diagram` — `template: <name>` plus that template's own arguments (no
+  `title`, `subtitle`, `insight`, `source`: those belong to the composite). One
+  diagram beside a chart, cards or bullets. Supported, with the smallest region
+  in inches (about 6 wide per column in a two-column slide; the build warns
+  below it): `dumbbell` `heatmap` `sankey` `slopegraph` 4.4×3.4 · `layer_stack`
+  5.2×3.8 · `bump` `radar` `treemap` 6×3.8 · `marimekko` `positioning_scale`
+  6×4 · `timeline` 6×3.4 · `journey` `value_chain` 7×4.4 · `fishbone` 8×4.5.
+  Others (cycle, swimlane, hub_spoke, risk_heatmap, venn) need the full slide.
+  At most two diagrams per slide, never three across.
 
 **Logic options** — for pages that read left to right as one argument
 ("current situation → strategy → advantages → disadvantages", "how it
@@ -1347,6 +1356,40 @@ b.add("composite", title="Option A: keep the mid-market position and partner for
             {"title": "Feasibility", "mark": "dot", "bullets": ["Already strong in the mid-market"]},
             {"title": "Pros", "tone": "green", "bullets": ["Closes the product gap fast"]},
             {"title": "Cons", "tone": "red", "bullets": ["Depends on the partner"]}]}])
+
+# Recipes: a diagram carries the relationship, the other region says what to do about it
+b.add("composite", title="Vendor B wins on integration and support; Vendor A only on features",
+      columns=[{"type": "diagram", "template": "radar", "heading": "Score by criterion (1-5)",
+                "criteria": ["Functionality", "Integration", "Support", "Price", "Scalability"],
+                "series": [{"name": "Vendor A", "values": [5, 2, 3, 4, 4]},
+                           {"name": "Vendor B", "values": [4, 5, 5, 3, 4]}],
+                "scale_max": 5, "focus": "Vendor B"},
+               [{"type": "cards", "columns": 2, "cards": [
+                   {"title": "Integration", "bullets": ["Vendor A needs 4 custom connectors"]},
+                   {"title": "Support", "bullets": ["Vendor B offers 24/7 coverage"]}]},
+                {"type": "callout", "label": "Recommendation", "text": "Shortlist **Vendor B**"}]],
+      source="Team scoring, 1-5")
+
+b.add("composite", title="Revenue grew in every region, but Recommender latency got worse",
+      columns=[{"type": "chart", "heading": "Revenue ($M)", "chart_type": "column",
+                "categories": ["2023", "2024", "2025"],
+                "series": [{"name": "Revenue", "values": [310, 365, 420]}]},
+               {"type": "diagram", "template": "slopegraph", "heading": "p95 latency",
+                "states": ["Before", "After"], "fmt": "{:,.0f} ms", "focus": "Recommender",
+                "series": [{"name": "Search", "start": 512, "end": 288},
+                           {"name": "Recommender", "start": 238, "end": 431}]}],
+      source="Finance close; APM p95")
+
+b.add("composite", title="Rollout reaches all 310 stores by mid-2025 if wave 1 holds",
+      columns=[[{"type": "diagram", "template": "timeline", "weight": 2.2,
+                 "events": [{"date": "Jan 2024", "title": "Pilot", "body": "3 stores"},
+                            {"date": "Oct 2024", "title": "Wave 1", "body": "40 stores"},
+                            {"date": "Jun 2025", "title": "National", "body": "310 stores",
+                             "tone": "green"}]},
+                {"type": "cards", "columns": 3, "cards": [
+                    {"title": "Gate 1", "bullets": ["Pilot NPS above 40"]},
+                    {"title": "Gate 2", "bullets": ["Wave 1 stock-outs below 2%"]},
+                    {"title": "Gate 3", "bullets": ["IT cut-over rehearsed"]}]}]])
 ```
 
 ---
