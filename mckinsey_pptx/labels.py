@@ -103,6 +103,24 @@ _T = {
     "Resources & capabilities": ("资源与能力", "자원과 역량", "資源と能力"),
     "Business & value proposition": ("业务与价值主张", "사업과 가치 제안", "事業と価値提案"),
     "Structure, systems & people": ("结构、系统与人员", "구조·시스템·인력", "組織・システム・人材"),
+    # diagram templates: axes, quadrants, focus tags, legends
+    "Relative market share (%)": ("相对市场份额（%）", "상대 시장 점유율(%)", "相対市場シェア（%）"),
+    "Market growth (%)": ("市场增速（%）", "시장 성장률(%)", "市場成長率（%）"),
+    "Question marks": ("问题业务", "물음표", "問題児"),
+    "Stars": ("明星业务", "스타", "花形"),
+    "Dogs": ("瘦狗业务", "도그", "負け犬"),
+    "Cash cows": ("现金牛业务", "캐시카우", "金のなる木"),
+    "Focus": ("重点", "중점", "重点"),
+    "Other units": ("其他业务", "기타 사업", "その他の事業"),
+    "Bubble area": ("气泡面积", "버블 면적", "バブル面積"),
+    "Priority": ("优先", "우선", "優先"),
+    "Short": ("短期", "단기", "短期"),
+    "Long": ("长期", "장기", "長期"),
+    "Step": ("步骤", "단계", "ステップ"),
+    "We are here": ("当前阶段", "현재 단계", "現在地"),
+    "Break point": ("破局点", "차단 지점", "打開点"),
+    "Key lever": ("关键杠杆", "핵심 레버", "主要レバー"),
+    "Outcome": ("结果", "결과", "結果"),
 }
 _IDX = {"zh": 0, "ko": 1, "ja": 2}
 

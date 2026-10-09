@@ -22,8 +22,9 @@ from pptx.util import Inches, Pt
 
 from ..base import add_line, add_oval, add_rect, add_textbox, write_paragraph
 from ..components import _polygon, letter_space
-from ..design import (add_arrow, add_fade_wedge, add_icon, add_stage_banners, fit_one_line,
-                      fit_size, plain, set_dashed, text_height_in, text_width_pt, tint,
+from ..design import (HAIRLINE_PT, add_arrow, add_fade_wedge, add_icon, add_stage_banners,
+                      check_focus, eyebrow, fit_one_line, fit_size, focus_tag, has_focus,
+                      is_focus, plain, set_dashed, text_height_in, text_width_pt, tint,
                       tone_rgb, warn_small, write_rich_paragraph)
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
@@ -37,9 +38,10 @@ def _as_node(n):
     return n if isinstance(n, dict) else {"title": str(n)}
 
 
-def _node(slide, theme, x, y, w, h, node, size, *, fill, line=None, color=None, dashed=False):
+def _node(slide, theme, x, y, w, h, node, size, *, fill, line=None, color=None, dashed=False,
+          line_w=1.25):
     pal = theme.palette
-    box = add_rect(slide, x, y, w, h, fill=fill, line=line, line_width=1.25 if line else None)
+    box = add_rect(slide, x, y, w, h, fill=fill, line=line, line_width=line_w if line else None)
     if dashed:
         set_dashed(box, line or pal.mid_blue, 1.0)
     tx, tw = x + 0.12, w - 0.24
@@ -53,7 +55,8 @@ def _node(slide, theme, x, y, w, h, node, size, *, fill, line=None, color=None, 
                          first=True)
     if node.get("body"):
         write_rich_paragraph(tb.text_frame, node["body"], size=max(size - 2, MIN_PT), theme=theme,
-                             color=color or pal.footer_gray, align=PP_ALIGN.CENTER)
+                             color=tint(color, 0.25) if color else pal.footer_gray,
+                             align=PP_ALIGN.CENTER)
 
 
 def _node_size(nodes, w, h, has_icon=False, max_size=16):
@@ -70,7 +73,7 @@ def _node_size(nodes, w, h, has_icon=False, max_size=16):
 
 def _label(slide, theme, x, y, w, text, size=11):
     tb = add_textbox(slide, x, y, w, 0.26, anchor=MSO_ANCHOR.BOTTOM)
-    write_paragraph(tb.text_frame, text, size=size, italic=True, bold=True,
+    write_paragraph(tb.text_frame, text, size=size, italic=True, bold=False,
                     color=theme.palette.mid_blue, family=theme.typography.family,
                     align=PP_ALIGN.CENTER, first=True)
 
@@ -99,6 +102,8 @@ def add_cycle(prs, *,
               kind: str = "virtuous",
               feedback: Union[bool, str] = True,
               connector_label: Optional[str] = None,
+              focus=None,
+              focus_label: Optional[str] = None,
               conclusion: Optional[str] = None,
               subtitle: Optional[str] = None,
               insight: Optional[str] = None,
@@ -112,6 +117,10 @@ def add_cycle(prs, *,
         connector_label: text on the arrows ("leads to ...").
     Loop: steps (3-6) around a centre; kind "vicious" draws it in red.
     conclusion: bold statement under the diagram (the "so what").
+    focus: the step the title is about (label or index; branch form counts the
+           steps path by path). Loop: drawn dark with a tag (focus_label, default
+           "Break point" for a vicious loop, "Key lever" otherwise). Branch: the
+           step is outlined in the accent.
     """
     slide, left, top, width, bottom = _frame(
         prs, theme, title, subtitle, insight, insight_label, page_number=page_number,
@@ -121,16 +130,20 @@ def add_cycle(prs, *,
         _conclusion(slide, theme, left, width, bottom - ch, ch, conclusion)
         bottom -= ch + 0.12
     if steps:
-        _loop(slide, theme, left, top, width, bottom, [_as_node(s) for s in steps], center,
-              kind, title)
+        nodes = [_as_node(s) for s in steps]
+        check_focus("cycle", title, focus, [n.get("title", "") for n in nodes])
+        _loop(slide, theme, left, top, width, bottom, nodes, center, kind, title,
+              focus, focus_label)
     else:
-        _branch(slide, theme, left, top, width, bottom, _as_node(start or ""),
-                [[_as_node(s) for s in p] for p in (paths or [])], _as_node(end or ""),
-                feedback, connector_label, title)
+        pth = [[_as_node(s) for s in p] for p in (paths or [])]
+        check_focus("cycle", title, focus, [n.get("title", "") for p in pth for n in p])
+        _branch(slide, theme, left, top, width, bottom, _as_node(start or ""), pth,
+                _as_node(end or ""), feedback, connector_label, title, focus)
     return slide
 
 
-def _branch(slide, theme, left, top, width, bottom, start, paths, end, feedback, clabel, where):
+def _branch(slide, theme, left, top, width, bottom, start, paths, end, feedback, clabel, where,
+            focus=None):
     pal = theme.palette
     n = max(len(paths), 1)
     k = max((len(p) for p in paths), default=1)
@@ -154,9 +167,9 @@ def _branch(slide, theme, left, top, width, bottom, start, paths, end, feedback,
     size = min(size, se_size + 1)
     warn_small("cycle", where, size, "Shorten the step titles or use fewer paths.")
     line_c = pal.mid_blue
-    # start node
+    # start node: outlined in navy; steps: white with a hairline; end: solid navy
     _node(slide, theme, left, mid - se_h / 2, sw, se_h, start, se_size,
-          fill=tint(pal.light_blue, 0.82), line=pal.mid_blue)
+          fill=pal.white, line=pal.deep_navy, color=pal.deep_navy)
     bx = left + sw + 0.3  # branch line
     add_line(slide, left + sw, mid, bx, mid, color=line_c, width_pt=1.25)
     if n > 1:
@@ -170,8 +183,11 @@ def _branch(slide, theme, left, top, width, bottom, start, paths, end, feedback,
         if clabel:
             _label(slide, theme, bx - 0.25, cy - 0.3, x - bx + 0.25, clabel)
         for j, st in enumerate(path):
-            _node(slide, theme, x, ys[i], step_w, nh, st, size, fill=pal.soft_gray,
-                  line=pal.mid_blue)
+            k = sum(len(p) for p in paths[:i]) + j
+            f = is_focus(focus, k, st.get("title", ""))
+            _node(slide, theme, x, ys[i], step_w, nh, st, size,
+                  fill=tint(pal.bright_blue, 0.88) if f else pal.white,
+                  line=pal.bright_blue if f else pal.rule_gray, line_w=1.75 if f else HAIRLINE_PT)
             if j < len(path) - 1:
                 nx = x + step_w + conn
                 add_arrow(slide, x + step_w, cy, nx - 0.02, cy, color=line_c)
@@ -187,7 +203,7 @@ def _branch(slide, theme, left, top, width, bottom, start, paths, end, feedback,
     if clabel:
         _label(slide, theme, mx - 0.6, mid - 0.3, ex - mx + 0.6, clabel)
     _node(slide, theme, ex, mid - se_h / 2, ew, se_h, end, se_size,
-          fill=tint(pal.light_blue, 0.82), line=pal.mid_blue)
+          fill=pal.deep_navy, line=pal.deep_navy, color=pal.white)
     if feedback:
         fy = bottom - 0.12
         sx, exx = left + sw / 2, ex + ew / 2
@@ -211,41 +227,69 @@ def _rect_exit(cx, cy, a, b, dx, dy):
     return min(tx, ty)
 
 
-def _loop(slide, theme, left, top, width, bottom, steps, center, kind, where):
+def _loop(slide, theme, left, top, width, bottom, steps, center, kind, where, focus=None,
+          focus_label=None):
+    """Steps on an ellipse joined by curved arcs. Nodes are neutral (white, hairline,
+    numbered); the arcs and the centre carry the colour (red for a vicious loop);
+    one focal step may be drawn dark with a tag."""
     pal = theme.palette
     n = max(len(steps), 3)
     accent = pal.status_red if kind == "vicious" else pal.mid_blue
+    if focus_label is None:
+        focus_label = "Break point" if kind == "vicious" else "Key lever"
     H = bottom - top
     cx, cy = left + width / 2, top + H / 2
-    nw, nh = min(2.6, width / 4.2), min(1.0, H / 4.2)
-    rx, ry = min(width / 2 - nw / 2 - 0.2, H * 1.15), H / 2 - nh / 2 - 0.05
-    pos = []
-    for i in range(len(steps)):
-        ang = -math.pi / 2 + 2 * math.pi * i / len(steps)
-        pos.append((cx + rx * math.cos(ang), cy + ry * math.sin(ang)))
-    size = _node_size(steps, nw, nh, any(s.get("icon") for s in steps), 15)
+    nw, nh = min(2.7, width / 4.2), min(0.95, H / 4.4)
+    rx = min(width / 2 - nw / 2 - 0.25, max(H * 0.95, 3.0))
+    ry = H / 2 - nh / 2 - 0.12
+    m = len(steps)
+    angs = [-math.pi / 2 + 2 * math.pi * i / m for i in range(m)]
+    pos = [(cx + rx * math.cos(a), cy + ry * math.sin(a)) for a in angs]
+    size = _node_size(steps, nw - 0.1, nh - 0.2, any(s.get("icon") for s in steps), 15)
     warn_small("cycle", where, size, "Shorten the loop steps.")
-    for i, (px, py) in enumerate(pos):
-        qx, qy = pos[(i + 1) % len(pos)]
-        dx, dy = qx - px, qy - py
-        L = math.hypot(dx, dy) or 1
-        ux, uy = dx / L, dy / L
-        s0 = _rect_exit(px, py, nw / 2, nh / 2, ux, uy) + 0.08
-        s1 = _rect_exit(qx, qy, nw / 2, nh / 2, ux, uy) + 0.1
-        if L > s0 + s1 + 0.1:
-            add_arrow(slide, px + ux * s0, py + uy * s0, qx - ux * s1, qy - uy * s1,
-                      color=accent, width_pt=2.0)
-    for (px, py), st in zip(pos, steps):
-        _node(slide, theme, px - nw / 2, py - nh / 2, nw, nh, st, size,
-              fill=tint(accent, 0.88), line=accent)
+
+    def inside(px, py, q, pad):
+        return abs(px - q[0]) < nw / 2 + pad and abs(py - q[1]) < nh / 2 + pad
+    # arcs first (under the nodes), clipped where they would enter a node
+    for i in range(m):
+        a0, a1 = angs[i], angs[i] + 2 * math.pi / m
+        pts = [(cx + rx * math.cos(a0 + (a1 - a0) * t / 72),
+                cy + ry * math.sin(a0 + (a1 - a0) * t / 72)) for t in range(73)]
+        pts = [p for p in pts if not inside(*p, pos[i], 0.1)
+               and not inside(*p, pos[(i + 1) % m], 0.16)]
+        if len(pts) < 4:
+            continue
+        ff = slide.shapes.build_freeform(Inches(pts[0][0]), Inches(pts[0][1]), scale=1.0)
+        ff.add_line_segments([(Inches(x), Inches(y)) for x, y in pts[1:-1]], close=False)
+        arc = ff.convert_to_shape()
+        arc.fill.background()
+        arc.shadow.inherit = False
+        arc.line.color.rgb = accent
+        arc.line.width = Pt(1.75)
+        add_arrow(slide, pts[-2][0], pts[-2][1], pts[-1][0], pts[-1][1], color=accent,
+                  width_pt=1.75)
+    for i, ((px, py), st) in enumerate(zip(pos, steps)):
+        f = is_focus(focus, i, st.get("title", ""))
+        x, y = px - nw / 2, py - nh / 2
+        _node(slide, theme, x, y, nw, nh, st, size,
+              fill=pal.deep_navy if f else pal.white,
+              line=pal.deep_navy if f else pal.rule_gray,
+              line_w=1.0 if f else HAIRLINE_PT, color=pal.white if f else None)
+        eyebrow(slide, theme, x + 0.1, y + 0.03, 0.6, f"{i + 1:02d}",
+                color=pal.light_blue if f else pal.footer_gray, size=9, h=0.2)
+        if f and focus_label:
+            focus_tag(slide, theme, x + nw - 0.08, y - 0.13, focus_label, h=0.26,
+                      anchor="right")
     if center:
-        d = min(2.0, H * 0.42, rx * 1.1)
-        add_oval(slide, cx - d / 2, cy - d / 2, d, d, fill=pal.deep_navy if kind != "vicious"
-                 else pal.status_red)
-        csz = fit_size([center], d * 0.72, d * 0.6, max_size=16, min_size=10, bold=True)
-        tb = add_textbox(slide, cx - d * 0.36, cy - d * 0.3, d * 0.72, d * 0.6,
-                         anchor=MSO_ANCHOR.MIDDLE)
-        write_rich_paragraph(tb.text_frame, center, size=csz, theme=theme, color=pal.white,
+        d = min(1.8, H * 0.4, rx * 1.0)
+        add_oval(slide, cx - d / 2, cy - d / 2, d, d, fill=pal.white, line=accent,
+                 line_width=2.0)
+        eyebrow(slide, theme, cx - d / 2, cy - d * 0.3, d, "Outcome", color=accent,
+                align=PP_ALIGN.CENTER, size=9)
+        csz = fit_size([center], d * 0.72, d * 0.42, max_size=16, min_size=10, bold=True)
+        tb = add_textbox(slide, cx - d * 0.36, cy - d * 0.12, d * 0.72, d * 0.45,
+                         anchor=MSO_ANCHOR.TOP)
+        write_rich_paragraph(tb.text_frame, center, size=csz, theme=theme, color=accent,
                              bold=True, align=PP_ALIGN.CENTER, first=True)
 
 
@@ -300,6 +344,7 @@ def add_risk_heatmap(prs, *,
                      map_label: Optional[str] = "Risk mapping",
                      mitigation_label: Optional[str] = "Mitigations",
                      zones: str = "blue",
+                     focus=None,
                      subtitle: Optional[str] = None,
                      insight: Optional[str] = None,
                      insight_label: Optional[str] = "Bottom line",
@@ -309,6 +354,8 @@ def add_risk_heatmap(prs, *,
     """risks: [{"title", "probability", "impact", "mitigation"? (str | [str])}]
     probability / impact: "low" | "medium" | "high", 1-3, 1-5 or 0-1.
     zones: "blue" (shades of the brand colour) or "traffic" (green/amber/red).
+    focus: the risk(s) the title is about (title or index) — filled navy, with
+           their mitigation outlined; the other risks stay white.
     """
     slide, left, top, width, bottom = _frame(
         prs, theme, title, subtitle, insight, insight_label, page_number=page_number,
@@ -330,20 +377,21 @@ def add_risk_heatmap(prs, *,
     ax_w = 0.55  # y label + end labels
     px, py = left + ax_w, top + 0.28
     pw, ph = lw - ax_w - 0.1, bottom - 0.55 - py
+    # zones stay light so the risk boxes read on top of them
     if zones == "traffic":
-        shades = [tint(pal.status_green, 0.75), tint(pal.status_amber, 0.55),
-                  tint(pal.status_red, 0.55)]
-        base = tint(pal.status_green, 0.88)
+        shades = [tint(pal.status_green, 0.8), tint(pal.status_amber, 0.68),
+                  tint(pal.status_red, 0.7)]
+        base = tint(pal.status_green, 0.9)
     else:
-        shades = [tint(pal.mid_blue, 0.78), tint(pal.mid_blue, 0.55), tint(pal.mid_blue, 0.3)]
-        base = tint(pal.mid_blue, 0.93)
+        shades = [tint(pal.mid_blue, 0.88), tint(pal.mid_blue, 0.76), tint(pal.mid_blue, 0.6)]
+        base = tint(pal.mid_blue, 0.95)
     add_rect(slide, px, py, pw, ph, fill=base)
     for r_, c in zip((0.45, 0.8, 1.08), shades):
         _zone(slide, px, py, pw, ph, r_, c)
-    add_rect(slide, px, py, pw, ph, fill=None, line=pal.deep_navy, line_width=1.0)
     add_arrow(slide, px - 0.12, py + ph + 0.12, px + pw + 0.05, py + ph + 0.12,
-              color=pal.deep_navy)
-    add_arrow(slide, px - 0.12, py + ph + 0.12, px - 0.12, py - 0.05, color=pal.deep_navy)
+              color=pal.text_dark, width_pt=HAIRLINE_PT)
+    add_arrow(slide, px - 0.12, py + ph + 0.12, px - 0.12, py - 0.05, color=pal.text_dark,
+              width_pt=HAIRLINE_PT)
     lo, hi = loc(theme, ends[0]), loc(theme, ends[1])
     for txt, x, al in ((lo, px - 0.5, PP_ALIGN.LEFT), (hi, px + pw - 1.0, PP_ALIGN.RIGHT)):
         tb = add_textbox(slide, x, py + ph + 0.18, 1.0, 0.28)
@@ -362,6 +410,7 @@ def add_risk_heatmap(prs, *,
                     color=pal.deep_navy, family=typo.family, align=PP_ALIGN.CENTER, first=True)
 
     # risk boxes
+    check_focus("risk_heatmap", title, focus, [r.get("title", "") for r in risks])
     us = _norm_levels([r.get("probability", 0.5) for r in risks])
     vs = _norm_levels([r.get("impact", 0.5) for r in risks])
     bw = min(2.3, pw * 0.36)
@@ -387,10 +436,12 @@ def add_risk_heatmap(prs, *,
             if by == py + 0.06:
                 bx = min(bx + bw * 0.5, px + pw - bw - 0.06)
         placed.append((bx, by, bw, bh))
-        add_rect(slide, bx, by, bw, bh, fill=pal.white, line=pal.deep_navy, line_width=1.25)
+        f = is_focus(focus, i, risks[i].get("title", ""))
+        add_rect(slide, bx, by, bw, bh, fill=pal.deep_navy if f else pal.white,
+                 line=pal.deep_navy, line_width=1.0 if f else HAIRLINE_PT)
         tb = add_textbox(slide, bx + 0.1, by, bw - 0.2, bh, anchor=MSO_ANCHOR.MIDDLE)
         write_rich_paragraph(tb.text_frame, t, size=size, theme=theme, align=PP_ALIGN.CENTER,
-                             first=True)
+                             color=pal.white if f else None, bold=f, first=True)
 
     if has_mit:
         mx = left + lw + gap
@@ -407,10 +458,13 @@ def add_risk_heatmap(prs, *,
         hs = [h + max(0, min(extra / m, 0.35)) for h in hs]
         y = top
         for i, (t, h) in enumerate(zip(mits, hs)):
-            box = add_rect(slide, mx, y, rw, h, fill=pal.white)
-            set_dashed(box, pal.deep_navy, 1.0)
+            f = is_focus(focus, i, risks[i].get("title", ""))
+            add_rect(slide, mx, y, rw, h, fill=pal.white,
+                     line=pal.deep_navy if f else pal.grid_gray,
+                     line_width=1.5 if f else HAIRLINE_PT)
             d = 0.34
-            add_icon(slide, str(i + 1), mx + 0.14, y + (h - d) / 2, d, theme, "navy")
+            add_icon(slide, str(i + 1), mx + 0.14, y + (h - d) / 2, d, theme,
+                     "navy" if f or not has_focus(focus) else "gray")
             tb = add_textbox(slide, mx + 0.6, y, rw - 0.75, h, anchor=MSO_ANCHOR.MIDDLE)
             write_rich_paragraph(tb.text_frame, t, size=msize, theme=theme, first=True)
             y += h + g

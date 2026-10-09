@@ -18,6 +18,8 @@ from ..base import (
 )
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
+from ..design import (HAIRLINE_PT, check_focus, eyebrow, has_focus, is_focus, legend_strip,
+                      muted_fill, tint)
 from .column_chart import _draw_takeaway, _draw_description_header
 
 
@@ -269,102 +271,111 @@ def add_growth_share_matrix(prs, *,
                             title="[Growth-share matrix / Insert action title]",
                             bus: Sequence[Dict],
                             x_max=100, y_max=50,
+                            x_label: str = "Relative market share (%)",
+                            y_label: str = "Market growth (%)",
+                            focus=None,
+                            focus_note: Optional[str] = None,
+                            size_label: Optional[str] = None,
                             page_number=None, section_marker=None,
                             source="xx", footnote="1. xx",
                             theme: Theme = DEFAULT_THEME):
-    """bus: list of {"name", "x" (market share), "y" (growth), "size", "quadrant"?}"""
+    """bus: list of {"name", "x" (market share), "y" (growth), "size", "label_pos"?}
+    focus: the unit(s) the title is about (name or index) — drawn in the accent,
+           every other bubble muted. focus_note: one-line annotation on it.
+    size_label: what bubble area encodes ("revenue") — shown in the legend.
+    Bubble AREA is proportional to size.
+    """
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, page_number=page_number,
                section_marker=section_marker, source=source, footnote=footnote)
     pal, typo = theme.palette, theme.typography
+    names = [b.get("name", "") for b in bus]
+    check_focus("growth_share", title, focus, names)
+    focused = has_focus(focus)
+    legend = focused or bool(size_label)
 
-    plot_box = (1.05, 1.65, 11.7, 5.0)
-    pl, pt, pw, ph = plot_box
+    pl, pt, pw = 1.15, 1.85, 11.0
+    ph = 4.2 if legend else 4.55
+    pr, pb = pl + pw, pt + ph
+    midx, midy = pl + pw / 2, pt + ph / 2
 
-    # Quadrant fills (split at 50% / 25)
-    midx = pl + pw / 2
-    midy = pt + ph / 2
-    add_rect(slide, pl, pt, pw / 2, ph / 2, fill=pal.mid_blue)             # top-left
-    add_rect(slide, midx, pt, pw / 2, ph / 2, fill=pal.bright_blue)         # top-right (Star)
-    add_rect(slide, pl, midy, pw / 2, ph / 2, fill=pal.soft_gray)           # bottom-left (Dog)
-    add_rect(slide, midx, midy, pw / 2, ph / 2, fill=pal.mid_blue)          # bottom-right
+    # structure as hairlines: two axes + the quadrant split, no filled quadrants
+    add_line(slide, pl, pb, pr, pb, color=pal.text_dark, width_pt=HAIRLINE_PT)
+    add_line(slide, pl, pt, pl, pb, color=pal.text_dark, width_pt=HAIRLINE_PT)
+    add_line(slide, midx, pt, midx, pb, color=pal.rule_gray, width_pt=HAIRLINE_PT)
+    add_line(slide, pl, midy, pr, midy, color=pal.rule_gray, width_pt=HAIRLINE_PT)
 
-    # Quadrant labels — positioned in corners. DRAWING DEFERRED so they render
-    # on top of bubbles (python-pptx uses insertion-order z-ordering).
-    lbl_w = 2.0
-    qm_x = pl + 0.15                         # top-left of top-left quadrant
-    st_x = pl + pw - lbl_w - 0.15            # top-right of top-right quadrant
-    dg_x = pl + 0.15
-    cc_x = pl + pw - lbl_w - 0.15
-    _quadrant_labels = [
-        ("Question mark", qm_x, pt + 0.15, pal.white, PP_ALIGN.LEFT),
-        ("Star",          st_x, pt + 0.15, pal.white, PP_ALIGN.RIGHT),
-        ("Dog",           dg_x, pt + ph - 0.40, pal.text_dark, PP_ALIGN.LEFT),
-        ("Cash cow",      cc_x, pt + ph - 0.40, pal.white, PP_ALIGN.RIGHT),
-    ]
+    ystep, xstep = _round_up_nice(y_max / 5), _round_up_nice(x_max / 5)
+    v = 0
+    while v <= y_max + 1e-9:
+        ty = pb - v / y_max * ph
+        tb = add_textbox(slide, pl - 0.55, ty - 0.11, 0.45, 0.22, anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, f"{v:g}", size=typo.chart_axis_size,
+                        color=pal.footer_gray, family=typo.family, align=PP_ALIGN.RIGHT,
+                        first=True)
+        v += ystep
+    v = 0
+    while v <= x_max + 1e-9:
+        tx = pl + v / x_max * pw
+        tb = add_textbox(slide, tx - 0.3, pb + 0.05, 0.6, 0.22)
+        write_paragraph(tb.text_frame, f"{v:g}", size=typo.chart_axis_size,
+                        color=pal.footer_gray, family=typo.family, align=PP_ALIGN.CENTER,
+                        first=True)
+        v += xstep
+    eyebrow(slide, theme, pl - 0.55, pt - 0.45, 6, y_label, color=pal.text_dark)
+    eyebrow(slide, theme, pr - 6, pb + 0.3, 6, x_label, color=pal.text_dark,
+            align=PP_ALIGN.RIGHT)
 
-    # Y-axis label
-    tb = add_textbox(slide, pl - 0.55, pt - 0.45, 4, 0.3)
-    write_paragraph(tb.text_frame, "Growth rate 20xx-20xx (%)",
-                    size=typo.section_title_size, bold=True,
-                    color=pal.text_dark, family=typo.family, first=True)
-    # X-axis label
-    tb = add_textbox(slide, pl, pt + ph + 0.30, pw, 0.3)
-    write_paragraph(tb.text_frame, "Market share (%)",
-                    size=typo.section_title_size, bold=True,
-                    color=pal.text_dark, family=typo.family,
-                    align=PP_ALIGN.CENTER, first=True)
-
-    # Y ticks
-    for v in range(0, int(y_max) + 1, 5):
-        ty = pt + ph - (v / y_max) * ph
-        tb = add_textbox(slide, pl - 0.55, ty - 0.10, 0.45, 0.22,
-                         anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, str(v), size=typo.chart_axis_size,
-                        color=pal.text_dark, family=typo.family,
-                        align=PP_ALIGN.RIGHT, first=True)
-    for v in range(0, int(x_max) + 1, 10):
-        tx = pl + (v / x_max) * pw
-        tb = add_textbox(slide, tx - 0.30, pt + ph + 0.05, 0.6, 0.22)
-        write_paragraph(tb.text_frame, str(v), size=typo.chart_axis_size,
-                        color=pal.text_dark, family=typo.family,
-                        align=PP_ALIGN.CENTER, first=True)
-
-    # Size legend
-    add_oval(slide, pl + pw - 3.0, pt - 0.45, 0.28, 0.28, fill=pal.dark_navy)
-    tb = add_textbox(slide, pl + pw - 2.65, pt - 0.45, 2.6, 0.3,
-                     anchor=MSO_ANCHOR.MIDDLE)
-    write_paragraph(tb.text_frame, "Size = [insert description]",
-                    size=typo.chart_label_size, color=pal.text_dark,
-                    family=typo.family, first=True)
-
-    # Bubbles: dark navy with thin white outline
-    sz_vals = [b.get("size", 1) for b in bus]
-    s_max = max(sz_vals) if sz_vals else 1
-    s_min = min(sz_vals) if sz_vals else 1
-    for b in bus:
-        x = pl + (b["x"] / x_max) * pw
-        y = pt + ph - (b["y"] / y_max) * ph
-        s = b.get("size", 1)
-        if s_max == s_min:
-            d = 0.6
-        else:
-            d = 0.4 + 0.6 * (s - s_min) / (s_max - s_min)
-        add_oval(slide, x - d / 2, y - d / 2, d, d, fill=pal.deep_navy,
+    # bubbles: area ~ size; focal bubble in the accent, the rest muted
+    sizes = [max(float(b.get("size", 1)), 0.0) for b in bus] or [1.0]
+    s_max = max(sizes) or 1.0
+    d_max = 1.1
+    base = muted_fill(theme) if focused else pal.dark_navy
+    order = sorted(range(len(bus)), key=lambda i: is_focus(focus, i, names[i]))
+    for i in order:
+        b = bus[i]
+        f = is_focus(focus, i, names[i])
+        d = max(0.22, d_max * math.sqrt(sizes[i] / s_max))
+        x = pl + b["x"] / x_max * pw
+        y = pb - b["y"] / y_max * ph
+        add_oval(slide, x - d / 2, y - d / 2, d, d, fill=pal.bright_blue if f else base,
                  line=pal.white, line_width=1.0)
         if b.get("name"):
-            tb = add_textbox(slide, x + d / 2 + 0.06, y - 0.12, 1.0, 0.24,
-                             anchor=MSO_ANCHOR.MIDDLE)
-            write_paragraph(tb.text_frame, b["name"],
-                            size=typo.chart_label_size, color=pal.white,
-                            family=typo.family, first=True)
+            pos = b.get("label_pos", "right")
+            lw, lh = 1.9, 0.26
+            if pos == "left":
+                lx, ly, al = x - d / 2 - lw - 0.06, y - lh / 2, PP_ALIGN.RIGHT
+            elif pos == "top":
+                lx, ly, al = x - lw / 2, y - d / 2 - lh - 0.02, PP_ALIGN.CENTER
+            elif pos == "bottom":
+                lx, ly, al = x - lw / 2, y + d / 2 + 0.02, PP_ALIGN.CENTER
+            else:
+                lx, ly, al = x + d / 2 + 0.06, y - lh / 2, PP_ALIGN.LEFT
+            tb = add_textbox(slide, lx, ly, lw, lh, anchor=MSO_ANCHOR.MIDDLE)
+            strong = f or not focused
+            write_paragraph(tb.text_frame, b["name"], size=typo.chart_label_size + 1,
+                            bold=strong, color=pal.deep_navy if strong else pal.footer_gray,
+                            family=typo.family, align=al, first=True)
+        if f and focus_note:
+            nx, ny = x + d / 2 + 0.2, max(pt + 0.05, y - d / 2 - 0.6)
+            add_line(slide, x + d * 0.3, y - d * 0.4, nx, ny + 0.3, color=pal.bright_blue,
+                     width_pt=HAIRLINE_PT)
+            tb = add_textbox(slide, nx + 0.05, ny, 3.6, 0.5)
+            write_paragraph(tb.text_frame, focus_note, size=typo.chart_label_size + 1,
+                            italic=True, color=pal.deep_navy, family=typo.family, first=True)
 
-    # Quadrant labels drawn LAST so they appear on top of bubbles.
-    for label, lx, ly, color, align in _quadrant_labels:
-        tb = add_textbox(slide, lx, ly, lbl_w, 0.30)
-        write_paragraph(tb.text_frame, label, size=typo.section_title_size,
-                        color=color, family=typo.family,
-                        align=align, first=True)
+    # quadrant names last, so they sit on top
+    for name, x, y, al in (("Question marks", pl + 0.15, pt + 0.08, PP_ALIGN.LEFT),
+                           ("Stars", pr - 3.15, pt + 0.08, PP_ALIGN.RIGHT),
+                           ("Dogs", pl + 0.15, pb - 0.34, PP_ALIGN.LEFT),
+                           ("Cash cows", pr - 3.15, pb - 0.34, PP_ALIGN.RIGHT)):
+        eyebrow(slide, theme, x, y, 3.0, name, align=al)
+
+    if legend:
+        items = ([("dot", pal.bright_blue, "Focus"), ("dot", base, "Other units")]
+                 if focused else [])
+        legend_strip(slide, theme, items, pb + 0.58,
+                     note=f"{loc(theme, 'Bubble area')} = {size_label}" if size_label else None)
     return slide
 
 
@@ -375,107 +386,79 @@ def add_prioritization_matrix(prs, *,
                               source="xx", footnote="1. xx",
                               description: str = "[Description]",
                               legend: Sequence[str] = ("[Insert status/group]",) * 3,
+                              focus=None,
                               theme: Theme = DEFAULT_THEME):
-    """items: [{"name", "x_band": 0|1|2 (Low/Med/High), "y_band": 0|1|2 (Long/Med/Short), "status": green|amber|red}]
-    legend: labels for the green / amber / red status dots, in that order."""
+    """items: [{"name", "x_band": 0|1|2 (Low/Med/High), "y_band": 0|1|2 (Short/Med/Long),
+               "status": green|amber|red, "ox"?, "oy"?, "d"?}]
+    legend: labels for the green / amber / red status dots, in that order.
+    focus: the item(s) the title is about (name or index) — ringed in navy, the
+           rest drawn lighter. The short-time x high-impact cell is the target zone.
+    """
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, page_number=page_number,
                section_marker=section_marker, source=source, footnote=footnote)
     pal, typo = theme.palette, theme.typography
+    names = [it.get("name", "") for it in items]
+    check_focus("prioritization_matrix", title, focus, names)
+    focused = has_focus(focus)
 
-    # Description left
-    tb = add_textbox(slide, 0.45, 1.5, 4, 0.3)
-    write_paragraph(tb.text_frame, description,
-                    size=typo.section_title_size, bold=True,
-                    color=pal.text_dark, family=typo.family, first=True)
+    if description:
+        tb = add_textbox(slide, 0.45, 1.42, 12.4, 0.3)
+        write_paragraph(tb.text_frame, description, size=typo.section_title_size, bold=True,
+                        color=pal.text_dark, family=typo.family, first=True)
 
-    # Legend top
-    leg_items = list(zip(("green", "amber", "red"), legend))
-    leg_x = 5.4
-    leg_y = 1.5
-    color_map = {
-        "green": pal.status_green,
-        "amber": pal.status_amber,
-        "red": pal.status_red,
-    }
-    for k, label in leg_items:
-        d = 0.28
-        add_oval(slide, leg_x, leg_y, d, d, fill=color_map[k])
-        tb = add_textbox(slide, leg_x + d + 0.08, leg_y - 0.02, 2.5, 0.32,
-                         anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, f"= {label}",
-                        size=typo.chart_label_size, color=pal.text_dark,
-                        family=typo.family, first=True)
-        leg_x += 2.5
-
-    # Plot grid box (kept short of footer to leave room for axis title)
-    plot_box = (1.55, 2.05, 11.30, 4.40)
-    pl, pt, pw, ph = plot_box
-
-    # Highlight top-right cell (Short × High)
+    pl, pt, pw, ph = 1.85, 2.15, 11.0, 3.9
     cell_w, cell_h = pw / 3, ph / 3
-    add_rect(slide, pl + 2 * cell_w, pt, cell_w, cell_h, fill=pal.bright_blue)
-    # Middle row gray strip
-    add_rect(slide, pl + cell_w, pt + cell_h, cell_w * 2, cell_h,
-             fill=pal.soft_gray)
-
-    # Dashed grid lines
+    # target zone: short time to impact x high impact — tinted, labelled, no solid block
+    add_rect(slide, pl + 2 * cell_w, pt, cell_w, cell_h, fill=tint(pal.bright_blue, 0.86))
+    eyebrow(slide, theme, pl + 2 * cell_w + 0.1, pt + 0.06, cell_w - 0.2, "Priority",
+            color=pal.mid_blue, align=PP_ALIGN.RIGHT, size=9)
     for i in range(1, 3):
-        gx = pl + i * cell_w
-        add_line(slide, gx, pt, gx, pt + ph, color=pal.placeholder_gray,
-                 width_pt=0.5, dash=MSO_LINE_DASH_STYLE.DASH)
-        gy = pt + i * cell_h
-        add_line(slide, pl, gy, pl + pw, gy, color=pal.placeholder_gray,
-                 width_pt=0.5, dash=MSO_LINE_DASH_STYLE.DASH)
+        add_line(slide, pl + i * cell_w, pt, pl + i * cell_w, pt + ph, color=pal.grid_gray,
+                 width_pt=HAIRLINE_PT)
+        add_line(slide, pl, pt + i * cell_h, pl + pw, pt + i * cell_h, color=pal.grid_gray,
+                 width_pt=HAIRLINE_PT)
+    add_line(slide, pl, pt + ph, pl + pw, pt + ph, color=pal.text_dark, width_pt=HAIRLINE_PT)
+    add_line(slide, pl, pt, pl, pt + ph, color=pal.text_dark, width_pt=HAIRLINE_PT)
 
-    # Y axis labels (Short / Medium / Long)
     for i, label in enumerate(["Short", "Medium", "Long"]):
-        ly = pt + i * cell_h + 0.05
-        tb = add_textbox(slide, pl - 0.95, ly, 0.85, 0.28)
-        write_paragraph(tb.text_frame, label, size=typo.chart_label_size,
-                        color=pal.placeholder_gray, family=typo.family,
-                        align=PP_ALIGN.RIGHT, first=True)
-    # X axis labels (Low / Medium / High)
+        tb = add_textbox(slide, pl - 1.0, pt + i * cell_h, 0.9, cell_h, anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, loc(theme, label), size=typo.chart_label_size,
+                        color=pal.footer_gray, family=typo.family, align=PP_ALIGN.RIGHT,
+                        first=True)
     for i, label in enumerate(["Low", "Medium", "High"]):
-        lx = pl + i * cell_w + cell_w / 2 - 0.5
-        tb = add_textbox(slide, lx, pt + ph + 0.06, 1.0, 0.28)
-        write_paragraph(tb.text_frame, label, size=typo.chart_label_size,
-                        color=pal.text_dark, family=typo.family,
-                        align=PP_ALIGN.CENTER, first=True)
+        tb = add_textbox(slide, pl + i * cell_w, pt + ph + 0.06, cell_w, 0.26)
+        write_paragraph(tb.text_frame, loc(theme, label), size=typo.chart_label_size,
+                        color=pal.footer_gray, family=typo.family, align=PP_ALIGN.CENTER,
+                        first=True)
+    eyebrow(slide, theme, pl, pt - 0.3, 4, "TIME TO IMPACT", color=pal.text_dark)
+    eyebrow(slide, theme, pl + pw - 5, pt + ph + 0.34, 5, "LEVEL OF IMPACT",
+            color=pal.text_dark, align=PP_ALIGN.RIGHT)
 
-    # Axis titles
-    tb = add_textbox(slide, pl - 0.95, pt + ph / 2 - 0.5, 0.85, 1.0,
-                     anchor=MSO_ANCHOR.MIDDLE)
-    p = tb.text_frame.paragraphs[0]
-    p.alignment = PP_ALIGN.RIGHT
-    r = p.add_run(); r.text = loc(theme, "TIME TO IMPACT")
-    r.font.size = Pt(typo.section_title_size); r.font.bold = True
-    r.font.color.rgb = pal.text_dark; r.font.name = typo.family
-
-    tb = add_textbox(slide, pl + pw - 2.5, pt + ph + 0.30, 2.5, 0.3)
-    write_paragraph(tb.text_frame, loc(theme, "LEVEL OF IMPACT"),
-                    size=typo.section_title_size, bold=True,
-                    color=pal.text_dark, family=typo.family,
-                    align=PP_ALIGN.RIGHT, first=True)
-
-    # Items
-    for it in items:
-        bx = it.get("x_band", 1)
-        by = it.get("y_band", 1)  # 0=Short(top), 1=Medium, 2=Long(bottom)
-        # offsets within cell
-        ox = it.get("ox", 0.5)
-        oy = it.get("oy", 0.5)
-        x = pl + (bx + ox) * cell_w
-        y = pt + (by + oy) * cell_h
+    color_map = {"green": pal.status_green, "amber": pal.status_amber, "red": pal.status_red}
+    order = sorted(range(len(items)), key=lambda i: is_focus(focus, i, names[i]))
+    for i in order:
+        it = items[i]
+        f = is_focus(focus, i, names[i])
+        x = pl + (it.get("x_band", 1) + it.get("ox", 0.5)) * cell_w
+        y = pt + (it.get("y_band", 1) + it.get("oy", 0.5)) * cell_h
         d = it.get("d", 0.85)
-        add_oval(slide, x - d / 2, y - d / 2, d, d,
-                 fill=color_map.get(it.get("status", "green"), pal.status_green))
-        # Centered label
-        tb = add_textbox(slide, x - d / 2, y - d / 2, d, d,
-                         anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, it.get("name", ""),
-                        size=typo.chart_label_size, color=pal.white
-                        if it.get("status") != "amber" else pal.text_dark,
-                        family=typo.family, align=PP_ALIGN.CENTER,
-                        bold=False, first=True)
+        st = it.get("status", "green")
+        fill = color_map.get(st, pal.status_green)
+        if focused and not f:
+            fill = tint(fill, 0.45)
+        add_oval(slide, x - d / 2, y - d / 2, d, d, fill=fill,
+                 line=pal.deep_navy if f else pal.white, line_width=2.5 if f else 1.0)
+        tb = add_textbox(slide, x - d / 2, y - d / 2, d, d, anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, it.get("name", ""), size=typo.chart_label_size,
+                        bold=f, color=pal.text_dark if st == "amber" or (focused and not f)
+                        else pal.white, family=typo.family, align=PP_ALIGN.CENTER, first=True)
+
+    used = [k for k in ("green", "amber", "red") if any(it.get("status", "green") == k
+                                                          for it in items)]
+    labels = dict(zip(("green", "amber", "red"), legend))
+    legend_strip(slide, theme, [("dot", color_map[k], labels[k]) for k in used],
+                 pt + ph + 0.62)
     return slide
+
+

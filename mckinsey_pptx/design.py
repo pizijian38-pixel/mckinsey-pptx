@@ -317,3 +317,139 @@ def add_callout_bar(slide, theme: Theme, x, y, w, h, text, *,
                 color=tone_rgb(theme, tone), family=theme.typography.family)
     add_rich_runs(p, text, size=size, color=pal.text_dark,
                   family=theme.typography.family, theme=theme)
+
+
+# ---------- focus, eyebrows and legend (shared by the diagram templates) ----------
+#
+# Rules borrowed from editorial diagram practice and applied in the house
+# palette: one focal accent per slide (the item the action title is about),
+# every other node neutral; structure drawn as hairlines rather than filled
+# blocks; small tracked caps ("eyebrows") for axis, quadrant and column
+# labels; the legend as one strip under the diagram.
+
+HAIRLINE_PT = 0.75
+
+
+def _focus_keys(focus):
+    if focus is None or focus is False:
+        return ()
+    if isinstance(focus, (str, int)):
+        return (focus,)
+    return tuple(focus)
+
+
+def has_focus(focus) -> bool:
+    return bool(_focus_keys(focus))
+
+
+def is_focus(focus, index: int, label=None) -> bool:
+    """True when `focus` names this item by position (int) or label (str,
+    case-insensitive, markup ignored)."""
+    lab = plain(label).strip().lower() if label is not None else None
+    for k in _focus_keys(focus):
+        if isinstance(k, bool):
+            continue
+        if isinstance(k, int) and k == index:
+            return True
+        if isinstance(k, str) and lab is not None and plain(k).strip().lower() == lab:
+            return True
+    return False
+
+
+def unmatched_focus(focus, labels) -> list:
+    """Focus keys that name no item (a typo would silently drop the accent)."""
+    labs = [plain(l).strip().lower() for l in labels]
+    out = []
+    for k in _focus_keys(focus):
+        if isinstance(k, int) and not isinstance(k, bool):
+            if not 0 <= k < len(labs):
+                out.append(k)
+        elif isinstance(k, str) and plain(k).strip().lower() not in labs:
+            out.append(k)
+    return out
+
+
+def check_focus(where: str, title: str, focus, labels):
+    bad = unmatched_focus(focus, labels)
+    if bad:
+        warn_small(where, title, 0, f"focus {bad!r} matches no item; "
+                   f"use an item label or a 0-based index.")
+
+
+def muted_fill(theme: Theme):
+    """Fill for non-focal items when one item carries the accent."""
+    return tint(theme.palette.dark_navy, 0.62)
+
+
+def eyebrow(slide, theme: Theme, x, y, w, text, *, color=None,
+            align=PP_ALIGN.LEFT, size=10, h=0.24, anchor=MSO_ANCHOR.MIDDLE):
+    """Small tracked caps label (axis, quadrant, column, step number).
+    CJK text has no caps and loses legibility when tracked: drawn plain, 1pt larger."""
+    from .metrics import _CJK
+    text = str(loc(theme, text))
+    cjk = bool(_CJK.search(text))
+    tb = add_textbox(slide, x, y, w, h, anchor=anchor)
+    p = write_paragraph(tb.text_frame, text if cjk else text.upper(),
+                        size=size + 1 if cjk else size, bold=True,
+                        color=color or theme.palette.footer_gray,
+                        family=theme.typography.family, align=align, first=True)
+    if not cjk:
+        for r in p.runs:
+            r._r.get_or_add_rPr().set("spc", "120")
+    return tb
+
+
+def eyebrow_width(theme: Theme, text, size=10) -> float:
+    from .metrics import _CJK
+    text = str(loc(theme, text))
+    if _CJK.search(text):
+        return text_width_pt(text, size + 1, True) / 72
+    return (text_width_pt(text.upper(), size, True) + 1.2 * len(text)) / 72
+
+
+def focus_tag(slide, theme: Theme, x, y, text, *, h=0.24, size=9, anchor="left"):
+    """Bright-blue tag with a white eyebrow ("WE ARE HERE"). Returns its width.
+    anchor="right" puts the tag's right edge at x."""
+    w = eyebrow_width(theme, text, size) + 0.2
+    if anchor == "right":
+        x -= w
+    add_rect(slide, x, y, w, h, fill=theme.palette.bright_blue)
+    eyebrow(slide, theme, x, y, w, text, color=theme.palette.white,
+            align=PP_ALIGN.CENTER, size=size, h=h)
+    return w
+
+
+def legend_strip(slide, theme: Theme, items, y, *, x=None, w=None, note=None):
+    """One horizontal legend under the diagram, above the footer.
+    items: [(kind, color, label)] with kind "dot" | "ring" | "box" | "line" | "dash"."""
+    from .base import add_line
+    pal, lay = theme.palette, theme.layout
+    x = lay.margin_left_in if x is None else x
+    w = (lay.slide_width_in - lay.margin_right_in - x) if w is None else w
+    add_line(slide, x, y, x + w, y, color=pal.grid_gray, width_pt=HAIRLINE_PT)
+    cx = x
+    for kind, color, label in items:
+        label = str(loc(theme, label))
+        if kind == "dot":
+            add_oval(slide, cx, y + 0.12, 0.16, 0.16, fill=color)
+        elif kind == "ring":
+            add_oval(slide, cx, y + 0.12, 0.16, 0.16, line=color, line_width=1.25)
+        elif kind == "box":
+            add_rect(slide, cx, y + 0.12, 0.22, 0.16, fill=color)
+        elif kind in ("line", "dash"):
+            ln = add_line(slide, cx, y + 0.2, cx + 0.3, y + 0.2, color=color, width_pt=1.75)
+            if kind == "dash":
+                from pptx.enum.dml import MSO_LINE_DASH_STYLE
+                ln.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+        lw = text_width_pt(label, 10) / 72 + 0.1
+        tb = add_textbox(slide, cx + 0.38, y + 0.08, lw, 0.24, anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, label, size=10, color=pal.text_dark,
+                        family=theme.typography.family, first=True)
+        cx += 0.38 + lw + 0.4
+    if note:
+        tb = add_textbox(slide, cx, y + 0.08, max(x + w - cx, 0.5), 0.24,
+                         anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, str(loc(theme, note)), size=10, italic=True,
+                        color=pal.footer_gray, family=theme.typography.family,
+                        align=PP_ALIGN.RIGHT, first=True)
+    return 0.4

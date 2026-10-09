@@ -20,8 +20,9 @@ from pptx.util import Inches
 
 from ..base import add_line, add_oval, add_rect, add_textbox, write_paragraph
 from ..components import letter_space
-from ..design import (add_arrow, add_icon, add_stage_banners, fit_one_line, fit_size, plain,
-                      set_dashed, text_height_in, tint, warn_small, write_rich_paragraph)
+from ..design import (HAIRLINE_PT, add_arrow, add_icon, add_stage_banners, check_focus,
+                      fit_one_line, fit_size, has_focus, is_focus, plain, set_dashed,
+                      text_height_in, tint, warn_small, write_rich_paragraph)
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
 from .evaluation_slides import _frame
@@ -283,6 +284,7 @@ def add_hub_spoke(prs, *,
                   direction: str = "in",
                   heading: Optional[str] = None,
                   side: Optional[Dict] = None,
+                  focus=None,
                   subtitle: Optional[str] = None,
                   insight: Optional[str] = None,
                   insight_label: Optional[str] = "Key insight",
@@ -294,6 +296,8 @@ def add_hub_spoke(prs, *,
     direction: "in" (elements feed the centre) | "out" (centre drives them).
     heading: a caption above the diagram (the claim the diagram makes).
     side: {"title", "bullets"? | "body"?} — the implication, in a panel on the right.
+    focus: the spoke the title is about (title or index) — filled in the accent,
+           with its arrow in the accent; the other spokes stay outlined.
     """
     slide, left, top, width, bottom = _frame(
         prs, theme, title, subtitle, insight, insight_label, page_number=page_number,
@@ -340,16 +344,20 @@ def add_hub_spoke(prs, *,
     for i in range(n):
         a = -math.pi / 2 + 2 * math.pi * i / n
         pos.append((cx + rx * math.cos(a), cy + ry * math.sin(a), a))
+    titles_ = [sp.get("title", "") for sp in spokes]
+    check_focus("hub_spoke", title, focus, titles_)
+    hot = [is_focus(focus, i, t) for i, t in enumerate(titles_)]
     # arrows first
-    for px, py, a in pos:
+    for (px, py, a), h_ in zip(pos, hot + [False] * (len(pos) - len(hot))):
         ux, uy = math.cos(a), math.sin(a)
         dist = math.hypot(px - cx, py - cy)
         ux, uy = (px - cx) / dist, (py - cy) / dist
         p_out = (px - ux * (d / 2 + 0.06), py - uy * (d / 2 + 0.06))
         p_in = (cx + ux * (D / 2 + 0.06), cy + uy * (D / 2 + 0.06))
         a0, a1 = (p_out, p_in) if direction == "in" else (p_in, p_out)
-        add_arrow(slide, a0[0], a0[1], a1[0], a1[1], color=pal.mid_blue, width_pt=2.0)
-    add_oval(slide, cx - D / 2, cy - D / 2, D, D, fill=pal.bright_blue)
+        add_arrow(slide, a0[0], a0[1], a1[0], a1[1],
+                  color=pal.bright_blue if h_ else pal.rule_gray, width_pt=2.0 if h_ else 1.25)
+    add_oval(slide, cx - D / 2, cy - D / 2, D, D, fill=pal.deep_navy)
     csz = fit_size([center], D * 0.74, D * 0.6, max_size=17, min_size=MIN_PT, bold=True)
     tb = add_textbox(slide, cx - D * 0.37, cy - D * 0.3, D * 0.74, D * 0.6,
                      anchor=MSO_ANCHOR.MIDDLE)
@@ -371,25 +379,32 @@ def add_hub_spoke(prs, *,
                for t in notes if t] or [12])
     warn_small("hub_spoke", title, min(nsz, tsz + 2),
                "Shorten the spoke titles (1-2 words) and notes (one short line).")
-    for (px, py, a), s in zip(pos, spokes):
-        add_oval(slide, px - d / 2, py - d / 2, d, d, fill=pal.deep_navy)
+    for (px, py, a), s, h_ in zip(pos, spokes, hot):
+        add_oval(slide, px - d / 2, py - d / 2, d, d,
+                 fill=pal.bright_blue if h_ else pal.white,
+                 line=None if h_ else pal.deep_navy, line_width=None if h_ else 1.25)
         if s.get("icon") and has_icon:
             idd = d * 0.3
-            add_icon(slide, s["icon"], px - idd / 2, py + d * 0.1, idd, theme, "navy")
+            add_icon(slide, s["icon"], px - idd / 2, py + d * 0.1, idd, theme,
+                     "navy" if h_ else "blue")
             tb = add_textbox(slide, px - d * 0.44, py - d * 0.4, d * 0.88, d * 0.48,
                              anchor=MSO_ANCHOR.BOTTOM)
         else:
             tb = add_textbox(slide, px - d * 0.44, py - d * 0.38, d * 0.88, d * 0.76,
                              anchor=MSO_ANCHOR.MIDDLE)
         write_rich_paragraph(tb.text_frame, s.get("title", ""), size=tsz, theme=theme,
-                             color=pal.white, bold=True, align=PP_ALIGN.CENTER, first=True)
+                             color=pal.white if h_ else pal.deep_navy, bold=True,
+                             align=PP_ALIGN.CENTER, first=True)
         if s.get("note"):
             nh = text_height_in([s["note"]], note_w - 0.16, nsz) + 0.16
             right = math.cos(a) >= -1e-6
             nx = px + d / 2 + 0.08 if right else px - d / 2 - 0.08 - note_w
             ny = min(max(py - nh / 2, y0), bottom - nh)
-            box = add_rect(slide, nx, ny, note_w, nh, fill=pal.soft_gray)
-            set_dashed(box, pal.grid_gray, 0.75)
-            tb = add_textbox(slide, nx + 0.08, ny, note_w - 0.16, nh, anchor=MSO_ANCHOR.MIDDLE)
-            write_rich_paragraph(tb.text_frame, s["note"], size=nsz, theme=theme, first=True)
+            # note as plain text with a hairline on the side facing the spoke
+            ex = nx if right else nx + note_w
+            add_line(slide, ex, ny + 0.04, ex, ny + nh - 0.04,
+                     color=pal.bright_blue if h_ else pal.grid_gray, width_pt=1.5 if h_ else HAIRLINE_PT)
+            tb = add_textbox(slide, nx + 0.12, ny, note_w - 0.2, nh, anchor=MSO_ANCHOR.MIDDLE)
+            write_rich_paragraph(tb.text_frame, s["note"], size=nsz, theme=theme, first=True,
+                                 align=PP_ALIGN.LEFT if right else PP_ALIGN.RIGHT)
     return slide
