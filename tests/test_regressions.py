@@ -558,6 +558,25 @@ def test_multi_line_chart_names_lines_at_the_end():
     assert ends["YNBY"] == "YNBY", ends
 
 
+
+def test_line_end_names_do_not_collide():
+    """Lines that finish close together (Saky 5.5 / Colgate 4.9 on a 0-25 axis)
+    get their end names moved below the point instead of printing on top of each
+    other - without landing on the next line's name (Crest 8.0 vs Saky 5.5)."""
+    from pptx.enum.chart import XL_LABEL_POSITION as P
+    data = dict(_SHARE, Saky=[5.1, 5.2, 5.2, 5.5], Colgate=[5.2, 5.0, 4.9, 4.9])
+    b = PresentationBuilder()
+    b.add("chart", chart_type="line", title="Crest slipped as LSL rose",
+          categories=["2022", "2023", "2024", "2025E"],
+          series=[{"name": k, "values": v} for k, v in data.items()],
+          highlight={"series": "Crest"}, number_format="0.0", source="")
+    gf = [sh for sh in b.prs.slides[0].shapes if sh.has_chart][0]
+    pos = {ser.name: ser.points[3].data_label.position for ser in gf.chart.plots[0].series}
+    assert pos["YNBY"] == P.RIGHT and pos["DARLIE"] == P.RIGHT, pos
+    assert pos["LSL"] == P.RIGHT and pos["Crest"] == P.BELOW, pos      # 9.0 / 8.0
+    assert pos["Saky"] == P.RIGHT and pos["Colgate"] == P.BELOW, pos    # 5.5 / 4.9
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
