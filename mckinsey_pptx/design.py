@@ -117,6 +117,8 @@ def add_icon(slide, name: Optional[str], x_in, y_in, d_in, theme: Theme,
                     bold=True, color=theme.palette.white,
                     family=theme.typography.family, align=PP_ALIGN.CENTER,
                     first=True)
+    if label.isdigit():            # a numbered badge is a sequence number
+        mark_index(tb)
 
 
 # ---------- panels ----------
@@ -504,4 +506,38 @@ INDEX_NAME = "chrome:index"
 def mark_index(shape):
     """Tag a step / sequence-number shape as layout chrome; returns the shape."""
     shape.name = INDEX_NAME
+    return shape
+
+
+# Axis tick labels are scale, not data: the checker ignores them entirely.
+AXIS_NAME = "chrome:axis"
+
+
+def mark_axis(shape):
+    """Tag an axis tick label (0, 100, 200 ...); returns the shape."""
+    shape.name = AXIS_NAME
+    return shape
+
+
+# Numbers the template computes itself (shares, totals, weighted scores) were
+# never typed by the agent, so the checker must not ask for their source.
+DERIVED_PREFIX = "derived:"
+
+
+def mark_derived(shape, values=None):
+    """Tag numbers the template computed; returns the shape.
+
+    values=None  - every number in the shape is computed (shape name).
+    values=[...] - only these displayed strings are computed (stored in the
+                   shape description); for a table that mixes typed inputs
+                   with computed cells.
+    The checker leaves them out of section [1] but still counts them for [2].
+    """
+    if values is None:
+        shape.name = DERIVED_PREFIX + (shape.name or "")
+    else:
+        cnv = shape._element.xpath(".//p:cNvPr")[0]
+        prev = cnv.get("descr") or ""
+        have = prev[len(DERIVED_PREFIX):] if prev.startswith(DERIVED_PREFIX) else ""
+        cnv.set("descr", DERIVED_PREFIX + "; ".join(x for x in [have, *map(str, values)] if x))
     return shape

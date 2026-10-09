@@ -609,6 +609,84 @@ def test_run_deck_env_report():
     assert "python-pptx :" in text and "LibreOffice :" in text and "PDF -> PNG  :" in text
 
 
+def _section(report: str, head: str, nxt: str) -> list:
+    body = report.split(head)[1].split(nxt)[0]
+    return [l.strip() for l in body.splitlines()[1:] if l.strip() and l.strip() != "none"]
+
+
+def _check_report(deck: Path, src: Path) -> str:
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        deck_check.main([str(deck), "--source", str(src)])
+    return out.getvalue()
+
+
+def test_catalog_examples_raise_no_invented_numbers():
+    """Every CATALOG example, checked against its own code as the source, must
+    leave section [1] empty. Axis ticks, shares, totals, weighted scores and
+    sequence numbers are drawn by the template, not typed by the agent; when
+    they were flagged, a correct decision_matrix or marimekko deck could never
+    pass, and agents rewrote them as plain tables to get a clean run."""
+    import re
+    cat = (ROOT / "mckinsey_pptx" / "agent" / "CATALOG.md").read_text(encoding="utf8")
+    bad = []
+    with tempfile.TemporaryDirectory() as d:
+        for part in re.split(r"\n## ", cat):
+            head = part.splitlines()[0][:50]
+            for blk in re.findall(r"```python\n(.*?)```", part, re.S):
+                if "b.add(" not in blk:
+                    continue
+                b = PresentationBuilder()
+                with contextlib.redirect_stderr(io.StringIO()), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    exec(blk, {"b": b})
+                deck, src = Path(d) / "d.pptx", Path(d) / "s.md"
+                b.save(str(deck))
+                # numeric lists in code are written "[1,2,3]"; a source writes "1, 2, 3"
+                src.write_text(re.sub(r"\[[\d.,\s-]+\]",
+                                      lambda m: m.group(0).replace(",", ", "), blk),
+                               encoding="utf8")
+                hits = _section(_check_report(deck, src), "[1] Numbers", "[2] Source")
+                if hits:
+                    bad.append(f"{head}: {hits}")
+    assert not bad, "\n".join(bad)
+
+
+def test_invented_numbers_are_still_flagged():
+    """Marking computed numbers must not hide typed ones: a number the agent
+    typed into a card or a table input is still reported."""
+    with tempfile.TemporaryDirectory() as d:
+        src = Path(d) / "s.md"
+        src.write_text("Option A and Option B are scored on market size.", encoding="utf8")
+        b = PresentationBuilder()
+        b.add("card_grid", title="Market", cards=[{"title": "Size", "bullets": ["Grew 37% in 2024"]}],
+              source="", footnote="")
+        b.add("decision_matrix", title="Scores", options=["Option A", "Option B"],
+              criteria=[{"name": "Market size", "weight": 50, "scores": [5, 3]},
+                        {"name": "Fit", "weight": 50, "scores": [4, 2]}],
+              source="", footnote="")
+        deck = Path(d) / "d.pptx"
+        b.save(str(deck))
+        lines = _section(_check_report(deck, src), "[1] Numbers", "[2] Source")
+        by_slide = {l.split(":")[0]: {x.strip() for x in l.split(":", 1)[1].split(",")}
+                    for l in lines}
+        assert "37" in by_slide.get("slide 1", set()), lines            # typed bullet number
+        s2 = by_slide.get("slide 2", set())
+        assert {"5", "3", "4", "50"} <= s2, lines     # typed scores and weight ("2" = page no.)
+        assert not ({"2.5", "1.5", "3.5", "4.5", "100"} & s2), lines      # computed cells
+
+
+def test_csv_source_commas_are_delimiters():
+    """"APAC,980,1010" was read as the single number 9801010 (a thousands
+    separator), so every CSV row with two adjacent 3-digit values was wrong."""
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "t.csv"
+        p.write_text('region,2023,2024\nAPAC,980,1010\n"US","1,200","1,350"\n', encoding="utf-8")
+        nums = deck_check.numbers(deck_check.source_text(p))
+        assert {"980", "1010", "1200", "1350"} <= nums, nums
+        assert not any(len(n) > 4 for n in nums), nums
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

@@ -19,7 +19,7 @@ from ..base import (
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
 from ..design import (HAIRLINE_PT, check_focus, eyebrow, has_focus, is_focus, legend_strip,
-                      muted_fill, tint)
+                      mark_axis, muted_fill, tint)
 from .column_chart import _draw_takeaway, _draw_description_header
 
 
@@ -57,14 +57,14 @@ def _draw_xy_axis(slide, theme, *, plot_box, x_max, y_max,
     # Axis labels (numbers)
     for tv in y_ticks:
         ty = pb - (tv / y_max) * ph
-        tb = add_textbox(slide, pl - 0.55, ty - 0.12, 0.45, 0.24,
-                         anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_axis(add_textbox(slide, pl - 0.55, ty - 0.12, 0.45, 0.24,
+                                   anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, f"{int(round(tv))}",
                         size=typo.chart_axis_size, color=pal.text_dark,
                         family=typo.family, align=PP_ALIGN.RIGHT, first=True)
     for tv in x_ticks:
         tx = pl + (tv / x_max) * pw
-        tb = add_textbox(slide, tx - 0.30, pb + 0.05, 0.6, 0.22)
+        tb = mark_axis(add_textbox(slide, tx - 0.30, pb + 0.05, 0.6, 0.22))
         write_paragraph(tb.text_frame, f"{int(round(tv))}",
                         size=typo.chart_axis_size, color=pal.text_dark,
                         family=typo.family, align=PP_ALIGN.CENTER, first=True)
@@ -309,7 +309,8 @@ def add_growth_share_matrix(prs, *,
     v = 0
     while v <= y_max + 1e-9:
         ty = pb - v / y_max * ph
-        tb = add_textbox(slide, pl - 0.55, ty - 0.11, 0.45, 0.22, anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_axis(add_textbox(slide, pl - 0.55, ty - 0.11, 0.45, 0.22,
+                                   anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, f"{v:g}", size=typo.chart_axis_size,
                         color=pal.footer_gray, family=typo.family, align=PP_ALIGN.RIGHT,
                         first=True)
@@ -317,7 +318,7 @@ def add_growth_share_matrix(prs, *,
     v = 0
     while v <= x_max + 1e-9:
         tx = pl + v / x_max * pw
-        tb = add_textbox(slide, tx - 0.3, pb + 0.05, 0.6, 0.22)
+        tb = mark_axis(add_textbox(slide, tx - 0.3, pb + 0.05, 0.6, 0.22))
         write_paragraph(tb.text_frame, f"{v:g}", size=typo.chart_axis_size,
                         color=pal.footer_gray, family=typo.family, align=PP_ALIGN.CENTER,
                         first=True)

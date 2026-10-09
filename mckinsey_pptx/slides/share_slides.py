@@ -22,7 +22,8 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from ..base import add_line, add_rect, add_textbox, write_paragraph
 from ..components import _polygon
 from ..design import (HAIRLINE_PT, check_focus, eyebrow, fit_size, fmt_num, has_focus,
-                      is_focus, legend_strip, pct, set_alpha, text_height_in, tint, warn_small)
+                      is_focus, legend_strip, mark_axis, mark_derived, pct, set_alpha,
+                      text_height_in, tint, warn_small)
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
 from .evaluation_slides import _frame
@@ -44,7 +45,7 @@ def _ramp(theme, k, i, muted=False):
     return tint(theme.palette.dark_navy, t), t < 0.45
 
 
-def _cell_text(slide, theme, x, y, w, h, lines, *, light, max_size=12):
+def _cell_text(slide, theme, x, y, w, h, lines, *, light, max_size=12, derived=True):
     """Name / value lines inside a cell, top-left; nothing if it doesn't fit at 10pt."""
     pal = theme.palette
     pad = 0.08
@@ -58,6 +59,8 @@ def _cell_text(slide, theme, x, y, w, h, lines, *, light, max_size=12):
     if not lines:
         return False
     tb = add_textbox(slide, x + pad, y + pad * 0.6, w - 2 * pad, h - pad)
+    if derived:                # shares and totals are computed, not typed
+        mark_derived(tb)
     col = pal.white if light else pal.text_dark
     for j, t in enumerate(lines):
         write_paragraph(tb.text_frame, t, size=size, bold=j == 0, color=col,
@@ -114,8 +117,8 @@ def add_marimekko(prs, *,
     usable = pw - gut * (len(live) - 1)
 
     for v, lab in ((0, "0%"), (0.5, "50%"), (1, "100%")):
-        tb = add_textbox(slide, left, py + (1 - v) * ph - 0.11, axis_w - 0.1, 0.22,
-                         anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_axis(add_textbox(slide, left, py + (1 - v) * ph - 0.11, axis_w - 0.1, 0.22,
+                                   anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, lab, size=typo.chart_axis_size, color=pal.footer_gray,
                         family=typo.family, align=PP_ALIGN.RIGHT, first=True)
     x = px
@@ -136,14 +139,15 @@ def add_marimekko(prs, *,
                 share = pct(v / totals[i])
                 val = fmt_num(v, fmt)
                 body = {"share": share, "value": val, "both": f"{val} · {share}"}[cell_label]
-                _cell_text(slide, theme, x, y, cw, h, [body], light=light, max_size=12)
+                _cell_text(slide, theme, x, y, cw, h, [body], light=light, max_size=12,
+                           derived=cell_label != "value")
             y += h
         if show_totals:
-            tb = add_textbox(slide, x, top, cw, 0.26, anchor=MSO_ANCHOR.BOTTOM)
+            tb = mark_derived(add_textbox(slide, x, top, cw, 0.26, anchor=MSO_ANCHOR.BOTTOM))
             write_paragraph(tb.text_frame, fmt_num(totals[i], fmt), size=typo.chart_label_size,
                             bold=True, color=pal.text_dark, family=typo.family,
                             align=PP_ALIGN.CENTER, first=True)
-        tb = add_textbox(slide, x - 0.05, py + ph + 0.06, cw + 0.1, 0.5)
+        tb = mark_derived(add_textbox(slide, x - 0.05, py + ph + 0.06, cw + 0.1, 0.5))
         fcol = focused and is_focus(focus, -1, names[i])
         write_paragraph(tb.text_frame, names[i], size=typo.chart_label_size, bold=True,
                         color=pal.mid_blue if fcol else pal.text_dark, family=typo.family,
@@ -390,6 +394,8 @@ def add_sankey(prs, *,
             tb = add_textbox(slide, xs[c] + bar_w / 2 - lw / 2, ya - 0.3, lw, 0.26,
                              anchor=MSO_ANCHOR.MIDDLE)
             al = PP_ALIGN.CENTER
+        if not any(abs(f["value"] - thru[nme]) < 1e-9 for f in fl):
+            mark_derived(tb)    # a sum over several flows, not a typed value
         for j, t in enumerate(txt):
             write_paragraph(tb.text_frame, t, size=typo.chart_label_size + (1 if j == 0 else 0),
                             bold=j == 0, color=pal.text_dark if j == 0 else pal.footer_gray,

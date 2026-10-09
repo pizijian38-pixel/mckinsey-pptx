@@ -17,7 +17,7 @@ from pptx.util import Pt
 
 from ..base import add_line, add_oval, add_rect, add_textbox, write_paragraph
 from ..design import (HAIRLINE_PT, add_arrow, check_focus, eyebrow, fit_size, focus_tag,
-                      has_focus, is_focus, set_dashed, text_height_in, text_width_pt, tint, warn_small,
+                      has_focus, is_focus, mark_index, set_dashed, text_height_in, text_width_pt, tint, warn_small,
                       write_rich_paragraph)
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
@@ -179,8 +179,10 @@ def add_journey(prs, *,
     # header
     for i, s in enumerate(stages):
         f = is_focus(focus, i, names[i])
-        eyebrow(slide, theme, xs[i] + 0.1, top, cw - 0.2, f"{loc(theme, 'Stage')} {i + 1}",
-                color=pal.bright_blue if f else pal.footer_gray, size=9, align=PP_ALIGN.CENTER)
+        mark_index(eyebrow(slide, theme, xs[i] + 0.1, top, cw - 0.2,
+                           f"{loc(theme, 'Stage')} {i + 1}",
+                           color=pal.bright_blue if f else pal.footer_gray, size=9,
+                           align=PP_ALIGN.CENTER))
         tb = add_textbox(slide, xs[i] + 0.05, top + 0.24, cw - 0.1, 0.34, anchor=MSO_ANCHOR.TOP)
         write_paragraph(tb.text_frame, names[i], size=size + 1, bold=True, color=pal.deep_navy,
                         family=typo.family, align=PP_ALIGN.CENTER, first=True)

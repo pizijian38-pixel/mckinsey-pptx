@@ -105,7 +105,17 @@ def _raw_source_text(path: Path) -> str:
         return _xlsx_text(path)
     if ext == ".pdf":
         return _pdf_text(path)
+    if ext in (".csv", ".tsv"):
+        return _csv_text(path, "\t" if ext == ".tsv" else ",")
     return path.read_text(encoding="utf8", errors="ignore")
+
+
+def _csv_text(path: Path, delim: str) -> str:
+    """One line per row, cells joined by ' | ': a delimiter comma is never read as
+    a thousands separator ("APAC,980,1010" is 980 and 1010, not 9801010)."""
+    import csv
+    with open(path, newline="", encoding="utf-8-sig", errors="ignore") as f:
+        return "\n".join(" | ".join(c.strip() for c in row) for row in csv.reader(f, delimiter=delim))
 
 
 def _iter_shapes(shapes):
@@ -154,6 +164,24 @@ def _content_frames(slide):
             for row in sh.table.rows:
                 for cell in row.cells:
                     yield cell.text_frame
+
+
+def derived_numbers(slide) -> set[str]:
+    """Numbers the template computed itself (shares, totals, weighted scores):
+    shapes named 'derived:*', or values listed in a shape's description
+    ('derived:0.40; 1.20'). They need no source; section [2] still counts them."""
+    out: set[str] = set()
+    for sh in _iter_shapes(slide.shapes):
+        if (sh.name or "").startswith("derived:"):
+            if sh.has_text_frame:
+                out |= numbers(sh.text_frame.text)
+        try:
+            descr = sh._element.xpath(".//p:cNvPr")[0].get("descr") or ""
+        except (IndexError, AttributeError):
+            descr = ""
+        if descr.startswith("derived:"):
+            out |= numbers(descr[len("derived:"):])
+    return out
 
 
 def slide_text(slide) -> str:
@@ -505,13 +533,14 @@ def main(argv=None) -> int:
     templates, groups = [], []
     for i, slide in enumerate(prs.slides, start=1):
         text = slide_text(slide)
-        nums = numbers(text)
+        nums = numbers(_NUMBERING.sub(" ", text))      # "2. Risk" is a list number
         # page number and axis zero are chrome, not content
         nums.discard(str(i))
         nums.discard("0")
         deck_nums_all |= nums
         if args.source:
-            new = sorted(n for n in nums if n not in src_nums)
+            derived = derived_numbers(slide)
+            new = sorted(n for n in nums if n not in src_nums and n not in derived)
             if new:
                 invented.append((i, new))
         ratio = fill_ratio(slide, sw, sh)

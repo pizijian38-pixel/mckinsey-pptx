@@ -11,6 +11,7 @@ from ..base import (
     write_paragraph, add_subtitle_placeholder,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..design import mark_index
 from ..labels import loc
 
 
@@ -30,7 +31,7 @@ def _add_circle_number(slide, theme, left, top, d, n, fill=None, color=None):
     fill = fill or pal.dark_navy
     color = color or pal.white
     add_oval(slide, left, top, d, d, fill=fill)
-    tb = add_textbox(slide, left, top, d, d, anchor=MSO_ANCHOR.MIDDLE)
+    tb = mark_index(add_textbox(slide, left, top, d, d, anchor=MSO_ANCHOR.MIDDLE))
     write_paragraph(tb.text_frame, str(n), size=typo.body_size, bold=True,
                     color=color, family=typo.family,
                     align=PP_ALIGN.CENTER, first=True)

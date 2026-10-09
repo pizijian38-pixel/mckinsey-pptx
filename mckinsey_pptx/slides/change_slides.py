@@ -16,7 +16,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 
 from ..base import add_line, add_oval, add_textbox, write_paragraph
 from ..design import (HAIRLINE_PT, check_focus, eyebrow, fmt_num, has_focus, is_focus,
-                      legend_strip, nice_bounds, text_width_pt, tint, warn_small)
+                      legend_strip, mark_axis, nice_bounds, text_width_pt, tint, warn_small)
 from ..labels import loc
 from ..theme import Theme, DEFAULT_THEME
 from .evaluation_slides import _frame
@@ -163,7 +163,7 @@ def add_dumbbell(prs, *,
     while v <= hi + 1e-9:   # faint vertical gridlines with the scale underneath
         x = x_of(v)
         add_line(slide, x, y_top, x, y_bot, color=pal.light_gray, width_pt=HAIRLINE_PT)
-        tb = add_textbox(slide, x - 0.5, y_bot + 0.05, 1.0, 0.24)
+        tb = mark_axis(add_textbox(slide, x - 0.5, y_bot + 0.05, 1.0, 0.24))
         write_paragraph(tb.text_frame, fmt_num(v, fmt), size=typo.chart_axis_size,
                         color=pal.footer_gray, family=typo.family, align=PP_ALIGN.CENTER,
                         first=True)

@@ -21,7 +21,7 @@ from ..design import (add_callout_bar, add_icon, add_insight_panel, fit_one_line
 from ..theme import Theme, DEFAULT_THEME
 from ..labels import loc
 from .table_slides import draw_table
-from ..design import mark_index
+from ..design import mark_derived, mark_index
 
 GAP = 0.25
 
@@ -195,6 +195,7 @@ def add_decision_matrix(prs, *,
     n_opt = len(options)
     totals = [0.0] * n_opt
     rows = []
+    computed = []                      # displayed values the template computed
     for c, f, w in zip(criteria, fracs, weights):
         scores = list(c["scores"])
         best = max(scores) if highlight_best else None
@@ -202,12 +203,15 @@ def add_decision_matrix(prs, *,
         for k, sc in enumerate(scores):
             totals[k] += sc * f
             txt = f"{sc:g}" + (f"  ({_fmt(sc * f, decimals)})" if show_weighted else "")
+            if show_weighted:
+                computed.append(_fmt(sc * f, decimals))
             cells.append(f"{{gold|{txt}}}" if best is not None and sc == best else txt)
         rows.append(cells)
     best_total = max(totals) if totals else None
     total_cells = [loc(theme, "Weighted total"), "100%" if pct else "1.0"]
     for t in totals:
         txt = _fmt(t, decimals)
+        computed.append(txt)
         total_cells.append(f"{{gold|{txt}}}" if highlight_best and t == best_total else f"**{txt}**")
     rows.append(total_cells)
 
@@ -221,6 +225,9 @@ def add_decision_matrix(prs, *,
                     col_widths=[2.6, 0.9] + [1.5] * n_opt, highlight_col=(
                         recommended + 2 if recommended is not None else None),
                     total_row=True, font_size=13 if len(rows) <= 8 else 12)
+    computed += ["100", "1.0"]         # the weight total
+    mark_derived(next(s for s in reversed(slide.shapes) if getattr(s, "has_table", False)),
+                 computed)
     if scale_note:
         tb = add_textbox(slide, left, top + th + 0.05, table_w, 0.28)
         tb.name = "chrome:note"          # a caption, not body text
@@ -615,7 +622,8 @@ def add_evaluation_matrix(prs, *,
         write_paragraph(tb.text_frame, total_label, size=size + 1, bold=True, color=pal.white,
                         family=typo.family, align=PP_ALIGN.CENTER, first=True)
         if has_w:
-            tb = add_textbox(slide, left + gw_ + cw_, y, ww_, th, anchor=MSO_ANCHOR.MIDDLE)
+            tb = mark_derived(add_textbox(slide, left + gw_ + cw_, y, ww_, th,
+                                          anchor=MSO_ANCHOR.MIDDLE))
             tw_ = sum(f or 0 for f in fr)
             write_paragraph(tb.text_frame, f"{tw_ * 100:.0f}%", size=size, bold=True,
                             color=pal.text_dark, family=typo.family, align=PP_ALIGN.CENTER,
@@ -629,15 +637,16 @@ def add_evaluation_matrix(prs, *,
                 d = 0.22
                 _dots(slide, theme, x + 0.2, y + (th - d) / 2, float(t), scale_max, d,
                       pal.deep_navy, pal.grid_gray)
-                tb = add_textbox(slide, x + 0.3 + scale_max * d * 1.28, y, 0.8, th,
-                                 anchor=MSO_ANCHOR.MIDDLE)
+                tb = mark_derived(add_textbox(slide, x + 0.3 + scale_max * d * 1.28, y, 0.8, th,
+                                              anchor=MSO_ANCHOR.MIDDLE))
                 write_paragraph(tb.text_frame, num(t), size=size, bold=True,
                                 color=tone_rgb(theme, "gold") if t == best_t else pal.deep_navy,
                                 family=typo.family, first=True)
             else:
                 under_score = has_notes and rating == "number"
-                tb = add_textbox(slide, x + 0.15, y, score_w if under_score else ow - 0.3, th,
-                                 anchor=MSO_ANCHOR.MIDDLE)
+                tb = mark_derived(add_textbox(slide, x + 0.15, y,
+                                              score_w if under_score else ow - 0.3, th,
+                                              anchor=MSO_ANCHOR.MIDDLE))
                 write_paragraph(tb.text_frame, num(t), size=size + 3, bold=True,
                                 color=tone_rgb(theme, "gold") if t == best_t else pal.deep_navy,
                                 family=typo.family, align=PP_ALIGN.CENTER, first=True)
