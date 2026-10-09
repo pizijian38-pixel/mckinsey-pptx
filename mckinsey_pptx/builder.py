@@ -390,9 +390,15 @@ def _check_title_focus(name, kw):
     hits = title_names(kw.get("title", ""), labels)
     if hits:
         import sys
+        from .metrics import plain
+        t = plain(kw.get("title", "")).lower()
+        # the item named first is usually the subject; longer label wins a tie
+        hits = sorted(set(hits), key=lambda h: (t.find(plain(h).lower()), -len(h)))
+        also = f" (also matches {', '.join(map(repr, hits[1:]))})" if hits[1:] else ""
         print(f"[mckinsey_pptx] WARNING {name} \"{str(kw.get('title', ''))[:50]}\": the title "
-              f"names {hits[0]!r} — pass focus={hits[0]!r} so that item carries the accent "
-              f"(or focus=[] if the slide deliberately has no focal item).", file=sys.stderr)
+              f"names {hits[0]!r}{also} — pass focus={hits[0]!r} so that item carries the "
+              f"accent, or focus=[] if the word is incidental and no item is focal.",
+              file=sys.stderr)
 
 
 def template_name(fn) -> str:
