@@ -988,6 +988,112 @@ def test_composite_with_diagram_is_held_to_the_label_floor():
 
 
 
+def test_catalog_entries_are_not_cut_at_code_comments():
+    """`# comment` lines inside an example were read as headings, so catalog.py
+    printed data_table, card_grid, swot, chart, tier_ladder, composite and
+    logic_grid without their later examples (and with an unclosed code fence)."""
+    import catalog
+    text, templates, named = catalog.load()
+    cut = [t["names"][0] for t in templates if "\n".join(t["body"]).count("```") % 2]
+    assert not cut, f"entries with an unclosed code fence: {cut}"
+    comment_heads = [k for k in named if k.startswith(("Recipes:", "Option deep dive",
+                                                       "Finance —", "Targets as value"))]
+    assert not comment_heads, comment_heads
+    composite = next(t for t in templates if t["names"][0] == "composite")
+    assert "Recipes: a diagram carries" in "\n".join(composite["body"])
+
+
+def test_skill_md_is_slim_and_its_commands_exist():
+    """SKILL.md is read in full on every run: it stays under 30 KB, and every
+    catalog.py flag it names works."""
+    import re
+    import catalog
+    skill = (ROOT / "SKILL.md").read_text(encoding="utf8")
+    assert len(skill.encode("utf8")) <= 30000, len(skill.encode("utf8"))
+    flags = set(re.findall(r"(?<![\w-])(--[a-z]+(?:-[a-z]+)*)", skill))
+    known = {"--guide", "--options", "--focus", "--theme", "--spines", "--icons", "--plan",
+             "--source", "--env", "--no-render"}          # catalog.py and run_deck.py flags
+    assert flags <= known, f"unknown flags in SKILL.md: {sorted(flags - known)}"
+    for flag in ("--guide", "--options", "--focus", "--theme", "--spines", "--icons"):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            assert catalog.main([flag]) == 0
+        assert len(out.getvalue()) > 200, flag
+
+
+_PLAN = """| # | Source section | Required elements | Message (action title) | Relationship: main · secondary | Template(s) | Why not text cards | Source data used | Inferences added |
+|---|---|---|---|---|---|---|---|---|
+| 1 | cover | — | Probe | — | cover_slide | — | — | — |
+| 2 | gap | — | Vendor B wins | profile · what follows | composite[diagram:radar + cards + callout] | — | scores | — |
+| 3 | list | — | Four initiatives | list | card_grid | 4 parallel initiatives, no order | — | — |
+"""
+
+
+def test_plan_table_is_parsed_and_checked():
+    import plan_check
+    rows = plan_check.parse_plan(_PLAN)
+    assert [r["template"] for r in rows] == ["cover_slide", "composite", "card_grid"]
+    assert rows[1]["parts"] == ["diagram:radar", "cards", "callout"]
+    assert rows[1]["relationship"].startswith("profile")
+    assert plan_check.check_plan(rows) == []
+    assert plan_check.entries_needed(rows) == ["cover_slide", "composite", "radar", "card_grid"]
+    bad = plan_check.parse_plan(_PLAN
+                                .replace("cover_slide", "cover_slid")
+                                .replace("4 parallel initiatives, no order", "—")
+                                .replace("diagram:radar", "diagram:venn"))
+    msgs = [f"{lv} {row}: {m}" for lv, row, m in plan_check.check_plan(bad)]
+    joined = "\n".join(msgs)
+    assert "unknown template 'cover_slid'" in joined and "did you mean 'cover_slide'" in joined, joined
+    assert "card_grid is a text layout" in joined, joined
+    assert "diagram:venn cannot be drawn in a region" in joined, joined
+
+
+def test_catalog_plan_prints_only_the_entries_the_plan_uses():
+    import catalog
+    with tempfile.TemporaryDirectory() as d:
+        plan = Path(d) / "p.md"
+        plan.write_text(_PLAN, encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = catalog.main(["--plan", str(plan)])
+        text = out.getvalue()
+        assert code == 0 and "no problems" in text, text[:400]
+        assert "(`composite`" in text and "(`radar`" in text and "(`card_grid`" in text
+        assert "(`sankey`" not in text
+        plan.write_text(_PLAN.replace("card_grid", "card_gird"), encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = catalog.main(["--plan", str(plan)])
+        assert code == 1 and "did you mean 'card_grid'" in out.getvalue()
+
+
+def test_checker_reports_where_the_deck_differs_from_the_plan():
+    kw = _catalog_first_calls()
+    b = PresentationBuilder(on_error="raise")
+    b.add("cover_slide", title="Probe")
+    b.add("composite", title="Vendor B wins",
+          columns=[{"type": "diagram", "template": "radar", **kw["radar"]},
+                   {"type": "bullets", "items": ["a"]}])
+    b.add("card_rows", title="Three steps", rows=[{"title": "One", "body": "x"}])
+    with tempfile.TemporaryDirectory() as d:
+        deck, plan = Path(d) / "d.pptx", Path(d) / "plan.md"
+        b.save(str(deck))
+        plan.write_text(_PLAN, encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = deck_check.main([str(deck), "--plan", str(plan)])
+        report = out.getvalue()
+        assert code == 1, report
+        sec = _section(report, "[12] Plan vs deck", "\n[zz]")
+        assert sec == ["slide 3: plan says card_grid, deck has card_rows"], sec
+        assert deck_check.FINDINGS["[12]"] == [3]
+        plan.write_text(_PLAN.replace("card_grid", "card_rows"), encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            deck_check.main([str(deck), "--plan", str(plan)])
+        assert "ok (3 slides match the plan)" in out.getvalue(), out.getvalue()[-300:]
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

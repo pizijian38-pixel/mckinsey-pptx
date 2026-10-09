@@ -1,6 +1,8 @@
 """Build, check and render a deck in one command (Windows, macOS, Linux).
 
     python scripts/run_deck.py output/build_<slug>.py --source <outline.docx> [--source ...]
+    python scripts/run_deck.py output/build_<slug>.py --plan output/<slug>_plan.md
+                                                                        # + plan vs deck
     python scripts/run_deck.py output/build_<slug>.py --no-render      # skip the previews
     python scripts/run_deck.py output/build_<slug>.py --deck output/<slug>.pptx
     python scripts/run_deck.py --env                                   # what is installed
@@ -234,6 +236,8 @@ def main(argv=None) -> int:
                     help="report python-pptx, LibreOffice and the PNG converter, then exit")
     ap.add_argument("--source", action="append", default=[],
                     help="source file the deck is built from (repeatable)")
+    ap.add_argument("--plan", help="the slide plan (output/<slug>_plan.md); the checker "
+                                   "reports where the deck differs from it")
     ap.add_argument("--deck", help="the .pptx the build writes (found automatically if omitted)")
     ap.add_argument("--no-render", action="store_true", help="skip PDF / PNG previews")
     ap.add_argument("--dpi", type=int, default=80)
@@ -275,6 +279,8 @@ def main(argv=None) -> int:
     sys.path.insert(0, str(HERE))
     import deck_check
     check_argv = [str(deck)] + sum((["--source", s] for s in args.source), [])
+    if args.plan:
+        check_argv += ["--plan", args.plan]
     flagged = deck_check.main(check_argv)
 
     render_line = "skipped (--no-render)"

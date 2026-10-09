@@ -1,6 +1,6 @@
 ---
 name: mckinsey-pptx
-description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 80 templates and a composite layout (marimekko, treemap, sankey, slopegraph, dumbbell, bump charts, heat maps, radar, venn, swimlanes, layer stacks, fishbone, customer journey, logic grids, strategic-challenge and storyline summary pages, flywheels, risk heat maps, positioning scales, value chains, phase grids, evaluation matrices, business model canvas, strategic triangle, hub-and-spoke, option profiles, decision matrices, risk registers, card grids, data tables, native charts, waterfalls, scorecards, roadmaps, timelines, 2x2 matrices, SWOT, flows, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases and strategic analyses, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
+description: Builds consulting-style business presentations as real, editable .pptx files from a brief, a deck outline, or Excel/Word/PDF/CSV data, choosing from 80 templates and a composite layout (marimekko, treemap, sankey, slopegraph, dumbbell, heat maps, radar, swimlanes, fishbone, customer journey, logic grids, strategic-challenge and storyline summaries, risk heat maps, value chains, phase grids, evaluation and decision matrices, business model canvas, native charts, waterfalls, scorecards, roadmaps, 2x2 matrices, SWOT, org charts). Use when the user asks to make a PPT, deck, presentation, slides or PowerPoint for any business purpose — performance reviews / QBRs, board or steering updates, strategy and market entry, strategy cases, options evaluations and proposals, project status, investment cases, operations improvement, marketing or product plans — or to turn an outline document into a deck, e.g. "做一份麦肯锡风格的PPT", "根据大纲做演示文稿", "做个季度业务回顾", "build a board update deck", "맥킨지 슬라이드 만들어줘".
 ---
 
 # McKinsey PPTX skill
@@ -12,53 +12,48 @@ communicates**, and you can defend each choice.
 
 ## Working rules (read first)
 
-1. **Run only these terminal commands** — every other command (a
-   `python -c` snippet, `Get-ChildItem`/`dir`/`ls` over folders,
-   `Test-Path`, `pip list`, `New-Item`, `where`) stops the run for the
-   user's approval, and a multi-line `python -c` can never be pre-approved.
+1. **Run only these terminal commands** — anything else (a `python -c`
+   snippet, `dir` / `ls` over folders, `Test-Path`, `pip list`, `New-Item`)
+   stops the run for the user's approval. `SKILL_DIR` is the folder of this
+   SKILL.md (don't search the disk for it); output goes to the workspace
+   `output/`, never into `SKILL_DIR`. Write files with your file tool, view
+   PNGs with your file viewer. Expect 6–10 commands for a whole deck.
    - `python "SKILL_DIR/scripts/read_source.py" "<attachment path>"` — the
      source as text, every table as a Markdown table (docx / xlsx / pptx /
      pdf / md / csv).
    - `python "SKILL_DIR/scripts/catalog.py"` — index of all templates; then
-     **one** call with every name and flag you need:
-     `python "SKILL_DIR/scripts/catalog.py" data_table chart fishbone --icons`.
-   - `python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source "<path>"`
-     — builds, checks and renders (finds LibreOffice, writes PNGs +
-     `contact_sheet.png`). `run_deck.py --env` reports what is installed.
-   Write files with your file tool (it creates `output/` itself), view PNGs
-   with your file viewer. `SKILL_DIR` is the folder of this SKILL.md — don't
-   search the disk for it. Expect about 6–10 commands for a whole deck.
-2. **Attachments are files on disk — read them, never retype them.** When the
-   user attaches or names a file, find its path in the conversation context
-   (Antigravity: the attachment / media entry of the request, a path like
-   `…\brain\<id>\.user_uploaded\media_….docx`; other hosts give an absolute
-   path), read it with `read_source.py` and pass the same path to
-   `--source`. **The attachment is the source even
-   when a similar file already sits in the workspace** (an older outline copy,
-   `source_outline.md`, a previous export). A hand-typed copy loses tables and
-   numbers, and the checker then compares the deck against your copy instead
-   of the real source. Can't find it? Ask the user for the path — don't
-   search the whole disk, don't reconstruct it.
-3. **A new request builds a new deck.** Write a new plan and a new build
-   script from the source. Plans, build scripts and decks already in
-   `output/` from an earlier conversation are not your draft: don't open or
-   reuse them, and save under a new slug if the name is taken. Edit an
-   existing build script only when the user asks to change that deck
-   (see Iterating).
-4. **Everything you need is in this file and `catalog.py`.** Don't read,
-   grep or `Select-String` the package source, `deck_check.py` or the
-   `assets/` folder: template arguments → `catalog.py <name>`; icon names,
-   tones and `**bold**` / `{red|…}` markup → `catalog.py --icons`;
-   slide-level options → `catalog.py --options`. A chart inside a
-   `composite` counts as a chart for the checker. If something you need
+     **one** call per need: `catalog.py --plan output/<slug>_plan.md` (checks
+     the plan, prints the entries it needs), or
+     `catalog.py data_table fishbone --icons` for named templates; other
+     flags: `--guide --options --focus --theme --spines`.
+   - `python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source "<path>" --plan output/<slug>_plan.md`
+     — builds, checks and renders (PNGs + `contact_sheet.png`). Run
+     `run_deck.py --env` once; only if it says `python-pptx : MISSING`:
+     `python -m pip install -r "SKILL_DIR/requirements.txt"`.
+   Use `python3` on macOS/Linux, `python` on Windows. One command per call:
+   PowerShell 5 rejects `&&` and `||`.
+2. **Attachments are files on disk — read them, never retype them.** Find the
+   path in the conversation context (Antigravity: the attachment / media entry
+   of the request, a path like `…\brain\<id>\.user_uploaded\media_….docx`),
+   read it with `read_source.py`, and pass the same path to `--source`. **The
+   attachment is the source even when a similar file already sits in the
+   workspace** (an older copy, `source_outline.md`): a hand-typed copy loses
+   tables and numbers, and the checker would compare against your copy. Can't
+   find it? Ask for the path; don't search the disk.
+3. **A new request builds a new deck.** New plan, new build script. Plans,
+   scripts and decks already in `output/` are not your draft: don't open or
+   reuse them; use a new slug if the name is taken. Edit an existing script
+   only when the user asks to change that deck (see Iterating).
+4. **Everything you need is in this file and `catalog.py`.** Don't read, grep
+   or search the package source, `deck_check.py` or `assets/`. If something
    isn't there, say so in the report instead of reverse-engineering it.
-5. **The checker is a reviewer, not a score.** Read the report and fix the
-   deck. Coverage ([2]) exists to show source facts you missed —
-   never add numbers, words or phrases (e.g. "10-slide") to raise it or to
-   shorten the vocabulary list. Advisory sections ([2] [3] [5c] [11]) never
-   require changing a correct slide. If a finding is wrong, say so in the
-   report.
+5. **The checker is a reviewer, not a score.** Fix the deck, not the report;
+   never add numbers or words to raise coverage or clear a finding. Advisory
+   sections ([2] [3] [5c] [11]) never require changing a correct slide. If a
+   finding is wrong, say so in the report.
 6. **Pick the template from the relationship, not the topic** (table below).
+   Optional for visual checks: LibreOffice + poppler or PyMuPDF; `run_deck.py`
+   finds them and says what is missing. The `.pptx` doesn't need them.
 
 ## Pick the template by the relationship
 
@@ -70,7 +65,7 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | A whole split into parts (one split) | `treemap`; ≤ 5 parts → `chart` doughnut | cards listing segments |
 | A whole split two ways (segment × player, region × channel) | `marimekko` | a numeric `data_table` |
 | Volume moving through stages, splitting or merging | `sankey` | `process_flow`, `funnel` |
-| **Several players / segments over 3+ periods** (share, sales, price) | `chart` `line` with every series; `highlight={"series": <the one the title is about>}`, a `tone` on one rival; ≤ ~8 lines | the source table copied as a `data_table` |
+| **Several players / segments over 3+ periods** (share, sales, price) | `chart` `line`, every series; `highlight={"series": <the one the title is about>}`; ≤ ~8 lines | the source table as a `data_table` |
 | Several items at two points in time — direction of change | `slopegraph` | before/after table |
 | Several items — the gap between two values (now vs target, us vs best) | `dumbbell` | two-column text |
 | Rank order over 3–6 periods | `bump` | a table of ranks |
@@ -82,7 +77,7 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | Customer steps with feelings or pain points | `journey` | `process_flow` |
 | Layers that build on each other (stack, operating model) | `layer_stack` | `card_rows` |
 | 2–3 overlapping conditions or groups | `venn` | cards |
-| Trend or magnitude of one series by period / category | `chart`: `line` trend · `column` / `bar` compare or rank · `grouped_column` two periods side by side · `stacked_column` composition; `highlight` the focus item and add an `insight` | a numeric `data_table` |
+| Trend or magnitude of one series | `chart`: `line` trend · `column` / `bar` compare or rank · `grouped_column` two periods · `stacked_column` composition; `highlight` the focus item, add an `insight` | a numeric `data_table` |
 | A change between two totals, explained by drivers | `waterfall` | cards of drivers |
 | Reinforcing loop, flywheel, vicious cycle | `cycle` | `card_rows` |
 | One concept and its 3–6 parts or stakeholders | `hub_spoke` | `card_grid` |
@@ -92,66 +87,47 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | Decomposing a goal or question | `issue_tree` | bullets |
 | Sequence of steps, one actor; narrowing quantity | `process_flow`; `funnel` | `card_rows` |
 | Plan over time; KPIs vs target | `roadmap` / `timeline` / `phase_grid`; `scorecard` | tables |
+| One claim that needs two relationships (a diagram and what follows from it; a level and its change) | `composite` with a `diagram` or `chart` region beside cards / callout (rule below) | two crowded slides |
 | **Really a list** of parallel points with detail | `card_grid` / `card_rows` — the right choice | — |
 | A text table (options × facets, as-is / to-be) | `data_table` | — |
 
 **A diagram asserts a relationship.** Cause → effect, sequence, flow,
 overlap, hierarchy or one focal item: draw it only when the source states it.
-If you infer it, either list it under "Inferences added" in the plan or use a
-list layout — never borrow an effect or a priority from another section to
-fill a diagram.
+If you infer it, list it under "Inferences added" in the plan or use a list
+layout — never borrow an effect or a priority from another section.
 
-Text layouts are correct when the content is a list. The checker's section
-[11] reminds you when they fill more than half of the content slides — a
-prompt to look at those slides again, not a rule to satisfy.
+**One slide, two relationships.** The title's claim is the *main*
+relationship and decides the template. A second one shares the slide only
+when it explains or qualifies the main one: `composite[diagram:radar + cards +
+callout]` (profile + what follows), `composite[chart + diagram:slopegraph]`
+(level + ranking shift), `composite[diagram:timeline + cards]` (plan + gates).
+Region sizes and the 14 diagrams a region can hold: `catalog.py composite`; at
+most two diagrams per slide. **Split into two slides** when each relationship
+makes its own claim (it needs its own title), when the second needs a
+full-slide diagram (cycle, swimlane, hub_spoke, risk_heatmap, venn), or when
+three relationships compete.
 
-## Paths
-
-- `SKILL_DIR` = the absolute path of the folder containing this `SKILL.md`
-  (you just read it from the filesystem, so you know it). Resolve it once and
-  use the absolute path everywhere below.
-- Python package: `SKILL_DIR/mckinsey_pptx/`
-- Template catalog (API of every template): `SKILL_DIR/mckinsey_pptx/agent/CATALOG.md`
-- Source reader: `SKILL_DIR/scripts/read_source.py` (attachments → text + tables)
-- Template lookup: `SKILL_DIR/scripts/catalog.py` (index / named entries)
-- Build + check + render: `SKILL_DIR/scripts/run_deck.py`
-- Deck checker (run by `run_deck.py`): `SKILL_DIR/scripts/deck_check.py`
-- Working example of a Chinese deck: `SKILL_DIR/examples/demo_chinese.py`
-- Output: the user's **workspace** under `output/`. Never write into `SKILL_DIR`.
-
-## First-run setup
-
-Use `python3` on macOS/Linux and `python` on Windows (whichever exists).
-
-Run `python "SKILL_DIR/scripts/run_deck.py" --env` once. Only if it reports
-`python-pptx : MISSING`, run `python -m pip install -r "SKILL_DIR/requirements.txt"`.
-Write every command as a single
-command — Windows PowerShell 5 rejects `&&` and `||`; run two commands as two
-steps instead of chaining them.
-
-The only dependency is `python-pptx`. The package itself is not installed
-with pip — build scripts add `SKILL_DIR` to `sys.path` (see step 5).
-
-Optional, for visual verification: LibreOffice, plus poppler (`pdftoppm`)
-or PyMuPDF (`pip install pymupdf`) for the PNGs. `run_deck.py` finds them
-itself (including `C:\Program Files\LibreOffice\program\soffice.exe`) and
-says what is missing. Don't block the build on these; the `.pptx` doesn't
-need them.
+Text layouts are correct when the content is a list; the checker's [11]
+reminds you when they fill over half of the content slides — a prompt to look
+again, not a rule. Mistakes the table doesn't cover: text features in
+`comparison_table` Harvey balls → `data_table`; `column_simple_growth` with
+forecast bars → `column_historic_forecast`; `bubble_chart` with quadrant
+labels → `growth_share` / `prioritization_matrix`; `org_chart` for decomposing
+a problem → `issue_tree`; 5+ trends in `three_trends_*` → `overview_areas`;
+area and width charts take values >= 0 only (gains and losses → `waterfall`).
 
 ---
 
 ## Step 0 — Pick the mode. Everything else depends on it.
 
-**Source mode** — the user gives you material the deck must be built from:
+**Source mode** — material the deck must be built from:
 a deck outline ("Slide 1: … Slide 2: …"), a report, a plan, a spreadsheet,
-or says "based on the file / framework in the folder". Most real requests
-with files are source mode.
+or "based on the file / framework in the folder".
 
-**Brief mode** — the user gives only a short description ("make a Q4 review
-deck, revenue 120bn, 2 KPIs late") and no document to follow.
+**Brief mode** — only a short description ("make a Q4 review deck,
+revenue 120bn, 2 KPIs late"), no document to follow.
 
-If unsure, it is source mode whenever a document in the workspace describes
-the deck's content.
+If unsure: source mode whenever a document describes the deck's content.
 
 ### Source-mode rules (non-negotiable)
 
@@ -179,22 +155,14 @@ the deck's content.
 5. **Elaborate, don't decide.** You may expand a terse source bullet into a
    header plus supporting points: restate it, explain what it means, connect
    it to another fact *in the source*, or say what follows from it for the
-   decision. You may **not** add anything the source doesn't contain, in
-   particular:
-   - new targets, KPIs, rankings or superlatives ("#1 in the region",
-     "fastest-growing", "market-leading");
-   - new partners, customers, suppliers or deal types ("strategic
-     partnership with …", "exclusive agreement");
-   - new products, features, offers, tiers or pricing ("a premium
-     subscription tier", "bundled packs");
-   - new markets, channels, sites, regions, campaigns or dates;
-   - new ownership, credential or regulatory claims ("proprietary",
-     "patented", "certified", "FDA-cleared", "clinically proven");
-   - new causes, mechanisms or customer / employee behaviour the source
-     doesn't state, and invented colour ("driven by bureaucracy",
-     "loved by Gen Z", "in every boardroom").
-   Test for every supporting point: *can I point to the sentence in the
-   source it comes from, or is it a plain logical consequence of two source
+   decision. You may **not** add anything the source doesn't contain: new
+   targets, KPIs, rankings or superlatives ("#1 in the region",
+   "market-leading"); new partners, customers, deal types, products, tiers,
+   prices, markets, channels, sites, campaigns or dates; new ownership,
+   credential or regulatory claims ("proprietary", "certified",
+   "clinically proven"); new causes, mechanisms or behaviour, and invented
+   colour ("loved by Gen Z"). Test for every supporting point: *can I point
+   to the source sentence, or is it a plain logical consequence of two source
    facts?* If not, delete it. Two true points beat three padded ones; a card
    with one source bullet may stay short.
 6. **Language follows the source document**, not the language of the
@@ -236,238 +204,169 @@ the deck's content.
 
 ## Step 1 — Understand the material and the use
 
-- **Audience** (executives, working team, board, class/jury) and **use**:
-  - *Live presentation* — fewer words per slide, one message per slide.
-  - *Pre-read / leave-behind / plan document* — slides must carry the full
-    argument on their own: denser, every claim backed on the slide.
-  "给高管看" alone does not mean "cut content"; a plan, review or report built
-  from a document is a pre-read unless the user says it is a short talk.
-- **Slide count:**
-  - Source mode: driven by the source — roughly one slide per section, plus
-    a cover, an optional agenda / section dividers for 15+ slides, and a
-    closing slide. Never fewer slides than source sections.
-  - Brief mode: 5–10 slides unless told otherwise.
-- **Attribution**: the company/team name for the footer — only if the user
-  gave one or it is in their files.
-- If the user points to or attaches files (`.xlsx`, `.csv`, `.docx`, `.pdf`,
-  `.md`), read them fully with `read_source.py` from their real path,
-  including tables (working rules 1–2). These paths are the `--source` files
-  in step 6.
+- **Audience and use.** *Live presentation*: fewer words, one message per
+  slide. *Pre-read / leave-behind / plan document*: slides carry the full
+  argument, every claim backed on the slide. "给高管看" alone does not mean
+  "cut content": a plan, review or report built from a document is a pre-read
+  unless the user says it is a short talk.
+- **Slide count.** Source mode: roughly one slide per section plus a cover, an
+  optional agenda / dividers for 15+ slides and a closing slide — never fewer
+  slides than sections. Brief mode: 5–10 unless told otherwise.
+- **Footer attribution:** the company or team name, only if the user gave it
+  or it is in their files.
+- Attached or named files (`.xlsx`, `.csv`, `.docx`, `.pdf`, `.md`): read them
+  fully, tables included, from their real path (working rules 1–2); those
+  paths are the `--source` files in Step 6.
 
-## Step 2 — Look up the templates
+## Step 2 — Choose templates from the index
 
-1. Run `python SKILL_DIR/scripts/catalog.py` once — the index of every
-   template with its *Use when* line.
-2. For each slide, name the relationship (table above) and 1–3 candidate
-   templates. Then fetch the full entries for **all** candidates of the deck
-   in one call: `catalog.py <every candidate…> --icons` (arguments, *Don't
-   use when*, a runnable example). Add `--guide` for "Choosing between
-   similar templates". Look up a template again only if the build reports an
-   argument error.
-
-The catalog (`CATALOG.md`) is the source of truth for names and arguments —
-never invent template names or argument shapes. Don't page through
-CATALOG.md by line ranges or grep it for templates you already know; the
-newer diagram templates sit at the end and get missed that way.
+Run `catalog.py` once: the index lists every template with its *Use when*
+line. For each slide name the relationship (table above) and pick the
+template; two candidates → `catalog.py <a> <b> --guide`. Then write the plan
+(Step 3) and run `catalog.py --plan output/<slug>_plan.md`: it rejects unknown
+names, unjustified text layouts and unsupported composite regions, and prints
+the entries (arguments, *Don't use when*, example) of exactly the templates
+the plan uses — look a template up again only if the build reports an
+argument error. The catalog is the source of truth for names and arguments;
+never invent them, and don't page through `CATALOG.md` or grep it.
 
 ## Step 3 — Write the slide plan first
 
 Before writing any build code, write `output/<slug>_plan.md` — a table with
-one row per slide:
+one row per slide, in slide order:
 
-| # | Source section | Required elements (from the request) | Message (action title) | Relationship | Template | Why not text cards | Source data used | Inferences added |
+| # | Source section | Required elements | Message (action title) | Relationship: main · secondary | Template(s) | Why not text cards | Source data used | Inferences added |
 |---|---|---|---|---|---|---|---|---|
 
-"Required elements" copies what the user asked that slide to contain
-(or "—"); after building, tick each one off against the rendered slide.
+- **Required elements:** what the user asked that slide to contain, or "—";
+  tick each off against the rendered slide.
+- **Relationship:** the main relationship in the words of the table above
+  ("whole split two ways", "gap per item", "causes of one problem", "list"),
+  then the secondary one, if any ("gap per item · what drives it"), else "—".
+- **Template(s):** the template name, nothing else but `· focus <item>` —
+  or, for a composite, its regions: `composite[diagram:radar + cards +
+  callout]` (diagram regions as `diagram:<template>`). `catalog.py --plan`
+  and the checker's [12] read this column.
+- **Why not text cards:** "—" for a diagram or chart; for `card_grid`,
+  `card_rows`, `data_table` or `swot`, a few words on why the content is a
+  list ("4 parallel initiatives, no order or quantity"). If you can't, pick
+  the diagram.
+- **Inferences added:** every supporting point or insight that is a
+  consequence you drew rather than a source sentence. Most rows say "—".
 
-"Relationship" names what the slide shows, in the words of the table above
-("whole split two ways", "gap per item", "causes of one problem", "list").
-"Why not text cards": for a diagram or chart, "—"; for `card_grid`,
-`card_rows`, `data_table` or `swot`, say in a few words why the content is
-really a list ("4 parallel initiatives, no order or quantity"). If you
-can't, pick the diagram.
-
-"Inferences added" lists every supporting point or insight that is a
-consequence you drew rather than a sentence from the source — so the user
-can check them. Keep it short; most rows should say "—".
-
-In source mode, check the plan against the source before continuing:
-every section is in the plan; every source table is in the "data used"
-column of some slide. Fix the plan, not the source.
+Source mode: check the plan against the source before continuing — every
+section is in the plan, every source table is in some slide's "data used".
+Fix the plan, not the source.
 
 **Action titles.** Each title states the slide's takeaway as a claim
 ("EMEA margin fell 3 pts as freight costs doubled", "Two of five
 workstreams are behind plan"), not a topic ("EMEA results", "Project
-status"). Take the claim from the source's own key message;
-keep the source's section name as the `section_marker` or subtitle if useful.
+status"). Take the claim from the source's own key message; the section
+name can go in `section_marker` or the subtitle.
 
-**Focus follows the title.** When the title singles out one item of a
-diagram ("*Batteries* are the only question mark worth funding", "the
-programme is in its *build* phase"), pass that item as `focus=` — on
-`growth_share`, `matrix_2x2`, `prioritization_matrix`, `cycle`,
-`risk_heatmap`, `process_flow`, `funnel`, `issue_tree`, `org_chart`,
-`hub_spoke`, `marimekko`, `treemap`, `sankey`, `slopegraph`, `dumbbell`,
-`fishbone`, `journey`, `heatmap`, `radar`, `venn`, `bump`, `swimlane`,
-`layer_stack`. The focal item gets the accent and everything else turns
-neutral; one or two focal items per slide, never more. Write the focal item
-next to the template in the plan ("growth_share · focus Batteries"). If the
-title makes no claim about one item — including titles that name several
-items side by side ("A, B and C constrain growth") — leave `focus` out (or
-`focus=[]` to silence the build warning). Never pick one of several named
-items as the focus: that is a priority the source didn't give.
+**Focus follows the title.** When the title singles out one item of a diagram
+("*Batteries* are the only question mark worth funding", "the programme is in
+its *build* phase"), pass it as `focus=` (the templates that take it:
+`catalog.py --focus`) and write it in the plan ("growth_share · focus
+Batteries"). The focal item gets the accent, everything else turns neutral;
+one or two per slide. If the title makes no claim about one item — including
+titles that name several items side by side ("A, B and C constrain growth") —
+leave `focus` out (`focus=[]` silences the build warning). Never pick one of
+several named items: that is a priority the source didn't give.
 
 ## Step 4 — Fill each slide to the right density
 
-**Slide anatomy for content slides:** action title → optional subtitle →
-2–4 content blocks → (analysis slides) a key insight.
+**Slide anatomy:** action title → optional subtitle → 2–4 content blocks →
+(analysis slides) a key insight.
 
-- Each source bullet becomes a **block header**, followed by 1–3 supporting
-  points drawn from the source (its details, its tables, and the logical
-  "so what"). A slide with four one-line bullets and nothing else is too
-  thin.
-- Every analysis slide (market, competition, segments, channels, SWOT)
-  carries a **key insight**. Every rich template has an `insight` slot
-  (`card_grid`, `chart`, `data_table`, `swot`, `tier_ladder`); older chart
-  templates use `takeaways`.
-- **What a key insight is:** one sentence that *synthesises* — it combines
-  two or more data points, or states what the data means for the decision
-  ("Growth came entirely from new customers; the base shrank 4%"). It is
-  **not** a restatement of the title, of one table row, or of the cards above.
-  - Insight panels next to a table or chart: the insight sentence plus at
-    most **3** bullets, each comparing or connecting data — never one bullet
-    per table row (the table already shows the rows).
-  - If you can't write an insight that adds something beyond the title, leave
-    `insight` out. Not every slide needs one; objectives, roadmaps and
-    reference tables often don't.
-- **Analysis pages end in a "so what" for the company.** On situation pages
-  (market, customers, competitors, PEST, five forces) the last column, band
-  or bar says what the facts mean for the company — "Competitive
-  advantage", "Impact on <company>", "Implication". In `logic_grid` that is
-  the conclusion column; in `composite` the last column or a `callout`.
-  The conclusion must follow from the cells beside it; in source mode,
-  list it under "Inferences added" unless the source states it.
-- **Show the chain, not just the list.** When a slide argues A → B → C
-  (cause → effect → consequence), use a layout whose columns or rows carry
-  that order (`logic_grid`, `composite` with `connectors`,
-  `strategic_challenge`), with column headers that name each step.
-- **Name the bottom bar for its role** (`insight_label=`): "Bottom line",
-  "Verdict", "Implication", "What it takes", "Preliminary view", "Decision
-  needed" — not "Key insight" on every slide.
-- **Emphasis:** where the template renders markup (`catalog.py --icons`
-  lists them; elsewhere the characters print literally and the checker flags
-  them), mark the 1–3 things the reader must see per card or panel — key numbers in `**bold**`, problems / declines in
-  `{red|…}`, growth / targets in `{green|…}`. Don't colour whole sentences.
-- **Icons:** give each `card_grid` card an `icon` that matches its meaning
-  (`catalog.py --icons` lists the names, e.g. `alert` for risks, `money` for cost, `users` for
-  customers or people, `trend_up` for growth, `clock` for time,
-  `settings` for operations). Use `tone` for meaning, not decoration.
-- Use the source's numbers inside the text ("from 12.4% to 9.8% in two
-  years"), not vague words ("declined slightly").
+- Each source bullet becomes a **block header** plus 1–3 supporting points
+  from the source (its details, its tables, the logical "so what"). Four
+  one-line bullets and nothing else is too thin.
+- **Key insight** (`insight=`; older chart templates `takeaways`): one sentence
+  that *synthesises* — it combines two or more data points or states what they
+  mean for the decision ("Growth came entirely from new customers; the base
+  shrank 4%"). It is not a restatement of the title, one table row or the
+  cards above. Beside a table or chart: the sentence plus at most 3 bullets
+  that compare or connect data, never one bullet per row. If you can't write
+  one that adds something, leave it out — objectives, roadmaps and reference
+  tables often have none. Name the bar for its role (`insight_label=`: "Bottom
+  line", "Verdict", "Implication", "Decision needed", "Preliminary view"), not
+  "Key insight" everywhere.
+- **Analysis pages end in a "so what" for the company** (market, customers,
+  competitors, PEST, five forces): the last column, band or bar says what the
+  facts mean ("Competitive advantage", "Impact on <company>"). It must follow
+  from the cells beside it; in source mode list it under "Inferences added"
+  unless the source states it.
+- **Show the chain, not just the list.** A → B → C arguments use a layout
+  whose columns or rows carry that order (`logic_grid`, `composite` with
+  `connectors`, `strategic_challenge`), column headers naming each step.
+- **Emphasis and icons:** where the template renders markup (`catalog.py
+  --icons` lists them; elsewhere the characters print literally and the
+  checker flags them), mark the 1–3 things per card the reader must see: key
+  numbers `**bold**`, problems `{red|…}`, growth `{green|…}` — never whole
+  sentences. Give each `card_grid` card an `icon` that matches its meaning;
+  `tone` carries meaning, not decoration.
+- Use the source's numbers in the text ("from 12.4% to 9.8% in two years"),
+  not vague words ("declined slightly").
 
-**Data → template rules:**
-
-The relationship table at the top comes first; this table covers the
-remaining cases. Default to templates 41–80: larger type, text fitted to the space, editable
-tables and charts. Use 1–40 only for what they uniquely cover (org chart,
-BCG / bubble chart, issue tree, funnel, process flow, cover, divider, agenda,
-quote, stat_hero). When no
-single template fits a slide that mixes content types, build it with
-`composite` regions instead of forcing it into one template.
+**Data → template** (the relationship table comes first; this covers the rest).
+Prefer templates 41–80: larger type, text fitted to the space, editable tables
+and charts; use 1–40 only for what they uniquely cover (org chart, BCG /
+bubble chart, issue tree, funnel, process flow, cover, divider, agenda, quote,
+stat_hero). When no single template fits a mixed slide, use `composite`. Templates
+not named here (`swot`, `roadmap`, `timeline`, `org_chart`, `phase_grid`,
+`positioning_scale`, `value_chain`, `business_model_canvas`, ...) are found by
+their *Use when* line in the index.
 
 | Content | Template |
 |---|---|
-| **Scores, ratings or rankings against criteria** (weighted evaluation, vendor / option scoring, maturity ratings) | **table, not a chart**: `decision_matrix` (weights, raw + weighted scores, best per row, totals); plain ratings → `data_table` |
-| 2–4 options / products / scenarios side by side, each with the same facets (summary, key numbers, pros, cons) | `option_profiles` |
-| One option / initiative / product in depth (how it works + numbers + why / how / pros / cons + verdict) | `composite` (e.g. `flow` + `kv_table` on the left, 2×2 `cards` on the right) |
-| One option read as an argument (current situation → strategy → advantages → disadvantages; how it addresses the challenge → key activities → impact) | `composite` with `headers` + `connectors=True`; `callout` for the value proposition, `pyramid` for positioning, `sections` for feasibility / pros / cons |
-| **A chain of reasoning per topic** (external situation → capability → advantage; customer need → what we do → performance → implication; factor → impact → implication) | `logic_grid` — one row per topic, conclusion column on the right |
-| PEST, five forces, stakeholders — each with "current situation" and "influence on us" | `logic_grid(direction="down")` |
-| Drivers that converge on one threat and the key question of the deck | `strategic_challenge` |
-| Executive summary of a problem-solving deck (situation → question → options → recommendation) | `storyline_summary` |
-| Competitors' relative position on several indicators | `positioning_scale` |
-| Industry stages with KSFs, margins or prices; own stages marked | `value_chain` |
-| Implementation plan: same row types per stage (partners / actions / resources), bars across years, KPI rows, risk panel | `phase_grid` |
-| Option scores **with a reason per cell**, dot ratings, criteria grouped by dimension, or a "why these criteria" formula | `evaluation_matrix` (text-only with `rating=None`) |
-| Business model | `business_model_canvas`; internal alignment around a goal → `strategic_triangle`; one concept and its 3–6 parts → `hub_spoke` |
-| KPIs with target vs. actual and status | `scorecard` |
-| Headline numbers / targets (2–4) | `card_grid` with `value` per card |
-| **Text** table, or mixed text and numbers | `data_table` (all rows and columns; `highlight_rows` / `highlight_col`) |
-| Options × criteria, as-is vs. to-be, feature comparison | `data_table`; `comparison_table` only when the source gives ratings |
+| **Scores, ratings or rankings against criteria** (weighted evaluation, vendor scoring, maturity) | **a table, not a chart**: `decision_matrix` (weights, weighted scores, best per row, totals); plain ratings → `data_table` |
+| Option scores **with a reason per cell**, dot ratings, criteria grouped by dimension | `evaluation_matrix` (text-only with `rating=None`) |
+| 2–4 options / products / scenarios with the same facets (summary, key numbers, pros, cons) | `option_profiles` |
+| One option / initiative in depth (how it works + numbers + why / how / pros / cons + verdict) | `composite` (`flow` + `kv_table`, 2×2 `cards`) |
+| One option read as an argument (situation → strategy → advantages → disadvantages) | `composite` with `headers` + `connectors=True`; `callout` for the value proposition, `pyramid` for positioning, `sections` for feasibility / pros / cons |
+| A chain of reasoning per topic (situation → capability → advantage; need → what we do → implication) | `logic_grid` — one row per topic, conclusion column right; PEST / five forces → `logic_grid(direction="down")` |
+| Drivers converging on one threat and the key question | `strategic_challenge` |
 | Executive summary of a problem-solving deck (strategy case, options paper, board proposal) | `storyline_summary` |
-| Short executive summary (situation / complication / resolution / ask) | `card_grid` (2×2) with `insight` = the bottom line |
-| Executive summary as prose; as 2–4 bold takeaways | `executive_summary_paragraph`; `executive_summary_takeaways` |
-| 2–8 parallel *qualitative* points with detail (initiatives, workstreams, principles, recommendations). Drivers with sizes → `waterfall`; risks → `risk_heatmap` / `risk_register`; segments with sizes → `treemap` / `marimekko` | `card_grid` |
-| 2–6 items needing a sentence each (decisions, recommendations, risks + mitigation) | `card_rows` |
-| SWOT or any S/W/O/T subset | `swot` |
-| Tiers that step up (service / price tiers, maturity levels) | `tier_ladder` |
-| Workstreams over time with milestones | `roadmap`; 3–7 dated events → `timeline`; weekly detail → `gantt_timeline` |
-| Reporting lines; one leader + a team | `org_chart`; `project_team_circles` |
-| Single bold statement / chapter break | `dark_navy_summary`, `section_divider` |
+| Short summary (situation / complication / resolution / ask) | `card_grid` 2×2 with `insight` = the bottom line |
+| Summary as prose; as 2–4 bold takeaways | `executive_summary_paragraph`; `executive_summary_takeaways` |
+| KPIs target vs. actual with status; headline numbers (2–4) | `scorecard`; `card_grid` with `value` per card |
+| **Text** or mixed text / number table; options × criteria, as-is vs. to-be | `data_table` (all rows and columns; `highlight_rows` / `highlight_col`); `comparison_table` only when the source gives ratings |
+| 2–8 parallel *qualitative* points with detail (initiatives, principles, recommendations) | `card_grid` (sized drivers → `waterfall`; risks → `risk_heatmap` / `risk_register`; segments → `treemap` / `marimekko`) |
+| 2–6 items needing a sentence each (decisions, risks + mitigation) | `card_rows` |
 
-**Common deck types** — when the user has no outline (brief mode) or asks
-for a type of deck, start from the matching spine and adapt it:
-
-| Deck type | Typical spine |
-|---|---|
-| Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
-| Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `option_profiles` → scored on `decision_matrix` / `radar` → recommendation `card_grid` → `roadmap` |
-| Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
-| Strategy case / strategic analysis (MBA case, strategy review) | `storyline_summary` → situation `logic_grid`s (firm: need → what we do → performance → implication; competition and new entrants) + `chart`s, `cycle` for a flywheel → `strategic_challenge` → `option_profiles` → one `composite` per option (`headers` + `connectors`, `group="options"`) → `evaluation_matrix` (or `decision_matrix`) → recommendation (`card_grid` rationale + `phase_grid` / `roadmap`) → `risk_heatmap` / `risk_register` → appendix: `business_model_canvas`, `strategic_triangle`, `logic_grid(direction="down")` for PEST / five forces, `positioning_scale`, `value_chain`, `swot`, `data_table`. With 10+ slides, set chapters with `PresentationBuilder(nav=[...])` and pass `nav=` per slide |
-| Options evaluation / proposal | `option_profiles` (neutral) → one `composite` per option (`group="options"`, same regions each time) → `decision_matrix` → recommendation `card_grid` + `roadmap` → `risk_register` |
-| Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
-| Operations / process improvement | baseline `chart` → root causes `fishbone` (the problem is stated in the source) or `issue_tree` (a goal to decompose) → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
-| Board / steering update | one-page summary → `scorecard` → decisions needed → appendix tables |
-| Marketing / product plan | market & customer → positioning `data_table` → offer / `tier_ladder` → channels & campaigns `card_grid` → targets & budget `chart` |
-
-These are starting points, not rules: in source mode the source's own
+No outline (brief mode) or a deck "type" asked for → `catalog.py --spines`
+lists the usual slide order per deck type; in source mode the source's own
 structure always wins.
 
-**Parallel slides look alike.** When consecutive slides cover parallel items
-(option 1 / 2 / 3, product A / B / C, region by region, one slide per
-workstream), give them **the same template and the same block order**, and
-pass the same `group=` to each (`b.add(..., group="options")`). Readers
-compare them side by side; a different layout for one of them reads as a
-different kind of content. Inside the shared frame, swap a block only when
-that item lacks the data (e.g. no unit economics for one option → a
-priority list in the same position).
+**Parallel slides look alike.** Consecutive slides on parallel items (option
+1 / 2 / 3, region by region) get the same template, the same block order and
+the same `group=` (`b.add(..., group="options")`). Swap a block only when
+that item lacks the data. **Vary the layouts** otherwise: at most three
+slides in a row with the same template unless they share a `group`; with
+numeric series the deck needs at least one `chart`. When a run gets long,
+re-express one slide (targets as `card_grid` values, drivers as a `chart`).
 
-**Vary the layouts** across different kinds of content. At most **three**
-slides in a row with the same template unless they share a `group` (a
-`swot` counts as a `card_grid`; `card_rows` is a different layout). If the source has numeric
-series, the deck must contain at least one `chart`. When a run gets long,
-re-express one slide differently — e.g. targets as `card_grid` values, a
-list of drivers as a `chart` of their sizes, a profile or option set as a
-`data_table` (aspect × detail). The checker (step 6) flags violations.
-
-**Layout / overflow rules:**
-- Titles must fit on **one line** (the underline sits right below it):
-  ≤ ~75 characters English, ≤ ~34 Chinese characters. Put the rest of the
-  message in the subtitle or the key insight.
-- `kicker=` puts a small label above the title that says where the slide
-  sits in the argument ("Option 2 | Outsource to 3PL", "Recommendation (1/2)
-  | Roadmap"). Use it on every content slide of a structured deck; keep it
-  under ~60 characters.
-- `default_section_marker` / `section_marker` is a short label in a small
-  top-right box: ≤ 20 characters ("Reignite 2026", "Market review").
-- `cover_slide`: `client` and `date` are one short line each (e.g. "Group 8",
-  "2026"); put a long key message in `subtitle`.
-- In dense templates (`overview_areas`, `phases_table_4`, `waves_timeline_4`,
-  `gantt_timeline`) columns are < 2" wide — keep each bullet to one short
-  line there, and move detail to a `data_table` slide if needed.
-- Fit is checked by rendering (step 7), not by cutting content in advance.
-  If a slide overflows, first pick a roomier template or split the slide;
-  shorten wording only after that, and never by dropping source data.
-- Literal `[...]` text renders as gray placeholder styling on purpose. Where a
-  template accepts `subtitle`, `description` or `takeaway_header`, pass a real
-  value. Chart templates: **always pass** `description=` and `takeaway_header=`.
-- Templates default to `source="xx"` / `footnote="1. xx"`. Always pass
-  `source=` (a real cited source, or `""`) and `footnote=""`.
-- `prioritization_matrix`: pass `description=` and `legend=(green, amber, red)`.
-- `**bold**` / `{tone|…}` markup renders only in the templates `catalog.py --icons`
-  lists; anywhere else it prints literally (checker section [4]).
-- `three_trends_icons` / `five_key_areas` / `three_trends_table`: labels
-  render as-is — write `"Cost leadership"`, not `"[Cost leadership]"`.
+**Layout rules:**
+- Titles fit on **one line**: ≤ ~75 characters English, ≤ ~34 Chinese; the
+  rest goes in the subtitle or insight.
+- `kicker=` (≤ ~60 characters) puts a label above the title saying where the
+  slide sits in the argument ("Option 2 | Outsource to 3PL"); use it on every
+  content slide of a structured deck. `section_marker` / `default_section_marker`
+  ≤ 20 characters. `cover_slide`: `client` and `date` one short line each; a
+  long key message goes in `subtitle`.
+- Dense templates (`overview_areas`, `phases_table_4`, `waves_timeline_4`,
+  `gantt_timeline`) have columns < 2" wide: one short line per bullet; detail
+  goes to a `data_table` slide.
+- Fit is checked by rendering (Step 7). If a slide overflows, pick a roomier
+  template or split the slide before shortening wording, and never drop
+  source data.
+- Always pass `source=` (a real cited source, or `""`) and `footnote=""` —
+  the defaults print `xx`. Chart templates: also `description=` and
+  `takeaway_header=`; `prioritization_matrix`: `description=` and
+  `legend=(green, amber, red)`. Literal `[...]` renders as gray placeholder
+  styling on purpose; pass real values. `three_trends_icons` / `five_key_areas`
+  / `three_trends_table` print labels as written — no brackets.
 
 ## Step 5 — Write the build script
 
@@ -495,131 +394,67 @@ and never edit files under `SKILL_DIR`.
 ## Step 6 — Build, check and render (one command)
 
 ```bash
-python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source <each source file>
+python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source <each source file> --plan output/<slug>_plan.md
 ```
 
-It runs the build, prints build WARNINGs, runs the checker on the deck the
-build wrote, renders PNGs into `output/preview_<slug>/` and ends with a
-summary (build / check / render). Exit status 0 = nothing to fix. Brief mode:
-no `--source`. Add `--no-render` while iterating on fixes.
+It builds (printing every failed slide at once), checks the deck, renders PNGs
+into `output/preview_<slug>/` and ends with a summary. Exit 0 = nothing to
+fix. Brief mode: no `--source`. Add `--no-render` while iterating.
 
-The checker reports:
-1. **Numbers not found in the sources** → in source mode, remove each one or
-   trace it to the source (a derived figure like a difference is fine if you
-   say so in the report). In brief mode, list them as illustrative.
-2. **Source numbers used** → in source mode aim for ≥ 90%; for every unused
-   number either add it or say in the report why it was left out.
-3. **Thin text slides** (advisory, source mode only; charts, tables,
-   roadmaps and other visual templates are exempt) → add supporting detail
-   *if the source has it*. Never pad a slide with invented points to fill
-   space — a short slide is better than a fabricated one, and live talks are
-   meant to be light.
-4. **Leftover placeholders** → fill or remove.
-5. **Content not in the sources**
-   - a) forbidden claim types (superlatives, exclusivity / ownership,
-     credentials, partnerships, commitments — e.g. `#1`, `fastest`,
-     `proprietary`, `certified`, `partnership`) and b) quoted terms that the source doesn't
-     contain → delete the point, or trace it to the source sentence.
-   - c) vocabulary not in the sources, per slide → re-read every slide with
-     many new words and apply rule 5's test to each supporting point. Plain
-     explanatory words are fine; new facts, features, places or behaviours
-     are not.
-6. **Layout variety** → more than three slides of the same template in a
-   row (outside a `group`), a mostly numeric table shown with no chart in
-   the deck, or a `group` whose slides use different templates → fix the
-   layout (parallel slides share one template; other runs get re-expressed).
-7. **Small text** (body < 12pt; labels on diagrams < 10pt) → shorten the longest bullets, drop the
-   subtitle or the insight bar, or split the slide. The build also prints
-   `[mckinsey_pptx] WARNING ... text fitted at Npt` — treat it the same way.
-   The build also warns when a title names a diagram item but `focus` is not
-   set, or when `focus` matches no item — fix the call, don't ignore it.
-8. **Footer source line** → wrong-language label (fix `make_theme(lang=)`)
-   or a caption used as a source (use `source=""`).
-9. **Insight restates a table row** → replace with a bullet that compares or
-   connects rows, or drop it.
-10. **English default labels in a CJK deck** → build the theme with
-   `make_theme(lang=...)` (the slide language) so default labels are
-   translated, or pass the labels yourself.
-11. **Layout mix** (advisory, never fails) → text layouts on more than half
-   of the content slides, and tables that hold numbers by period. Re-check
-   those slides against the relationship table; keep the ones that really
-   are lists or where exact values per cell are the point.
+Each flagged checker section prints what to do. The rules that don't fit on a
+report line:
+- **[1] numbers not in the sources:** source mode — delete or trace to the
+  source; a derived figure is fine if the report says how it was computed.
+  Brief mode — list as illustrative.
+- **[2] coverage:** aim ≥ 90% of source numbers used; for each unused one,
+  show it or say why it was left out. Never add numbers to raise it.
+- **[5] content not in the sources:** apply rule 5's test to every point
+  flagged; plain explanatory words are fine, new facts, features, places or
+  behaviours are not.
+- **[3] [11] advisory:** a short slide beats a padded one; [11] is a prompt to
+  re-check text layouts against the relationship table.
+- **[12] plan vs deck:** update the plan row or fix the slide so the report
+  matches the deck.
+- Build WARNINGs (`text fitted at Npt`, `focus` missing or matching nothing)
+  count as findings: fix the call.
 
 Fix and rebuild until the checker is clean or every remaining item is
-explained in the report. Fix the deck, not the report: never reword a
-correct point or add words just to clear a finding (working rule 5).
+explained in the report.
 
 ## Step 7 — Inspect the previews (mandatory when they rendered)
 
-`run_deck.py` wrote `output/preview_<slug>/contact_sheet.png` (every slide
-on one image) and `slide-NN.png`. Look at the contact sheet first, then open
-single slides that look wrong. If the summary says the render was not done,
-install what it names (LibreOffice; `pip install pymupdf` if `pdftoppm` is
-missing) once — don't write your own conversion commands.
-
-Check: text running past boxes, labels hidden behind
-shapes, titles wrapping into the underline, chart labels stacking, large
-empty areas, leftover `[...]` / `xx`. Fix and rebuild. If the tools are
-missing, say the deck was not visually verified.
+Open `output/preview_<slug>/contact_sheet.png` (every slide on one image),
+then single `slide-NN.png` files that look wrong. If the summary says the
+render was not done, install what it names once (LibreOffice; `pip install
+pymupdf` if `pdftoppm` is missing) — don't write your own conversion commands.
+Check: text running past boxes, labels hidden behind shapes, titles wrapping
+into the underline, chart labels stacking, large empty areas, leftover `[...]`
+/ `xx`. Fix and rebuild. If the tools are missing, say the deck was not
+visually verified.
 
 ## Step 8 — Report back (in the user's language)
 
-- The output `.pptx` path and slide count.
-- Numbered slide list: template + one-line rationale (from the plan).
-- Source mode: section coverage ("20/20 sections, 7/7 tables"), checker
-  results, every `[待补充]` slot, any source data left out and why.
-- Checker result: copy the `== summary` lines of the last `run_deck.py` run
-  verbatim. If `check` is not `clean`, list each remaining item and why it
-  stays. Never describe a run with open items as passed.
-- If the checker printed a [11] layout-mix reminder: one line per listed
-  slide — the relationship it shows and why a text layout is still right
-  (from the plan's "Why not text cards" column). Slides you can't justify
-  get a diagram before you report.
-- Brief mode: which numbers came from the user and which are illustrative.
+- The `.pptx` path and slide count; a numbered slide list: template + one-line
+  rationale (from the plan).
+- Source mode: section coverage ("20/20 sections, 7/7 tables"), every `[待补充]`
+  slot, source data left out and why. Brief mode: which numbers came from the
+  user and which are illustrative.
+- The `== summary` lines of the last `run_deck.py` run, verbatim. If `check`
+  is not `clean`, list each remaining item and why it stays; never describe a
+  run with open items as passed.
+- For each slide in a [11] reminder: the relationship it shows and why a text
+  layout is still right (the plan's "Why not text cards"). Slides you can't
+  justify get a diagram before you report.
 - An offer to iterate ("要把第 4 页换成别的版式吗？").
-
-## Choosing between templates
-
-Start from the relationship table at the top. For each slide list 1–3 candidate templates, eliminate with their *Don't use
-when* clauses, then pick by item count (3 vs 5 vs 7), axis type (continuous
-vs categorical) and audience. Mistakes the table does not cover:
-
-- Text features in `comparison_table` Harvey balls → `data_table`.
-- `column_simple_growth` when forecast bars are needed → `column_historic_forecast`.
-- `bubble_chart` when there are quadrant labels → `growth_share` / `prioritization_matrix`.
-- `org_chart` for decomposing a problem → `issue_tree`.
-- 5+ trends in `three_trends_*` → `overview_areas`.
-- Area and width charts take values >= 0 only; for gains and losses use `waterfall`.
 
 ## Theme
 
-Always build the theme with **`make_theme`** — one call sets the slide
-language, the footer attribution and (optionally) brand colours:
-
-```python
-from mckinsey_pptx import make_theme
-make_theme()                                         # English, no attribution
-make_theme("Acme Corp")                              # English, footer "ⓒ 2026 Acme Corp"
-make_theme("Acme Corp", brand="0B4DA2")              # + brand colour (accent= optional)
-make_theme("某某公司", lang="zh")                     # Chinese slides: 微软雅黑, "资料来源："
-make_theme("某某公司", lang="zh", font="PingFang SC") # 苹方 (or "Source Han Sans SC", "DengXian")
-make_theme("<company>", lang="ko")                   # Korean slides
-```
-
-- `lang` is the language **of the slides** (step 0, rule 6), never the
-  language the user chats in. Using `lang="zh"` for an English deck puts
-  "资料来源：" in every footer — the checker flags it.
-- `lang` also translates every **default label** templates draw ("Key
-  insight" → "关键洞察", "Weighted total" → "加权总分", "Recommended" →
-  "推荐", SWOT headers, "Low / High", "Option A" → "方案 A" …). A Chinese
-  deck built without `lang="zh"` shows English labels — never do that.
-  Labels you pass explicitly are drawn as given, so write them in the slide
-  language.
-- `company`: only if the user gave it or it is in their files. Footer
-  attribution is blank otherwise (page number only).
-- `brand`: when the user names a brand colour, or the brand has a well-known
-  one. Semantic red / green / amber stay as they are.
-- Older helpers (`make_zh_theme`, `make_brand_theme`) still work.
+Always `make_theme(company, lang=<language of the slides>, brand=...)`:
+`lang="zh"` / `"ko"` also translates every default label, so a Chinese deck
+built without it shows English labels; `lang` follows the source (Step 0,
+rule 6), never the chat language. `company` only if the user gave it;
+`brand` (hex) only if they named a brand colour. Details and fonts:
+`catalog.py --theme`.
 
 ## Iterating
 

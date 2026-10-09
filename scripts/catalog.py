@@ -7,6 +7,10 @@
     python scripts/catalog.py --options       # slide-level options + common arguments
     python scripts/catalog.py --focus         # the focus= rule and which templates take it
     python scripts/catalog.py --icons         # icon names, tones and **bold** / {red|...} markup
+    python scripts/catalog.py --theme         # make_theme: language, company, brand colour
+    python scripts/catalog.py --spines        # typical slide order per type of deck (no outline)
+    python scripts/catalog.py --plan output/<slug>_plan.md
+                                              # check the slide plan, print the entries it needs
 
 Names may be template names or aliases (case-insensitive). Unknown names list the
 closest matches and exit with status 1.
@@ -26,8 +30,11 @@ _NUM = re.compile(r"^## (\d+)\. (.+)$")
 def _sections(text: str):
     """[(heading, body_lines)] split at every '# ' / '## ' heading."""
     out, cur, buf = [], None, []
+    fenced = False
     for line in text.splitlines():
-        if _HEAD.match(line):
+        if line.startswith("```"):
+            fenced = not fenced          # "# comment" inside an example is not a heading
+        if not fenced and _HEAD.match(line):
             if cur is not None:
                 out.append((cur, buf))
             cur, buf = line, []
@@ -86,7 +93,8 @@ def print_index(templates):
         a = f" [{', '.join(alias)}]" if alias else ""
         print(f"{t['num']:>2}. {main}{a} — {_short(cat, 40)} — {_short(use)}")
     print("\nAlso: --icons (icon names, tones, markup)  --guide (similar templates)  "
-          "--options (slide-level options)  --focus (focus= rule)")
+          "--options (slide-level options)  --focus (focus= rule)  --theme (make_theme)  "
+          "--spines (slide order per deck type)  --plan <plan.md> (check a plan)")
 
 
 def find(templates, key):
@@ -107,6 +115,31 @@ def _print_markup_scope():
     print()
 
 
+def plan_report(path, templates) -> int:
+    """Check a slide plan, then print the catalog entries of exactly the
+    templates it uses (one call instead of an index search + a lookup)."""
+    import plan_check
+    try:
+        rows = plan_check.parse_plan(Path(path).read_text(encoding="utf-8-sig"))
+    except OSError as e:
+        print(f"[catalog] cannot read the plan: {e}", file=sys.stderr)
+        return 1
+    problems = plan_check.check_plan(rows)
+    errors = [p for p in problems if p[0] == "error"]
+    print(f"Plan: {len(rows)} slides, {len({r['template'] for r in rows})} distinct templates.")
+    for level, row, msg in problems:
+        print(f"  {level.upper():7s} row {row}: {msg}" if row else f"  {level.upper():7s} {msg}")
+    if not problems:
+        print("  no problems")
+    print("\nEntries for the templates in this plan (arguments, Don't use when, example):\n")
+    for name in plan_check.entries_needed(rows):
+        for t in find(templates, name):
+            print("\n".join([t["head"]] + t["body"]))
+            print("\n---\n")
+    print("(Icon names, tones and markup: catalog.py --icons.)")
+    return 1 if errors else 0
+
+
 def main(argv):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -116,11 +149,18 @@ def main(argv):
     if not argv:
         print_index(templates)
         return 0
+    if argv[0] == "--plan":
+        if len(argv) != 2:
+            print("usage: catalog.py --plan output/<slug>_plan.md", file=sys.stderr)
+            return 1
+        return plan_report(argv[1], templates)
     rich = next((k for k in named if k.startswith("Rich text, tones and icons")), None)
     flags = {"--guide": ["Choosing between similar templates"],
              "--icons": [rich] if rich else [],
              "--rich": [rich] if rich else [],
              "--options": ["Slide-level options (every template)", "Common arguments"],
+             "--theme": ["Theme (make_theme)"],
+             "--spines": ["Deck spines"],
              "--focus": None}
     status = 0
     for arg in argv:

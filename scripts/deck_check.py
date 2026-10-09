@@ -17,6 +17,7 @@ Reports, per deck:
      Chinese / Korean / Japanese deck
  11. Layout mix (advisory, never fails): text layouts on more than half of the
      content slides -> a reminder to check for relationships a diagram shows better
+ 12. With --plan: slides whose template differs from the slide plan
 
 Sources: .docx .pptx .md .txt .csv .xlsx (.pdf if pypdf is installed).
 Exit code 1 if anything is flagged, so a build script can gate on it.
@@ -537,6 +538,8 @@ def main(argv=None) -> int:
                     help="source file the deck was built from (repeatable)")
     ap.add_argument("--sparse", type=float, default=0.12,
                     help="flag slides whose text fill ratio is below this")
+    ap.add_argument("--plan", help="the slide plan (output/<slug>_plan.md): report where "
+                                   "the deck differs from it")
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="print every slide's text fill ratio")
     args = ap.parse_args(argv)
@@ -617,6 +620,9 @@ def main(argv=None) -> int:
             _note("[1]", [i for i, _ in invented])
             for i, ns in invented:
                 print(f"  slide {i}: {', '.join(ns)}")
+            print("  -> source mode: delete each one or trace it to a source sentence (a "
+                  "difference or total is fine if the report says how it was computed); "
+                  "brief mode: list it as illustrative.")
         else:
             print("  none")
         used = src_nums & deck_nums_all
@@ -625,6 +631,9 @@ def main(argv=None) -> int:
         missing = sorted(src_nums - deck_nums_all, key=lambda x: (len(x), x))
         if missing:
             print(f"  not used: {', '.join(missing[:60])}{' ...' if len(missing) > 60 else ''}")
+            if cov < 0.9:
+                print("  -> aim for 90%: show each missing figure, or say in the report why it "
+                      "was left out. Never add numbers just to raise this.")
 
     print(f"\n[3] Thin text slides (advisory; source mode, text templates, fill < {args.sparse:.0%}):")
     if sparse:
@@ -771,6 +780,22 @@ def main(argv=None) -> int:
         print(f"  reminder: slide(s) {', '.join(map(str, series_tables))} show numbers by period "
               "as a table — a line chart (every series, the focal one highlighted) shows the "
               "trend; keep the table only if exact values per cell are the point.")
+
+    if args.plan:
+        import plan_check
+        print("\n[12] Plan vs deck (update the plan row, or fix the slide, so the report "
+              "matches the deck):")
+        rows = plan_check.parse_plan(Path(args.plan).read_text(encoding="utf-8-sig"))
+        built = [(template_of(s_), diagrams_of(s_)) for s_ in prs.slides]
+        diffs = plan_check.compare_with_deck(rows, built) if rows else [
+            (0, "no plan table found in the plan file")]
+        if diffs:
+            flagged = True
+            _note("[12]", [n for n, _ in diffs if n])
+            for _, msg in diffs:
+                print(f"  {msg}")
+        else:
+            print(f"  ok ({len(rows)} slides match the plan)")
 
     return 1 if flagged else 0
 

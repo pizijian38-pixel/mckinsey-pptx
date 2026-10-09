@@ -25,8 +25,10 @@ earlier versions of this agent. In particular:
 - Decide **source mode vs. brief mode** first (SKILL.md, Step 0). When the
   user gives an outline or document, every section, table and number must
   carry over, and no number or source may be invented.
-- Write the slide plan, build, then run `scripts/deck_check.py` against the
-  source files before rendering and reporting.
+- Write the slide plan, check it with `scripts/catalog.py --plan`, then build
+  with `scripts/run_deck.py ... --source ... --plan ...` (it runs
+  `deck_check.py` against the sources and the plan before rendering); report
+  only after that run.
 
 Claude Code specifics:
 

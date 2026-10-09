@@ -2290,6 +2290,56 @@ These work on every template (don't add them unless useful):
 - `source: str`, `footnote: str` — bottom-left small text.
 - `theme: Theme` — build it with `make_theme(company, lang=..., brand=...)`.
 
+# Theme (make_theme)
+
+Always build the theme with **`make_theme`** — one call sets the slide
+language, the footer attribution and (optionally) brand colours:
+
+```python
+from mckinsey_pptx import make_theme
+make_theme()                                         # English, no attribution
+make_theme("Acme Corp")                              # English, footer "ⓒ 2026 Acme Corp"
+make_theme("Acme Corp", brand="0B4DA2")              # + brand colour (accent= optional)
+make_theme("某某公司", lang="zh")                     # Chinese slides: 微软雅黑, "资料来源："
+make_theme("某某公司", lang="zh", font="PingFang SC") # 苹方 (or "Source Han Sans SC", "DengXian")
+make_theme("<company>", lang="ko")                   # Korean slides
+```
+
+- `lang` is the language **of the slides** (Step 0, rule 6), never the
+  language the user chats in. Using `lang="zh"` for an English deck puts
+  "资料来源：" in every footer — the checker flags it.
+- `lang` also translates every **default label** templates draw ("Key
+  insight" → "关键洞察", "Weighted total" → "加权总分", "Recommended" →
+  "推荐", SWOT headers, "Low / High", "Option A" → "方案 A" …). A Chinese
+  deck built without `lang="zh"` shows English labels — never do that.
+  Labels you pass explicitly are drawn as given, so write them in the slide
+  language.
+- `company`: only if the user gave it or it is in their files. Footer
+  attribution is blank otherwise (page number only).
+- `brand`: when the user names a brand colour, or the brand has a well-known
+  one. Semantic red / green / amber stay as they are.
+- Older helpers (`make_zh_theme`, `make_brand_theme`) still work.
+
+# Deck spines
+
+Starting order for a type of deck when the user gives no outline (brief mode) or asks
+for one by type. Adapt it:
+
+| Deck type | Typical spine |
+|---|---|
+| Performance review (QBR, monthly / annual results) | summary `card_grid` → `scorecard` → `chart`s of key trends → `waterfall` of the main variance → issues `card_rows` → actions / outlook |
+| Strategy / market entry | summary → market `chart`s → competition `data_table` / `matrix_2x2` → options `option_profiles` → scored on `decision_matrix` / `radar` → recommendation `card_grid` → `roadmap` |
+| Project / programme status | status `scorecard` → `roadmap` with milestones → risks `card_rows` → decisions needed `card_rows` |
+| Strategy case / strategic analysis (MBA case, strategy review) | `storyline_summary` → situation `logic_grid`s (firm: need → what we do → performance → implication; competition and new entrants) + `chart`s, `cycle` for a flywheel → `strategic_challenge` → `option_profiles` → one `composite` per option (`headers` + `connectors`, `group="options"`) → `evaluation_matrix` (or `decision_matrix`) → recommendation (`card_grid` rationale + `phase_grid` / `roadmap`) → `risk_heatmap` / `risk_register` → appendix: `business_model_canvas`, `strategic_triangle`, `logic_grid(direction="down")` for PEST / five forces, `positioning_scale`, `value_chain`, `swot`, `data_table`. With 10+ slides, set chapters with `PresentationBuilder(nav=[...])` and pass `nav=` per slide |
+| Options evaluation / proposal | `option_profiles` (neutral) → one `composite` per option (`group="options"`, same regions each time) → `decision_matrix` → recommendation `card_grid` + `roadmap` → `risk_register` |
+| Investment / business case | ask (`dark_navy_summary`) → problem / opportunity → options → financials `chart` / `waterfall` → risks → `timeline` |
+| Operations / process improvement | baseline `chart` → root causes `fishbone` (the problem is stated in the source) or `issue_tree` (a goal to decompose) → initiatives `matrix_2x2` → impact `waterfall` → `roadmap` |
+| Board / steering update | one-page summary → `scorecard` → decisions needed → appendix tables |
+| Marketing / product plan | market & customer → positioning `data_table` → offer / `tier_ladder` → channels & campaigns `card_grid` → targets & budget `chart` |
+
+These are starting points, not rules: in source mode the source's own
+structure always wins.
+
 # Building a deck
 
 Chinese deck:
