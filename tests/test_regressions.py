@@ -755,9 +755,23 @@ def test_catalog_examples_raise_no_invented_numbers():
     they were flagged, a correct decision_matrix or marimekko deck could never
     pass, and agents rewrote them as plain tables to get a clean run."""
     import re
+    import os
     cat = (ROOT / "mckinsey_pptx" / "agent" / "CATALOG.md").read_text(encoding="utf8")
     bad = []
+    cwd = os.getcwd()
     with tempfile.TemporaryDirectory() as d:
+        os.chdir(d)                     # examples save to output/deck.pptx
+        os.makedirs("output", exist_ok=True)
+        try:
+            _raise_no_invented_numbers(cat, d, bad)
+        finally:
+            os.chdir(cwd)
+    assert not bad, "\n".join(bad)
+
+
+def _raise_no_invented_numbers(cat, d, bad):
+    import re
+    if True:
         for part in re.split(r"\n## ", cat):
             head = part.splitlines()[0][:50]
             for blk in re.findall(r"```python\n(.*?)```", part, re.S):
@@ -776,7 +790,6 @@ def test_catalog_examples_raise_no_invented_numbers():
                 hits = _section(_check_report(deck, src), "[1] Numbers", "[2] Source")
                 if hits:
                     bad.append(f"{head}: {hits}")
-    assert not bad, "\n".join(bad)
 
 
 def test_invented_numbers_are_still_flagged():
