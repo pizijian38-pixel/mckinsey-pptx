@@ -1191,6 +1191,43 @@ def test_read_source_saves_long_text_and_finds_the_attachment():
             os.chdir(cwd)
 
 
+def _eval_plan(case, pick):
+    """A plan for an eval case: `pick(slide answers)` -> Template(s) cell."""
+    import json
+    answers = json.loads((ROOT / "tests" / "selection_eval" / case / "answers.json")
+                         .read_text(encoding="utf-8"))["slides"]
+    rows = ["| # | Source section | Relationship | Template(s) | Why not text cards |",
+            "|---|---|---|---|---|"]
+    for k, a in answers.items():
+        rows.append(f"| {k} | Slide {k}: x | {a['relationship']} | {pick(a)} | list |")
+    return "\n".join(rows)
+
+
+def test_selection_eval_scores_the_reference_and_penalises_text():
+    """The eval answer keys use real template names, the reference plan scores
+    100%, an all-text plan scores low, and the fishbone trap costs a point."""
+    sys.path.insert(0, str(ROOT / "tests" / "selection_eval"))
+    import score
+
+    def ref(a):
+        t = a["preferred"][0]
+        return f"composite[diagram:{t[10:]} + table]" if t.startswith("composite:") else t
+    with tempfile.TemporaryDirectory() as d:
+        for case in score.CASES:
+            p = Path(d) / f"{case}_plan.md"
+            p.write_text(_eval_plan(case, ref), encoding="utf-8")
+            _, total, best, st = score.score_case(case, p)
+            assert total == best and st["missing"] == 0, (case, total, best)
+            p.write_text(_eval_plan(case, lambda a: "cover_slide" if a["preferred"] == ["cover_slide"]
+                                    else "card_grid"), encoding="utf-8")
+            _, total, best, st = score.score_case(case, p)
+            assert total / best < 0.3 and st["diagram_hits"] == 0, (case, total, best)
+        p = Path(d) / "qbr_plan.md"
+        p.write_text(_eval_plan("qbr", lambda a: "fishbone" if "trap" in a else ref(a)), encoding="utf-8")
+        _, total, best, st = score.score_case("qbr", p)
+        assert st["trap"] == 1 and total == best - 3, (total, best)
+
+
 def test_catalog_output_fits_a_tail_window():
     """Antigravity shows only the last ~8,100 characters of a command's output.
     The index lost its first 34 templates, multi-template lookups lost their

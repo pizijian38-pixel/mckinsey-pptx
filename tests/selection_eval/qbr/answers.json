@@ -1,0 +1,15 @@
+{
+  "case": "qbr",
+  "slides": {
+    "1":  {"relationship": "cover", "preferred": ["cover_slide"]},
+    "2":  {"relationship": "several series over 4 periods", "preferred": ["chart", "line_chart", "grouped_column_chart", "stacked_column_chart"], "acceptable": []},
+    "3":  {"relationship": "a whole split into 4 parts", "preferred": ["chart", "treemap"], "acceptable": []},
+    "4":  {"relationship": "change between two values explained by drivers", "preferred": ["waterfall"], "acceptable": ["chart"]},
+    "5":  {"relationship": "gap between actual and target per item", "preferred": ["dumbbell"], "acceptable": ["chart", "scorecard"]},
+    "6":  {"relationship": "issues to address, no single stated effect (trap: fishbone)", "preferred": ["card_rows", "logic_grid", "card_grid"], "acceptable": ["data_table"], "trap": ["fishbone"], "list": true},
+    "7":  {"relationship": "decomposing a question into levers", "preferred": ["issue_tree"], "acceptable": ["logic_grid"]},
+    "8":  {"relationship": "text table (initiative x owner x status)", "preferred": ["data_table"], "acceptable": ["scorecard"], "list": true},
+    "9":  {"relationship": "really a list of parallel priorities", "preferred": ["card_grid", "card_rows"], "acceptable": [], "list": true},
+    "10": {"relationship": "dated events", "preferred": ["timeline"], "acceptable": ["roadmap"]}
+  }
+}

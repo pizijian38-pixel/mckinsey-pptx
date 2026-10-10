@@ -89,6 +89,8 @@ def parse_plan(text: str) -> List[Dict]:
                         cols["template"] = i
                     elif c.startswith("why not"):
                         cols["why"] = i
+                    elif c.startswith("source section") or c == "source":
+                        cols["section"] = i
             continue
 
         def cell(key):
@@ -98,7 +100,8 @@ def parse_plan(text: str) -> List[Dict]:
         n = cell("n")
         rows.append({"n": int(n) if n.isdigit() else None,
                      "relationship": cell("relationship"), "template": template,
-                     "parts": parts, "why": cell("why"), "raw": cell("template")})
+                     "parts": parts, "why": cell("why"), "raw": cell("template"),
+                     "section": cell("section")})
     return rows
 
 

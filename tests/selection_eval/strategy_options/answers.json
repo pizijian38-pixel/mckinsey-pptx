@@ -1,0 +1,16 @@
+{
+  "case": "strategy_options",
+  "slides": {
+    "1":  {"relationship": "cover", "preferred": ["cover_slide"]},
+    "2":  {"relationship": "SCQA executive summary", "preferred": ["storyline_summary"], "acceptable": ["card_grid", "executive_summary_takeaways"]},
+    "3":  {"relationship": "a whole split into 6 parts", "preferred": ["treemap"], "acceptable": ["chart"]},
+    "4":  {"relationship": "overlapping groups", "preferred": ["venn"], "acceptable": []},
+    "5":  {"relationship": "positioning on two dimensions", "preferred": ["matrix_2x2", "bubble_chart"], "acceptable": ["positioning_scale", "prioritization_matrix"]},
+    "6":  {"relationship": "options with the same facets", "preferred": ["option_profiles"], "acceptable": ["data_table", "composite"]},
+    "7":  {"relationship": "options profiled on criteria on one scale", "preferred": ["radar"], "acceptable": ["decision_matrix", "evaluation_matrix"]},
+    "8":  {"relationship": "reinforcing loop", "preferred": ["cycle"], "acceptable": []},
+    "9":  {"relationship": "layers that build on each other", "preferred": ["layer_stack"], "acceptable": []},
+    "10": {"relationship": "one concept and its parts", "preferred": ["hub_spoke"], "acceptable": []},
+    "11": {"relationship": "plan over time in phases", "preferred": ["roadmap", "timeline", "phase_grid"], "acceptable": ["gantt_timeline"]}
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "case": "market_entry",
+  "slides": {
+    "1":  {"relationship": "cover", "preferred": ["cover_slide"]},
+    "2":  {"relationship": "whole split two ways (country x channel)", "preferred": ["marimekko"], "acceptable": ["treemap", "chart"]},
+    "3":  {"relationship": "several players over 5 periods", "preferred": ["chart", "line_chart"], "acceptable": ["bump"]},
+    "4":  {"relationship": "gap between two values per item", "preferred": ["dumbbell"], "acceptable": ["chart", "slopegraph"]},
+    "5":  {"relationship": "narrowing quantity through stages", "preferred": ["funnel"], "acceptable": ["chart"]},
+    "6":  {"relationship": "volume splitting through stages", "preferred": ["sankey"], "acceptable": ["process_flow"]},
+    "7":  {"relationship": "customer steps with feelings / pain points", "preferred": ["journey"], "acceptable": ["process_flow"]},
+    "8":  {"relationship": "options scored on weighted criteria", "preferred": ["decision_matrix"], "acceptable": ["evaluation_matrix", "radar"]},
+    "9":  {"relationship": "risks by probability x impact", "preferred": ["risk_heatmap"], "acceptable": ["risk_register", "matrix_2x2"]},
+    "10": {"relationship": "really a list (no order, no quantity)", "preferred": ["card_grid", "card_rows"], "acceptable": ["data_table"], "list": true},
+    "11": {"relationship": "plan over time with phases and milestones", "preferred": ["roadmap", "timeline", "phase_grid"], "acceptable": ["gantt_timeline", "process_flow"]}
+  }
+}
