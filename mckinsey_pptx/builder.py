@@ -15,13 +15,15 @@ from typing import Sequence, Optional, Dict, Any, Iterable, List
 
 from .base import init_presentation, apply_east_asian_font
 from .theme import Theme, DEFAULT_THEME
+from . import validate
 from .slides import (
     executive_summary, assessment_table, bubble_chart, column_chart,
     trends_slides, org_charts, timeline_slides, summary_slide,
     structure_slides, comparison_slides, extra_charts, process_extras,
     table_slides, card_slides, native_chart, ladder_slides,
     finance_slides, plan_slides, matrix_slides, composite_slides,
-    evaluation_slides,
+    evaluation_slides, logic_slides, analysis_slides, framework_slides,
+    share_slides, change_slides, diagram_slides, grid_slides, flow_slides,
 )
 
 
@@ -95,6 +97,49 @@ _REGISTRY = {
     "scoring_matrix": evaluation_slides.add_decision_matrix,
     "risk_register": evaluation_slides.add_risk_register,
     "price_ladder": ladder_slides.add_tier_ladder,
+
+    # Logic (one page that carries an argument)
+    "logic_grid": logic_slides.add_logic_grid,
+    "logic_chain": logic_slides.add_logic_grid,
+    "strategic_challenge": logic_slides.add_strategic_challenge,
+    "key_question": logic_slides.add_strategic_challenge,
+    "storyline_summary": logic_slides.add_storyline_summary,
+    "cycle": analysis_slides.add_cycle,
+    "flywheel": analysis_slides.add_cycle,
+    "risk_heatmap": analysis_slides.add_risk_heatmap,
+    "risk_matrix": analysis_slides.add_risk_heatmap,
+    "positioning_scale": analysis_slides.add_positioning_scale,
+    "value_chain": analysis_slides.add_value_chain,
+    "phase_grid": plan_slides.add_phase_grid,
+    "implementation_grid": plan_slides.add_phase_grid,
+    "evaluation_matrix": evaluation_slides.add_evaluation_matrix,
+    "business_model_canvas": framework_slides.add_business_model_canvas,
+    "bmc": framework_slides.add_business_model_canvas,
+    "strategic_triangle": framework_slides.add_strategic_triangle,
+    "hub_spoke": framework_slides.add_hub_spoke,
+
+    # Part-of-whole, flows, change, qualitative diagrams
+    "marimekko": share_slides.add_marimekko,
+    "mekko": share_slides.add_marimekko,
+    "treemap": share_slides.add_treemap,
+    "sankey": share_slides.add_sankey,
+    "slopegraph": change_slides.add_slopegraph,
+    "slope": change_slides.add_slopegraph,
+    "dumbbell": change_slides.add_dumbbell,
+    "fishbone": diagram_slides.add_fishbone,
+    "ishikawa": diagram_slides.add_fishbone,
+    "journey": diagram_slides.add_journey,
+    "customer_journey": diagram_slides.add_journey,
+    "heatmap": grid_slides.add_heatmap,
+    "heat_map": grid_slides.add_heatmap,
+    "radar": grid_slides.add_radar,
+    "spider": grid_slides.add_radar,
+    "venn": grid_slides.add_venn,
+    "bump": change_slides.add_bump,
+    "rank_chart": change_slides.add_bump,
+    "swimlane": flow_slides.add_swimlane,
+    "layer_stack": flow_slides.add_layer_stack,
+    "layers": flow_slides.add_layer_stack,
 
     # Summary
     "dark_navy_summary": summary_slide.add_dark_navy_summary,
@@ -249,10 +294,219 @@ def add_kicker(slide, text, theme):
     letter_space(p, 200)
 
 
+def add_nav(slide, sections, current, theme):
+    """Section breadcrumb at the top-left: one small chevron per section, the
+    current one dark (where the slide sits in the deck's storyline)."""
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+    from pptx.util import Inches, Emu
+    from .base import write_paragraph
+    from .design import tint
+    from .metrics import fit_one_line, text_width_pt
+    layout, pal = theme.layout, theme.palette
+    avail = (layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
+             - layout.section_marker_w_in - 0.3)
+    n = len(sections)
+    cur = current if isinstance(current, int) else (
+        list(sections).index(current) if current in sections else -1)
+    if cur < 0:
+        import sys
+        print(f"[mckinsey_pptx] WARNING nav: {current!r} is not one of {list(sections)}",
+              file=sys.stderr)
+    size = 10
+    ws = [text_width_pt(s, size, True) / 72 / 0.9 + 0.45 for s in sections]
+    if sum(ws) > avail:
+        k = avail / sum(ws)
+        ws = [w * k for w in ws]
+        size = min(fit_one_line(s, w - 0.4, 10, 7, True) for s, w in zip(sections, ws))
+    x, y, h = layout.margin_left_in, 0.13, 0.26
+    for i, (s, w) in enumerate(zip(sections, ws)):
+        shp = slide.shapes.add_shape(MSO_SHAPE.PENTAGON if i == 0 else MSO_SHAPE.CHEVRON,
+                                     Inches(x), Inches(y), Inches(w + 0.08), Inches(h))
+        shp.adjustments[0] = 0.4
+        shp.shadow.inherit = False
+        shp.line.fill.background()
+        shp.fill.solid()
+        on = i == cur
+        shp.fill.fore_color.rgb = pal.mid_blue if on else tint(pal.mid_blue, 0.88)
+        tf = shp.text_frame
+        tf.margin_left, tf.margin_right = Inches(0.18), Inches(0.08)
+        tf.margin_top = tf.margin_bottom = Emu(0)
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        tf.word_wrap = False
+        write_paragraph(tf, s, size=size, bold=on, color=pal.white if on else pal.footer_gray,
+                        family=theme.typography.family, align=PP_ALIGN.CENTER, first=True)
+        x += w + 0.02
+
+
+# ---------- focus check ----------
+
+def _labels(v):
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, dict):
+        return [v.get(k) for k in ("title", "label", "name", "head") if v.get(k)][:1]
+    return []
+
+
+def focus_candidates(name: str, kw: Dict[str, Any]) -> List[str]:
+    """Item labels of a focus-capable template (None: template has no focus)."""
+    L: List[str] = []
+    if name == "growth_share":
+        for b in kw.get("bus", []):
+            L += _labels(b)
+    elif name == "matrix_2x2":
+        for q in kw.get("quadrants", []):
+            L += _labels(q)
+        for p in kw.get("points", []):
+            L += _labels(p)
+    elif name == "prioritization_matrix":
+        for it in kw.get("items", []):
+            L += _labels(it)
+    elif name == "cycle":
+        for st in kw.get("steps") or [x for p in kw.get("paths", []) for x in p]:
+            L += _labels(st)
+    elif name == "risk_heatmap":
+        for r in kw.get("risks", []):
+            L += _labels(r)
+    elif name in ("process_flow_horizontal", "funnel"):
+        for st in kw.get("steps", kw.get("stages", [])):
+            L += _labels(st)
+    elif name == "issue_tree":
+        for m in kw.get("main_drivers", []):
+            L += _labels(m)
+            for s2 in m.get("secondaries", []) or []:
+                L += _labels(s2)
+                for u in s2.get("underlying", []) or []:
+                    L += _labels(u)
+    elif name == "org_chart":
+        for b in kw.get("branches", []):
+            L += _labels(b) + list(b.get("reports", []) or [])
+    elif name == "hub_spoke":
+        for sp in kw.get("spokes", []):
+            L += _labels(sp)
+    elif name == "marimekko":
+        L += [c.get("name", "") for c in kw.get("columns", [])] + list(kw.get("series", []))
+    elif name == "treemap":
+        for it in kw.get("items", []):
+            L += _labels(it)
+    elif name == "sankey":
+        for f in kw.get("flows", []):
+            L += [f.get("from", ""), f.get("to", "")]
+    elif name in ("slopegraph", "journey"):
+        for it in kw.get("series", kw.get("stages", [])):
+            L += _labels(it)
+    elif name == "dumbbell":
+        for it in kw.get("rows", []):
+            L += _labels(it)
+    elif name == "heatmap":
+        L += list(kw.get("rows", [])) + list(kw.get("columns", []))
+    elif name in ("radar", "bump"):
+        for it in kw.get("series", []):
+            L += _labels(it)
+    elif name == "venn":
+        L += [s.get("name", "") for s in kw.get("sets", [])]
+    elif name == "swimlane":
+        for it in kw.get("steps", []):
+            L += _labels(it)
+    elif name == "layer_stack":
+        for it in kw.get("layers", []):
+            L += _labels(it)
+    elif name == "fishbone":
+        for c in kw.get("causes", []):
+            L += [c.get("category", "")] + list(c.get("items", []))
+    else:
+        return None
+    return [str(x) for x in L if x]
+
+
+def title_names(title: str, labels: Sequence[str]) -> List[str]:
+    """Labels the action title mentions (whole words for Latin, substrings for CJK)."""
+    import re
+    from .metrics import _CJK, plain
+    t = plain(title).lower()
+    hits = []
+    for lab in labels:
+        l_ = plain(lab).strip().lower()
+        if not l_:
+            continue
+        if _CJK.search(l_):
+            if len(l_) >= 2 and l_ in t:
+                hits.append(lab)
+        elif len(l_) >= 3 and re.search(r"(?<!\w)" + re.escape(l_) + r"(?!\w)", t):
+            hits.append(lab)
+    return hits
+
+
+TITLE_MIN_PT = 20       # below this the title reads as a different size per slide
+
+
+def _check_title_length(name, kw):
+    """A title that only fits one line by shrinking below TITLE_MIN_PT (or not at
+    all) is too long: the Crest run produced 14 titles of 79-97 characters."""
+    title = kw.get("title")
+    if name in _FULL_BLEED or not isinstance(title, str):
+        return
+    from .metrics import fit_one_line, plain, text_width_pt  # noqa: F401
+    theme = kw.get("theme")
+    lay, typo = theme.layout, theme.typography
+    width = (lay.slide_width_in - lay.margin_left_in - lay.margin_right_in
+             - lay.section_marker_w_in - 0.2)
+    size = fit_one_line(title, width, typo.title_size, min(18, typo.title_size), bold=True)
+    if size < TITLE_MIN_PT:
+        import sys
+        fits = text_width_pt(plain(title), size, bold=True) / 72 <= width
+        # characters to cut so the title fits one line at TITLE_MIN_PT
+        over = text_width_pt(plain(title), TITLE_MIN_PT, bold=True) / 72 / (width * 0.95)
+        cut = max(1, int(len(title) * (1 - 1 / over)) + 1) if over > 1 else 1
+        print(f"[mckinsey_pptx] WARNING {name} \"{title[:40]}\": title "
+              + (f"shrinks to {size}pt" if fits else "wraps") + f" — cut about {cut} "
+              "characters (rest to the subtitle)", file=sys.stderr)
+
+
+def _check_title_focus(name, kw):
+    labels = focus_candidates(name, kw)
+    if labels is None or kw.get("focus") is not None or kw.get("highlight") is not None:
+        return
+    hits = title_names(kw.get("title", ""), labels)
+    # A title that names several items ("A, B and C constrain growth") makes no
+    # claim about one of them: no focal item, so no warning. Labels nested in
+    # another hit ("Scale" in "Scale-up") count as one item.
+    low = [h.lower() for h in set(hits)]
+    distinct = [h for h in low if not any(h != o and h in o for o in low)]
+    if len(distinct) > 1:
+        return
+    if hits:
+        import sys
+        from .metrics import plain
+        t = plain(kw.get("title", "")).lower()
+        # the item named first is usually the subject; longer label wins a tie
+        hits = sorted(set(hits), key=lambda h: (t.find(plain(h).lower()), -len(h)))
+        print(f"[mckinsey_pptx] WARNING {name} \"{str(kw.get('title', ''))[:50]}\": the title "
+              f"names {hits[0]!r} — pass focus={hits[0]!r} so that item carries the "
+              f"accent, or focus=[] if the word is incidental and no item is focal.",
+              file=sys.stderr)
+
+
 def template_name(fn) -> str:
     """Canonical template name for a registry callable (aliases collapse)."""
     canon = {v: k for k, v in reversed(list(_REGISTRY.items()))}
     return canon.get(fn, fn.__name__)
+
+
+class BuildErrors(Exception):
+    """Raised by PresentationBuilder.save() when slides failed to build; the
+    message lists every failure so they can be fixed in one pass."""
+
+
+def _where(exc: BaseException) -> str:
+    """Innermost frame inside this package: 'share_slides.py:147 add_treemap'."""
+    import os
+    import traceback
+    for fr in reversed(traceback.extract_tb(exc.__traceback__)):
+        if os.sep + "mckinsey_pptx" + os.sep in fr.filename:
+            return f"{os.path.basename(fr.filename)}:{fr.lineno} {fr.name}"
+    return ""
 
 
 class PresentationBuilder:
@@ -260,8 +514,23 @@ class PresentationBuilder:
 
     def __init__(self, theme: Theme = DEFAULT_THEME, *,
                  auto_page_numbers: bool = True,
-                 default_section_marker: Optional[str] = None):
+                 default_section_marker: Optional[str] = None,
+                 nav: Optional[Sequence[str]] = None,
+                 on_error: str = "collect"):
+        """nav: the deck's chapters (["Overview", "Situation", ...]); a slide
+        added with nav="Situation" (or an index) shows the breadcrumb bar.
+
+        on_error: "collect" (default) - a slide that cannot be built is
+        recorded and the build goes on; save() then raises BuildErrors listing
+        every failure, so one run exposes all mistakes. "raise" - the first
+        failure raises from add() (library use, tests)."""
+        if on_error not in ("collect", "raise"):
+            raise ValueError("on_error must be 'collect' or 'raise'")
+        self.on_error = on_error
+        self.errors: List[Dict[str, Any]] = []
+        self._calls = 0                 # add() calls so far: the slide's position in the script
         self.theme = theme
+        self.nav = list(nav) if nav else None
         self.auto_page_numbers = auto_page_numbers
         self.default_section_marker = default_section_marker
         self.prs = init_presentation(theme)
@@ -269,10 +538,14 @@ class PresentationBuilder:
 
     # Direct add by type
     def add(self, slide_type: str, **kwargs):
+        self._calls += 1
         fn = _REGISTRY.get(slide_type)
         if fn is None:
-            raise ValueError(f"Unknown slide type: {slide_type}. "
-                             f"Available: {sorted(_REGISTRY)}")
+            if self.on_error == "raise":
+                raise ValueError(f"Unknown slide type: {slide_type}. "
+                                 f"Available: {sorted(_REGISTRY)}")
+            self._fail(slide_type, kwargs, [validate.unknown_template(slide_type, list(_REGISTRY))])
+            return None
         if self.auto_page_numbers:
             self._page += 1
             kwargs.setdefault("page_number", self._page)
@@ -282,14 +555,46 @@ class PresentationBuilder:
         kwargs.setdefault("theme", self.theme)
         kicker = kwargs.pop("kicker", None)
         group = kwargs.pop("group", None)
-        out = fn(self.prs, **kwargs)
-        slide = self.prs.slides[-1]
+        nav = kwargs.pop("nav", None)
         name = template_name(fn)
-        if kicker and name not in _FULL_BLEED:
+        found = validate.problems(name, fn, kwargs)
+        errs = [m for level, m in found if level == "error"]
+        for level, m in found:
+            if level == "warning":
+                import sys
+                print(f"[mckinsey_pptx] WARNING {name} \"{str(kwargs.get('title', ''))[:50]}\": {m}",
+                      file=sys.stderr)
+        if errs:
+            if self.on_error == "raise":
+                raise TypeError(f"{name}: " + "; ".join(errs))
+            self._fail(name, kwargs, errs)
+            return None
+        _check_title_focus(name, kwargs)
+        _check_title_length(name, kwargs)
+        if self.on_error == "raise":
+            out = fn(self.prs, **kwargs)
+        else:
+            try:
+                out = fn(self.prs, **kwargs)
+            except Exception as e:  # noqa: BLE001 - reported together at save()
+                self._fail(name, kwargs, [f"{type(e).__name__}: {e}"
+                                          + (f"   [{_where(e)}]" if _where(e) else "")], hint=True)
+                return None
+        slide = self.prs.slides[-1]
+        if nav is not None and self.nav and name not in _FULL_BLEED:
+            # one line of space above the title: the breadcrumb replaces the kicker
+            add_nav(slide, self.nav, nav, kwargs["theme"])
+        elif kicker and name not in _FULL_BLEED:
             add_kicker(slide, kicker, kwargs["theme"])
         # Record template (+ parallel group) on the slide (<p:cSld name>) so
         # scripts/deck_check.py can check layout variety and consistency.
-        slide._element.cSld.set("name", "mp:" + name + (f"|{group}" if group else ""))
+        rec = "mp:" + name + (f"|{group}" if group else "")
+        if name == "composite":
+            from .components import diagram_templates
+            drawn = diagram_templates(kwargs.get("columns"))
+            if drawn:     # the checker holds diagram labels to the 10pt floor
+                rec += ("" if group else "|") + "|d=" + ",".join(drawn)
+        slide._element.cSld.set("name", rec)
         return out
 
     # Adaptive add (type optional)
@@ -301,7 +606,25 @@ class PresentationBuilder:
     def add_specs(self, specs: Iterable[Dict[str, Any]]):
         return [self.add_spec(s) for s in specs]
 
+    def _fail(self, name, kwargs, messages, hint=False):
+        self.errors.append({"slide": self._calls, "template": name,
+                            "title": str(kwargs.get("title", ""))[:60],
+                            "messages": list(messages), "hint": hint})
+
+    def report(self) -> str:
+        lines = [f"BUILD FAILED - {len(self.errors)} slide(s) could not be built; "
+                 "fix all of them, then run again:"]
+        for e in self.errors:
+            lines.append(f"  slide {e['slide']} - {e['template']}"
+                         + (f" \"{e['title']}\"" if e["title"] else ""))
+            lines += [f"      {m}" for m in e["messages"]]
+            lines.append(f"      -> python scripts/catalog.py {e['template']}  "
+                         "(arguments and a runnable example)")
+        return "\n".join(lines)
+
     def save(self, path: str):
+        if self.errors:
+            raise BuildErrors(self.report())
         ea = self.theme.typography.east_asian_family
         if ea:
             apply_east_asian_font(self.prs, ea)

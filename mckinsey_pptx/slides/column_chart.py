@@ -15,6 +15,7 @@ from ..base import (
     blank_slide, add_chrome, add_rect, add_oval, add_line, add_textbox,
     write_paragraph,
 )
+from ..design import mark_axis
 from ..theme import Theme, DEFAULT_THEME
 
 
@@ -175,8 +176,8 @@ def _draw_axis_and_bars(slide, theme, *, chart_box, data_label,
         ty = plot_bottom - (tval / axis_top) * plot_h if axis_top > 0 else plot_bottom
         add_line(slide, plot_left, ty, plot_right, ty,
                  color=pal.grid_gray, width_pt=0.5)
-        tb = add_textbox(slide, cleft, ty - 0.10, 0.5, 0.22,
-                         anchor=MSO_ANCHOR.MIDDLE)
+        tb = mark_axis(add_textbox(slide, cleft, ty - 0.10, 0.5, 0.22,
+                                   anchor=MSO_ANCHOR.MIDDLE))
         write_paragraph(tb.text_frame, f"{int(round(tval))}",
                         size=typo.chart_axis_size, color=pal.text_dark,
                         family=typo.family, align=PP_ALIGN.RIGHT, first=True)

@@ -15,6 +15,10 @@ from ..base import (
     write_paragraph, add_subtitle_placeholder,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..design import (check_focus, eyebrow, fit_one_line, fit_size, focus_tag, has_focus,
+                      is_focus, text_height_in, warn_small)
+from ..labels import loc
+from ..design import mark_index
 
 
 # ---------- Process flow (horizontal) ----------
@@ -23,74 +27,91 @@ def add_process_flow_horizontal(prs, *,
                                 title="[Process flow / Insert action title]",
                                 subtitle: Optional[str] = None,
                                 steps: Sequence[Dict],
+                                focus=None,
+                                focus_label: Optional[str] = "We are here",
                                 page_number=None,
                                 section_marker="Section marker",
                                 source="xx", footnote="1. xx",
                                 theme: Theme = DEFAULT_THEME):
-    """steps: [{"name": "Step 1", "description": "..."}]
-    Renders 4-6 numbered chevron tiles in a row with descriptions below.
+    """steps: [{"name": "Step 1", "description": "...", "items"?: ["...", ...]}]
+    3-6 chevrons in one navy row with numbered eyebrows; under each, the
+    description (bold) and optional bullets, separated by hairlines.
+    focus: the step the title is about (name or index) — it stays navy with a tag
+           (focus_label), the other chevrons turn light grey.
     """
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, page_number=page_number,
                section_marker=section_marker, source=source, footnote=footnote)
     pal, typo, layout = theme.palette, theme.typography, theme.layout
-
+    left = layout.margin_left_in
+    width = layout.slide_width_in - left - layout.margin_right_in
+    top = 1.65
     if subtitle:
-        tb = add_textbox(slide, layout.margin_left_in, 1.30,
-                         layout.slide_width_in - layout.margin_left_in
-                         - layout.margin_right_in, 0.32)
+        tb = add_textbox(slide, left, 1.30, width, 0.32)
         write_paragraph(tb.text_frame, subtitle, size=typo.body_size,
-                        color=pal.placeholder_gray, family=typo.family,
-                        first=True)
-
-    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
-    body_top = 2.0
-    body_bottom = layout.footer_top_in - 0.30
+                        color=pal.placeholder_gray, family=typo.family, first=True)
+        top = 1.85
+    names = [st.get("name", f"Step {i + 1}") for i, st in enumerate(steps)]
+    check_focus("process_flow", title, focus, names)
+    focused = has_focus(focus)
     n = max(len(steps), 1)
-
-    chev_h = 0.85
-    overlap = 0.30
-    chev_w = (width + (n - 1) * overlap) / n
-    chev_y = body_top
-    # Alternate fills for visual rhythm
-    fills = [pal.deep_navy, pal.bright_blue, pal.deep_navy, pal.bright_blue,
-             pal.deep_navy, pal.bright_blue]
-
+    overlap, ch = 0.22, 0.72
+    cw = (width + (n - 1) * overlap) / n
+    col_w = cw - overlap
+    name_size = min([fit_one_line(nm, cw - 0.6, 14, 10, True) for nm in names] or [14])
+    body_top = top + 0.32 + ch + 0.25
+    body_bottom = layout.footer_top_in - 0.3
+    descs = [st.get("description", "") for st in steps]
+    dsize = min([fit_size([d] + list(st.get("items", [])), col_w - 0.3,
+                          body_bottom - body_top, max_size=13, min_size=10,
+                          para_gap_pt=4, indent_in=0.25)
+                 for d, st in zip(descs, steps)] or [12])
+    warn_small("process_flow", title, dsize, "Shorten the step descriptions.")
+    col_h = max([text_height_in([d] + list(st.get("items", [])), col_w - 0.3, dsize,
+                                para_gap_pt=5, indent_in=0.25)
+                 for d, st in zip(descs, steps)] or [0.5]) + 0.15
     for i, st in enumerate(steps):
-        cx = layout.margin_left_in + i * (chev_w - overlap)
-        fill = fills[i % len(fills)]
-        s = slide.shapes.add_shape(MSO_SHAPE.CHEVRON,
-                                   Inches(cx), Inches(chev_y),
-                                   Inches(chev_w), Inches(chev_h))
-        s.shadow.inherit = False
-        s.fill.solid(); s.fill.fore_color.rgb = fill
-        s.line.fill.background()
-
-        # Number circle inside chevron
-        n_d = 0.42
-        nx = cx + 0.18
-        ny = chev_y + (chev_h - n_d) / 2
-        add_oval(slide, nx, ny, n_d, n_d, fill=pal.white)
-        tb = add_textbox(slide, nx, ny, n_d, n_d, anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, str(i + 1).zfill(2),
-                        size=typo.body_size - 1, bold=True,
-                        color=fill, family=typo.family,
-                        align=PP_ALIGN.CENTER, first=True)
-
-        # Step name (overlay text)
-        tb = add_textbox(slide, nx + n_d + 0.10, chev_y,
-                         chev_w - n_d - 0.55, chev_h, anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, st.get("name", f"Step {i+1}"),
-                        size=typo.body_size, bold=True, color=pal.white,
-                        family=typo.family, first=True)
-
-        # Description below
-        desc_top = chev_y + chev_h + 0.20
-        tb = add_textbox(slide, cx + 0.10, desc_top,
-                         chev_w - overlap - 0.10, body_bottom - desc_top - 0.10)
-        write_paragraph(tb.text_frame, st.get("description", ""),
-                        size=typo.body_size - 1, color=pal.text_dark,
-                        family=typo.family, first=True)
+        x = left + i * (cw - overlap)
+        f = is_focus(focus, i, names[i])
+        dark = f or not focused
+        fill = pal.deep_navy if dark else pal.soft_gray
+        mark_index(eyebrow(slide, theme, x + (0.12 if i == 0 else 0.3), top, 1.3,
+                           f"{loc(theme, 'Step')} {i + 1:02d}",
+                           color=pal.bright_blue if f else pal.footer_gray, size=9))
+        if f and focus_label:
+            focus_tag(slide, theme, x + (0.12 if i == 0 else 0.3) + 0.95, top, focus_label)
+        shp = slide.shapes.add_shape(MSO_SHAPE.PENTAGON if i == 0 else MSO_SHAPE.CHEVRON,
+                                     Inches(x), Inches(top + 0.32), Inches(cw), Inches(ch))
+        shp.shadow.inherit = False
+        shp.fill.solid()
+        shp.fill.fore_color.rgb = fill
+        shp.line.color.rgb = pal.white
+        shp.line.width = Pt(2.5)
+        try:
+            shp.adjustments[0] = 0.28
+        except (IndexError, KeyError):
+            pass
+        tb = add_textbox(slide, x + (0.15 if i == 0 else 0.34), top + 0.32, cw - 0.62, ch,
+                         anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, names[i], size=name_size, bold=True,
+                        color=pal.white if dark else pal.deep_navy, family=typo.family,
+                        first=True)
+        dx = x + (0.12 if i == 0 else 0.3)
+        if i:  # divider as tall as the tallest column's text, not the whole page
+            add_line(slide, x + 0.12, body_top, x + 0.12, body_top + col_h, color=pal.grid_gray,
+                     width_pt=0.75)
+        tb = add_textbox(slide, dx, body_top, col_w - 0.3, body_bottom - body_top)
+        first = True
+        if descs[i]:
+            write_paragraph(tb.text_frame, descs[i], size=dsize, bold=bool(st.get("items")),
+                            color=pal.deep_navy if st.get("items") else pal.text_dark,
+                            family=typo.family, first=True, space_after=6)
+            first = False
+        for it in st.get("items", []):
+            write_paragraph(tb.text_frame, it, size=dsize - 1 if dsize > 10 else dsize,
+                            color=pal.text_dark, family=typo.family, bullet=True,
+                            space_after=4, first=first)
+            first = False
     return slide
 
 
@@ -100,13 +121,18 @@ def add_funnel(prs, *,
                title="[Funnel / Insert action title]",
                subtitle: Optional[str] = None,
                stages: Sequence[Dict],
+               focus=None,
                page_number=None,
                section_marker="Section marker",
                source="xx", footnote="1. xx",
                theme: Theme = DEFAULT_THEME):
     """stages: [{"name": "Awareness", "value": "1.2M", "description": "..."}]
-    Top-down funnel; bands narrow from top to bottom.
+    Top-down funnel of trapezoid bands; each band's description sits on the right,
+    joined to it by a hairline leader.
+    focus: the stage the title is about (name or index) — stays navy, the other
+           bands turn light grey.
     """
+    from ..components import _polygon
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, page_number=page_number,
                section_marker=section_marker, source=source, footnote=footnote)
@@ -120,67 +146,55 @@ def add_funnel(prs, *,
                         color=pal.placeholder_gray, family=typo.family,
                         first=True)
 
+    names = [st.get("name", f"Stage {i + 1}") for i, st in enumerate(stages)]
+    check_focus("funnel", title, focus, names)
+    focused = has_focus(focus)
     width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
     body_top = 1.95
-    body_bottom = layout.footer_top_in - 0.20
-    body_h = body_bottom - body_top
-
-    # Funnel occupies left half, descriptions on right
-    funnel_left = layout.margin_left_in + 0.5
-    funnel_right_max = layout.margin_left_in + width * 0.55
-    funnel_w_top = funnel_right_max - funnel_left
-    funnel_w_bot = funnel_w_top * 0.30
-    funnel_cx = (funnel_left + funnel_right_max) / 2
-
+    body_bottom = layout.footer_top_in - 0.25
     n = max(len(stages), 1)
-    band_h = (body_h - 0.10 * (n - 1)) / n
+    gap = 0.08
+    band_h = min(1.2, (body_bottom - body_top - gap * (n - 1)) / n)
+    total_h = n * band_h + gap * (n - 1)
+    body_top += (body_bottom - body_top - total_h) / 2
 
-    # Color gradient navy -> bright blue
-    colors = [pal.deep_navy, pal.mid_blue, pal.bright_blue,
-              pal.light_blue, pal.bright_blue, pal.light_blue]
+    f_left = layout.margin_left_in + 0.2
+    f_right = layout.margin_left_in + width * 0.5
+    w_top, w_bot = f_right - f_left, (f_right - f_left) * 0.3
+    cx = (f_left + f_right) / 2
+    right_left = f_right + 0.8
+    right_w = layout.slide_width_in - layout.margin_right_in - right_left
+
+    def half(t):  # half-width at fraction t of the funnel height
+        return (w_top * (1 - t) + w_bot * t) / 2
 
     for i, st in enumerate(stages):
-        # Width interpolation linear from full to bot
-        t_top = i / n
-        t_bot = (i + 1) / n
-        w_top = funnel_w_top * (1 - t_top) + funnel_w_bot * t_top
-        w_bot = funnel_w_top * (1 - t_bot) + funnel_w_bot * t_bot
-        y_top = body_top + i * (band_h + 0.10)
-        y_bot = y_top + band_h
-
-        # Render as trapezoid via freeform on the slide
-        # Approximation using a rectangle (simpler & still on-brand)
-        rect_w = (w_top + w_bot) / 2
-        rect_left = funnel_cx - rect_w / 2
-        add_rect(slide, rect_left, y_top, rect_w, band_h,
-                 fill=colors[i % len(colors)])
-
-        # Stage name + value (white, centered)
-        tb = add_textbox(slide, rect_left + 0.10, y_top, rect_w - 0.20,
-                         band_h, anchor=MSO_ANCHOR.MIDDLE)
+        y0 = body_top + i * (band_h + gap)
+        y1 = y0 + band_h
+        t0, t1 = (y0 - body_top) / total_h, (y1 - body_top) / total_h
+        f = is_focus(focus, i, names[i])
+        dark = f or not focused
+        _polygon(slide, [(cx - half(t0), y0), (cx + half(t0), y0),
+                         (cx + half(t1), y1), (cx - half(t1), y1)],
+                 pal.deep_navy if dark else pal.soft_gray)
+        tw = 2 * half(t1) - 0.2
+        tb = add_textbox(slide, cx - tw / 2, y0, tw, band_h, anchor=MSO_ANCHOR.MIDDLE)
         tf = tb.text_frame
-        p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
-        r1 = p.add_run()
-        r1.text = st.get("name", f"Stage {i+1}")
-        r1.font.size = Pt(typo.body_size + 1); r1.font.bold = True
-        r1.font.color.rgb = pal.white; r1.font.name = typo.family
+        write_paragraph(tf, names[i], size=typo.body_size, bold=True,
+                        color=pal.white if dark else pal.deep_navy, family=typo.family,
+                        align=PP_ALIGN.CENTER, first=True)
         if st.get("value"):
-            p2 = tf.add_paragraph()
-            p2.alignment = PP_ALIGN.CENTER
-            r2 = p2.add_run()
-            r2.text = str(st["value"])
-            r2.font.size = Pt(typo.body_size + 4); r2.font.bold = True
-            r2.font.color.rgb = pal.white; r2.font.name = typo.family
-
-        # Description on right
-        right_left = funnel_right_max + 0.6
-        right_w = layout.slide_width_in - layout.margin_right_in - right_left
-        tb = add_textbox(slide, right_left, y_top, right_w, band_h,
-                         anchor=MSO_ANCHOR.MIDDLE)
-        write_paragraph(tb.text_frame, st.get("description", ""),
-                        size=typo.body_size, color=pal.text_dark,
-                        family=typo.family, first=True)
+            write_paragraph(tf, str(st["value"]), size=typo.body_size + 4, bold=True,
+                            color=pal.white if dark else pal.deep_navy, family=typo.family,
+                            align=PP_ALIGN.CENTER)
+        ym = (y0 + y1) / 2
+        add_line(slide, cx + half((ym - body_top) / total_h) + 0.08, ym, right_left - 0.12, ym,
+                 color=pal.bright_blue if f else pal.grid_gray, width_pt=0.75)
+        if st.get("description"):
+            tb = add_textbox(slide, right_left, y0, right_w, band_h, anchor=MSO_ANCHOR.MIDDLE)
+            write_paragraph(tb.text_frame, st["description"], size=typo.body_size,
+                            bold=f, color=pal.deep_navy if f else pal.text_dark,
+                            family=typo.family, first=True)
     return slide
 
 

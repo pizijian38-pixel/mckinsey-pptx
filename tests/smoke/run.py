@@ -57,7 +57,8 @@ def main() -> int:
                 section = line.split("]")[0] + "]"
                 continue
             line_s = line.strip()
-            if not line_s or line_s in ("none", "ok") or line_s.startswith(("a)", "b)", "c)", "not used:")):
+            if not line_s or line_s in ("none", "ok") or line_s.startswith(
+                    ("a)", "b)", "c)", "not used:", "->", "also:", "ok, computed")):
                 continue
             if section == "[5]" and "(" in line_s and line_s.startswith("slide") and ":" in line_s \
                     and "vocabulary" not in line_s and line_s.split(":")[0].endswith(")"):
@@ -68,8 +69,8 @@ def main() -> int:
                 if not nums:
                     continue
                 line_s = line_s.split(":", 1)[0] + ": " + ", ".join(nums)
-            if section in ("[2]", "[3]") or line_s.startswith("Deck:") or line_s.startswith("("):
-                continue          # [2] coverage is shown in the summary; [3] is advisory
+            if section in ("[2]", "[3]", "[11]") or line_s.startswith("Deck:") or line_s.startswith("("):
+                continue          # [2] coverage is shown in the summary; [3] and [11] are advisory
             if section == "[6]" and line_s.startswith("ok"):
                 continue
             issues.append(f"{section} {line_s}")
@@ -87,6 +88,12 @@ def main() -> int:
                            capture_output=True)
             pdf = deck.with_suffix(".pdf")
             subprocess.run(["pdftoppm", "-jpeg", "-r", "50", str(pdf), str(out / deck.stem)], capture_output=True)
+    # regression tests for bugs found on real decks
+    reg = subprocess.run([sys.executable, str(ROOT / "tests" / "test_regressions.py")],
+                         capture_output=True, text=True)
+    for line in reg.stdout.splitlines():
+        print(line)
+    failed += reg.returncode != 0
     print(f"\n{'all passed' if not failed else f'{failed} scenario(s) failed'}")
     return 1 if failed else 0
 

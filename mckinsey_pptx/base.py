@@ -335,11 +335,34 @@ def apply_east_asian_font(prs, typeface: str):
                 _set_ea(rpr, typeface)
 
 
+def _flatten_theme_effects(prs):
+    """Empty the theme's effect styles.
+
+    python-pptx's default theme defines effect styles 1-3 as an outer drop
+    shadow (3 adds a bevel). Every connector it creates references style 1,
+    so each rule, arrow and grid line carried a shadow in PowerPoint. The
+    design rule is no shadows anywhere: emptying the styles removes them for
+    every shape at once, in PowerPoint and LibreOffice alike.
+    """
+    from lxml import etree
+    from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+    from pptx.oxml.ns import qn
+    part = prs.slide_master.part.part_related_by(RT.THEME)
+    root = etree.fromstring(part.blob)
+    for style in root.iter(qn("a:effectStyle")):
+        for child in list(style):
+            style.remove(child)
+        etree.SubElement(style, qn("a:effectLst"))
+    part._blob = etree.tostring(root, xml_declaration=True, encoding="UTF-8",
+                                standalone=True)
+
+
 def init_presentation(theme: Theme = DEFAULT_THEME):
     from pptx import Presentation
     prs = Presentation()
     prs.slide_width = Inches(theme.layout.slide_width_in)
     prs.slide_height = Inches(theme.layout.slide_height_in)
+    _flatten_theme_effects(prs)
     return prs
 
 

@@ -30,6 +30,43 @@ _TYPES = {
 _DEFAULT_SERIES_TONES = ("navy", "blue", "mid_blue", "light_blue", "amber", "gray")
 
 
+def _excel_fmt(v, fmt: str) -> str:
+    """Format a value with a simple Excel number format ('0.0', '#,##0', '0"%"')."""
+    import re
+    suffix = "".join(re.findall(r'"([^"]*)"', fmt or "")) + ("%" if (fmt or "").endswith("%") else "")
+    core = re.sub(r'"[^"]*"|%', "", fmt or "")
+    dec = len(core.split(".")[1]) if "." in core else 0
+    if fmt in (None, "", "General"):
+        dec = 0 if float(v).is_integer() else 1
+    from decimal import ROUND_HALF_UP, Decimal
+    q = Decimal(str(v)).quantize(Decimal(1).scaleb(-dec), rounding=ROUND_HALF_UP)
+    return f"{q:{',' if ',' in core else ''}.{dec}f}{suffix}"
+
+
+def _end_positions(ends, span, plot_h_in, label_h_in=0.2):
+    """Label position at each line's last point, placed top-down: each name goes
+    to the right of its point unless that overlaps a name already placed, then
+    above, then below. Heights are in inches on the plot."""
+    lh, pad = label_h_in, 0.04
+    boxes = {"right": lambda y: (y - lh / 2, y + lh / 2),
+             "above": lambda y: (y + pad, y + pad + lh),
+             "below": lambda y: (y - pad - lh, y - pad)}
+    to_pos = {"right": XL_LABEL_POSITION.RIGHT, "above": XL_LABEL_POSITION.ABOVE,
+              "below": XL_LABEL_POSITION.BELOW}
+    placed, pos = [], {}
+    for name, v in sorted(ends, key=lambda e: -e[1]):
+        y = v / span * plot_h_in
+        choice = "right"
+        for opt in ("right", "above", "below"):
+            lo, hi = boxes[opt](y)
+            if all(hi <= a or lo >= b for a, b in placed):
+                choice = opt
+                break
+        placed.append(boxes[choice](y))
+        pos[name] = to_pos[choice]
+    return pos
+
+
 def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
                categories: Sequence, series: Sequence[Dict],
                number_format: str = "General", show_values: bool = True,
@@ -71,17 +108,21 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
         ca.format.line.color.rgb = pal.rule_gray
 
     multi = len(series) > 1 or is_pie
-    chart.has_legend = multi
-    if multi:
+    # 3+ lines: each line is named at its right end instead of in a legend
+    end_named = chart_type == "line" and len(series) > 2
+    chart.has_legend = multi and not end_named
+    if chart.has_legend:
         chart.legend.position = XL_LEGEND_POSITION.TOP
         chart.legend.include_in_layout = False
         chart.legend.font.size = Pt(12)
 
     hl_series = hl.get("series")
+    # Emphasis is the accent (bright blue). Red means "bad" - only when asked for.
+    hl_tone = hl.get("tone") or "blue"
     for i, (s, ps) in enumerate(zip(series, plot.series)):
         tone = s.get("tone") or _DEFAULT_SERIES_TONES[i % len(_DEFAULT_SERIES_TONES)]
         if hl_series is not None:
-            tone = "red" if s["name"] == hl_series else ("gray" if not s.get("tone") else tone)
+            tone = hl_tone if s["name"] == hl_series else ("gray" if not s.get("tone") else tone)
         rgb = tone_rgb(theme, tone)
         if chart_type == "line":
             ps.format.line.color.rgb = rgb
@@ -101,7 +142,7 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
         if hl.get("point") is not None and not is_pie and chart_type != "line":
             pt = ps.points[int(hl["point"])]
             pt.format.fill.solid()
-            pt.format.fill.fore_color.rgb = pal.status_red
+            pt.format.fill.fore_color.rgb = tone_rgb(theme, hl_tone)
 
     # Crowded line charts: label only the highlighted / explicitly toned series.
     label_only = None
@@ -117,11 +158,43 @@ def draw_chart(slide, theme: Theme, x, y, w, h, *, chart_type: str = "column",
             dl.number_format_is_linked = False
             dl.font.size = Pt(11)
             dl.font.bold = True
-            dl.font.color.rgb = tone_rgb(theme, "red" if s["name"] == hl_series
+            dl.font.color.rgb = tone_rgb(theme, hl_tone if s["name"] == hl_series
                                          else s.get("tone"))
-            dl.position = XL_LABEL_POSITION.ABOVE
+            # focal line labels above, a toned rival's below: close lines don't collide
+            dl.position = (XL_LABEL_POSITION.ABOVE if s["name"] == hl_series or not hl_series
+                           else XL_LABEL_POSITION.BELOW)
             dl.show_value = True
-    elif show_values:
+    if end_named:
+        lasts = {s["name"]: max((k for k, v in enumerate(s["values"]) if v is not None),
+                                default=None) for s in series}
+        every = [float(v) for s in series for v in s["values"] if v is not None]
+        span = (y_max if y_max is not None else max(every, default=1)) - min(every + [0])
+        ends = {}
+        for s in series:
+            k = lasts[s["name"]]
+            if k is not None:
+                ends.setdefault(k, []).append((s["name"], float(s["values"][k])))
+        place = {}
+        for group in ends.values():
+            place.update(_end_positions(group, span or 1, max(h - 0.9, 1.0)))
+        for s, ps in zip(series, plot.series):
+            vals = [v for v in s["values"]]
+            last = lasts[s["name"]]
+            if last is None:
+                continue
+            dl = ps.points[last].data_label
+            dl.position = place.get(s["name"], XL_LABEL_POSITION.RIGHT)
+            tf = dl.text_frame
+            labelled = show_values and label_only and s["name"] in label_only
+            tf.text = (f"{s['name']} {_excel_fmt(vals[last], number_format)}" if labelled
+                       else str(s["name"]))
+            r = tf.paragraphs[0].runs[0]
+            r.font.size = Pt(11)
+            focal = s["name"] == hl_series or bool(s.get("tone"))
+            r.font.bold = focal
+            r.font.color.rgb = (tone_rgb(theme, hl_tone) if s["name"] == hl_series else
+                                tone_rgb(theme, s.get("tone")) if s.get("tone") else pal.footer_gray)
+    elif show_values and not label_only:
         plot.has_data_labels = True
         dl = plot.data_labels
         dl.number_format = number_format
@@ -163,8 +236,10 @@ def add_native_chart(prs, *,
     """chart_type: column | grouped_column | stacked_column | stacked_column_100
                    | bar | stacked_bar | line | pie | doughnut
     series: [{"name": str, "values": [num], "tone"?: str}]
-    highlight: {"series": name} -> that series in red, others muted (line/bar);
-               {"point": index} -> that category's bar in red (single series).
+    highlight: {"series": name} -> that series in the accent, others muted (line/bar);
+               {"point": index} -> that category's bar in the accent (single series).
+               Add "tone": "red" (or green / amber) only when the item is bad (good)
+               news - red is a judgement, not emphasis.
     number_format: Excel format for value labels, e.g. '0.0', '0"%"', '#,##0'.
     """
     slide = blank_slide(prs)

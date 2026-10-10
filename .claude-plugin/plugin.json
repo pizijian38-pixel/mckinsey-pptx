@@ -1,7 +1,7 @@
 {
   "name": "axlabs-mckinsey-pptx",
   "version": "0.7.0",
-  "description": "McKinsey-style PPTX generator with 55 production-ready slide templates plus a composite layout (executive summary, BCG matrix, KPI dashboard, roadmap, org chart, historic-forecast, etc.). Ships with a subagent that picks the right template for each slide, defends its choice, and builds a real .pptx file. Built by AX Labs.",
+  "description": "McKinsey-style PPTX generator with 67 production-ready slide templates plus a composite layout (logic grids, strategic challenge, storyline summary, flywheels, risk heat maps, value chains, evaluation matrices, business model canvas, executive summary, BCG matrix, KPI dashboard, roadmap, org chart, historic-forecast, etc.). Ships with a subagent that picks the right template for each slide, defends its choice, and builds a real .pptx file. Built by AX Labs.",
   "author": {
     "name": "AX Labs (이승필 / Seungpil Lee)",
     "email": "help@theuxlabs.com",

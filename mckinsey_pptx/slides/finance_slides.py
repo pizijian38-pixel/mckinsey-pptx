@@ -152,7 +152,8 @@ def add_scorecard(prs, *,
 
     has_comment = any(m.get("comment") for m in metrics)
     rel = [3.0, 1.3, 1.3, 1.5] + ([4.2] if has_comment else [])
-    cols = list(columns)[:len(rel)]
+    from ..labels import loc
+    cols = [loc(theme, c) for c in list(columns)[:len(rel)]]
     total = sum(rel)
     ws = [width * r / total for r in rel]
     xs = [left + sum(ws[:i]) for i in range(len(ws))]
@@ -187,8 +188,8 @@ def add_scorecard(prs, *,
                                  align=PP_ALIGN.LEFT if k == 0 else PP_ALIGN.CENTER,
                                  first=True)
         tone = _STATUS.get(str(m.get("status", "")).lower(), "gray")
-        label = m.get("status_label") or {"green": "On track", "amber": "At risk",
-                                           "red": "Off track"}.get(tone, str(m.get("status", "")))
+        label = m.get("status_label") or loc(theme, {"green": "On track", "amber": "At risk",
+                                                     "red": "Off track"}.get(tone, str(m.get("status", ""))))
         pw, ph = min(ws[3] - 0.3, 1.35), min(0.38, row_h - 0.16)
         px, py = xs[3] + (ws[3] - pw) / 2, y + (row_h - ph) / 2
         add_rect(slide, px, py, pw, ph, fill=tone_rgb(theme, tone))

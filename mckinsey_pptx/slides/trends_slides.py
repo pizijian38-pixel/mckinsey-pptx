@@ -11,6 +11,8 @@ from ..base import (
     write_paragraph, add_subtitle_placeholder,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..design import mark_index
+from ..labels import loc
 
 
 def _add_arrow_right(slide, theme, left, top, w=0.45, h=0.35):
@@ -29,7 +31,7 @@ def _add_circle_number(slide, theme, left, top, d, n, fill=None, color=None):
     fill = fill or pal.dark_navy
     color = color or pal.white
     add_oval(slide, left, top, d, d, fill=fill)
-    tb = add_textbox(slide, left, top, d, d, anchor=MSO_ANCHOR.MIDDLE)
+    tb = mark_index(add_textbox(slide, left, top, d, d, anchor=MSO_ANCHOR.MIDDLE))
     write_paragraph(tb.text_frame, str(n), size=typo.body_size, bold=True,
                     color=color, family=typo.family,
                     align=PP_ALIGN.CENTER, first=True)
@@ -238,11 +240,11 @@ def add_five_key_areas(prs, *,
     arrow_x = layout.margin_left_in + 3.6         # = 4.05
     desc_col_x = layout.margin_left_in + 4.4      # = 4.85
     tb = add_textbox(slide, name_col_x, body_top, name_col_w, 0.32)
-    write_paragraph(tb.text_frame, "Area", size=typo.section_title_size,
+    write_paragraph(tb.text_frame, loc(theme, "Area"), size=typo.section_title_size,
                     bold=True, color=pal.text_dark, family=typo.family,
                     first=True)
     tb = add_textbox(slide, desc_col_x, body_top, width - 4.4, 0.32)
-    write_paragraph(tb.text_frame, "Description", size=typo.section_title_size,
+    write_paragraph(tb.text_frame, loc(theme, "Description"), size=typo.section_title_size,
                     bold=True, color=pal.text_dark, family=typo.family,
                     first=True)
     add_line(slide, name_col_x, body_top + 0.32,

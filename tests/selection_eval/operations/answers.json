@@ -1,0 +1,16 @@
+{
+  "case": "operations",
+  "slides": {
+    "1":  {"relationship": "cover", "preferred": ["cover_slide"]},
+    "2":  {"relationship": "one series over periods against a target", "preferred": ["chart", "line_chart"], "acceptable": ["column_simple_growth"]},
+    "3":  {"relationship": "causes of one stated problem", "preferred": ["fishbone"], "acceptable": ["issue_tree", "logic_grid"]},
+    "4":  {"relationship": "change between two totals explained by drivers", "preferred": ["waterfall"], "acceptable": ["chart"]},
+    "5":  {"relationship": "steps across several actors / hand-offs", "preferred": ["swimlane"], "acceptable": ["process_flow"]},
+    "6":  {"relationship": "one measure over two categorical dimensions", "preferred": ["heatmap"], "acceptable": ["chart"]},
+    "7":  {"relationship": "rank order over 5 periods", "preferred": ["bump"], "acceptable": ["chart", "line_chart"]},
+    "8":  {"relationship": "two points in time per item, with a note per item", "preferred": ["composite:slopegraph", "composite:dumbbell"], "acceptable": ["slopegraph", "dumbbell"]},
+    "9":  {"relationship": "prioritising on two dimensions", "preferred": ["prioritization_matrix", "matrix_2x2"], "acceptable": ["bubble_chart"]},
+    "10": {"relationship": "KPIs vs target with status", "preferred": ["scorecard"], "acceptable": ["data_table", "kpi_dashboard"]},
+    "11": {"relationship": "really a list (decisions, a sentence each)", "preferred": ["card_rows", "card_grid"], "acceptable": ["data_table"], "list": true}
+  }
+}

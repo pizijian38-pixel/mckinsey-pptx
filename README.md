@@ -236,10 +236,30 @@ git clone https://github.com/pizijian38-pixel/mckinsey-pptx.git .agent/skills/mc
 Antigravity 会根据 skill 的描述自动启用它。如果没有触发，可以明确说
 "使用 mckinsey-pptx skill 做……"。生成的文件在项目的 `output/` 文件夹里。
 
+模型按 skill 的流程只用三个固定命令：`scripts/read_source.py`（读附件，表格完整保留）、
+`scripts/catalog.py`（按名称查模板，一次查完）和 `scripts/run_deck.py`（构建 + 检查 +
+渲染预览）。整份 deck 大约 6–10 条命令，不再临时拼写多行 `python -c`。附件请直接拖进
+对话，模型会按附件路径读取，不再手抄大纲。
+
+#### 减少审批弹窗（Antigravity 权限设置）
+
+Antigravity 按 [官方权限规则](https://antigravity.google/docs/permissions) 决定是否弹窗。
+skill 能做的是只用上面三条固定命令；下面三项只能在设置里解决：
+
+1. **权限预设**：Settings → General → Permission Settings。本地自用、低风险的项目选
+   **Turbo**（命令不受限、可访问全部文件）。注意 **项目级设置会覆盖全局设置**——
+   在 `ppt_test` 这类项目的项目设置里也确认一遍。
+2. **不想用 Turbo 时**，保留 Default，并添加：
+   - 命令允许规则 `command(python)`；
+   - 文件读取规则：skill 目录（如 `~/.gemini/antigravity/skills/mckinsey-pptx`）和附件目录
+     `~/.gemini/antigravity/brain`——这两个都在项目之外，默认每次读取都会询问。
+3. **已知 bug**：多位用户报告"Always Proceed"在重启后不生效（[论坛](https://discuss.ai.google.dev/t/bug-antigravity-still-ask-permission-even-command-is-already-on-allowed-list/118636)）。
+   设置正确仍弹窗时，在弹窗的下拉框里重新选一次 "Always Proceed"。
+
 ### 更新
 
 ```bash
-cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
+git -C "$HOME/.gemini/antigravity/skills/mckinsey-pptx" pull
 ```
 
 ---
@@ -286,7 +306,8 @@ cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
   产品形态、渠道、技术或医学主张。
 - **出稿后自检**：用 `scripts/deck_check.py` 把 PPT 和源文件逐项对照，报告：
   疑似编造的数字、源数据覆盖率、内容过稀的页面、残留占位符、
-  源文件里没有的主张或引号词、同一版式连续过多或缺少图表、字号过小、页脚来源写法错误。
+  源文件里没有的主张或引号词、同一版式连续过多或缺少图表、字号过小、页脚来源写法错误，
+  以及文字版式占比（仅提醒）。
 
 示例：
 
@@ -298,7 +319,12 @@ cd ~/.gemini/antigravity/skills/mckinsey-pptx && git pull
 
 ```bash
 python scripts/deck_check.py output/xxx.pptx --source inputs/大纲.docx
+# 或一条命令完成构建 + 检查 + 预览图（Windows 自动找 LibreOffice）
+python scripts/run_deck.py output/build_xxx.py --source inputs/大纲.docx
 ```
+
+第 [11] 项"版式构成"只是提醒：文字版式（卡片、表格）超过内容页一半时提示你
+复查哪些页其实是关系（流向、占比、变化、排名、因果、交集），不会判为不通过。
 
 ---
 
@@ -491,7 +517,7 @@ A. 能，就是**普通的 PowerPoint 文件**。用 PowerPoint / WPS / Keynote 
 
 ---
 
-## 能做哪些幻灯片？（55 个模板 + 复合版式）
+## 能做哪些幻灯片？（80 个模板 + 复合版式）
 
 Claude 会自动挑选，你也可以直接指定。
 
@@ -506,6 +532,9 @@ Claude 会自动挑选，你也可以直接指定。
 - **对比柱状图**（突出重点项）
 - **气泡图**、**堆积柱状图**、**分组对比图**、**折线图**
 - **KPI 仪表盘**（4–8 个指标卡，同比 ▲▼）
+- **Marimekko**（细分 × 玩家，面积 = 占比）、**Treemap**（面积 = 数值）、**桑基图**（流向与转化）
+- **斜率图**（两个时点的变化）、**哑铃图**（每类两个值的差距）、**排名变化图**（3–6 期排名）
+- **热力图**（行 × 列数值）、**雷达图**（多选项多维度画像，原生可编辑）
 
 ### 🧩 矩阵 / 分析框架
 - **BCG 增长-份额矩阵**（2×2 象限）
@@ -519,6 +548,8 @@ Claude 会自动挑选，你也可以直接指定。
 - **团队圆形图**（负责人 + 成员）
 - **职能团队矩阵**
 - **议题树**（问题 → 原因 → 根本原因）
+- **鱼骨图**（一个问题现象的分类原因）、**客户旅程**（阶段 × 行为 × 情绪曲线）
+- **泳道图**（跨角色流程与交接）、**分层堆叠**（技术 / 能力栈）、**韦恩图**（2–3 个条件的交集）
 
 ### 🗓 路线图 / 流程
 - **三阶段箭头**
@@ -554,6 +585,21 @@ Claude 会自动挑选，你也可以直接指定。
 - **风险登记** `risk_register`：风险卡片 + 等级标签（高 / 中 / 低）+ 应对措施
 - **复合版式** `composite`：在一页里自由组合"流程图、指标表、大数字、卡片、优劣势、编号清单、分阶段路线、图表、表格"，
   做出咨询公司式的"方案详解页"（左边商业模式和数字，右边 Why / How / 优劣势，底部结论）
+- **逻辑链网格** `logic_grid`：每行一个主题，按"外部情境 → 自身能力 → 竞争优势"或"客户需求 → 我们怎么做 → 表现 → 启示"
+  逐列推进，最后一列是深色结论框；`direction="down"` 变成 PEST / 五力分析的"现状 → 对公司的影响"
+- **战略挑战收敛** `strategic_challenge`：多个驱动因素 → 各自后果 → 汇聚成一个核心威胁 → "How can X …, given …?" 关键问题
+- **故事线执行摘要** `storyline_summary`：情境 → 关键问题 → 备选方案（推荐方案高亮）→ 建议，一页讲完整份 deck
+- **复合版式的逻辑升级**：列标题（箭头 / 横线 / 色条）、列间箭头、区块间向下箭头，以及新组件
+  `callout`（新价值主张）、`pyramid`（定位金字塔）、`sections`（可行性 / 优点 ✓ / 缺点 ✗）
+- **因果飞轮 / 循环** `cycle`：起点 → 多条并行影响链 → 结果，虚线反馈回起点；或 3–6 步的恶性循环
+- **风险热力图** `risk_heatmap`：按发生概率 × 影响程度分区摆放编号风险，右侧按编号列出应对措施
+- **竞争定位刻度** `positioning_scale`：每个指标一行，写出含义，各家在"低 → 高"刻度上的位置一目了然
+- **价值链 + KSF** `value_chain`：箭头环节 + 每段关键成功要素，标出公司自己做的环节，可加价格/成本
+- **分阶段落地网格** `phase_grid`：行（合作伙伴 / 行动 / 资源）× 阶段，可跨年份合并、加 KPI 行和右侧风险应对栏
+- **评分矩阵（带理由）** `evaluation_matrix`：每格"分数 + 理由"、圆点评分、按维度分组、顶部公式横幅、优先级标签
+- **商业模式画布** `business_model_canvas`、**战略三角** `strategic_triangle`、**中心辐射图** `hub_spoke`
+- **章节导航条**：`PresentationBuilder(nav=[...])` 后每页传 `nav="当前章节"`，顶部显示面包屑
+- **标签自动跟随语言**：`make_theme(lang="zh")` 时，"Key insight / 推荐 / 加权总分 / SWOT 标题"等默认标签全部显示为中文
 - 每页都可以加 `kicker`（标题上方的小字定位标签），并列页面用 `group` 标记，保证版式一致
 - 文字中可以用 `**加粗**`、`{red|标红}`、`{green|标绿}` 强调关键词，内置 88 个商务图标
 - **品牌配色**：说"用品牌色 #103B8C"即可，整套配色会自动换成你的品牌色

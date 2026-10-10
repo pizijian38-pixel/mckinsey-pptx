@@ -15,6 +15,9 @@ option_profiles / risk_register templates.
     phases     compact roadmap: phase columns with period band + bullets
     chart      native chart (same arguments as `chart`)
     table      native table (same arguments as `data_table`)
+    callout    highlighted statement (value proposition, the option in a line)
+    pyramid    positioning / hierarchy pyramid with the chosen level highlighted
+    sections   stacked titled groups (Feasibility / Pros / Cons) with ✓ / ✗ marks
 """
 from __future__ import annotations
 
@@ -26,8 +29,9 @@ from pptx.util import Inches
 
 from .base import add_line, add_rect, add_textbox, write_paragraph
 from .design import (add_icon, add_rich_runs, fit_one_line, fit_size, text_height_in,
-                     tone_rgb, warn_small, write_rich_paragraph)
+                     text_width_pt, tone_rgb, warn_small, write_rich_paragraph)
 from .theme import Theme
+from .labels import loc
 
 HEADING_H = 0.34
 MIN_PT, MAX_PT = 10, 16
@@ -41,7 +45,7 @@ def letter_space(paragraph, hundredths_pt: int = 150):
 def draw_heading(slide, theme: Theme, x, y, w, text, *, color=None, size=11):
     """Small-caps style label above a region ("BUSINESS MODEL")."""
     tb = add_textbox(slide, x, y, w, HEADING_H - 0.04, anchor=MSO_ANCHOR.BOTTOM)
-    p = write_paragraph(tb.text_frame, str(text).upper(), size=size, bold=True,
+    p = write_paragraph(tb.text_frame, str(loc(theme, text)).upper(), size=size, bold=True,
                         color=color or theme.palette.mid_blue,
                         family=theme.typography.family, first=True)
     letter_space(p, 120)
@@ -179,7 +183,8 @@ def comp_pros_cons(slide, theme, x, y, w, h, *, pros: Sequence[str] = (),
                    cons: Sequence[str] = (), labels=("Advantages", "Disadvantages"),
                    layout="stacked", size=None, where=""):
     """✓ / ✗ lists; layout 'stacked' (one above the other) or 'columns'."""
-    groups = [(labels[0], list(pros), "check", "green"), (labels[1], list(cons), "cross", "red")]
+    groups = [(loc(theme, labels[0]), list(pros), "check", "green"),
+              (loc(theme, labels[1]), list(cons), "cross", "red")]
     groups = [g for g in groups if g[1]]
     if not groups:
         return
@@ -316,6 +321,217 @@ def comp_phases(slide, theme, x, y, w, h, *, phases: Sequence[Dict], where=""):
                                  first=k == 0, space_before=0 if k == 0 else 4)
 
 
+# ---------- callout ----------
+
+def comp_callout(slide, theme, x, y, w, h, *, text, label=None, style="outline", tone=None,
+                 where=""):
+    """Highlighted statement: a new value proposition, the option in one line,
+    a 'so what'. style: outline (label sits on the border) | solid | tint."""
+    from .design import tint
+    pal, typo = theme.palette, theme.typography
+    label = loc(theme, label)
+    color = tone_rgb(theme, tone) if tone else pal.mid_blue
+    lab_h = 0.3 if label else 0.0
+    inner_w = w - 0.4
+    size = fit_size([text], inner_w, max(h - lab_h - 0.3, 0.3), max_size=16, min_size=MIN_PT,
+                    bold=style == "solid")
+    warn_small("callout", where, size, "Shorten the callout text.")
+    need = text_height_in([text], inner_w, size, bold=style == "solid") + 0.36
+    bh = min(h - lab_h / 2, need + (lab_h / 2 if style == "outline" else lab_h))
+    by = y + (lab_h / 2 if style == "outline" else 0)
+    if style == "solid":
+        add_rect(slide, x, by, w, bh, fill=color)
+        txt_color = pal.white
+    elif style == "tint":
+        add_rect(slide, x, by, w, bh, fill=tint(color, 0.85))
+        txt_color = pal.deep_navy
+    else:
+        add_rect(slide, x, by, w, bh, fill=pal.white, line=color, line_width=1.5)
+        txt_color = pal.text_dark
+    ty = by
+    if label:
+        lsize = fit_one_line(label, w - 0.6, 12, 9, True)
+        lw = min(w - 0.4, text_width_pt(label, lsize, True) / 72 / 0.92 + 0.3)
+        if style == "outline":
+            tb = add_textbox(slide, x + (w - lw) / 2, y, lw, lab_h, fill=pal.white,
+                             anchor=MSO_ANCHOR.MIDDLE)
+            ty = y + lab_h
+        else:
+            tb = add_textbox(slide, x + 0.2, by + 0.08, w - 0.4, lab_h, anchor=MSO_ANCHOR.MIDDLE)
+            ty = by + lab_h
+        write_paragraph(tb.text_frame, label, size=lsize, bold=True,
+                        color=pal.white if style == "solid" else color,
+                        family=typo.family,
+                        align=PP_ALIGN.CENTER if style == "outline" else PP_ALIGN.LEFT,
+                        first=True)
+    tb = add_textbox(slide, x + 0.2, ty, inner_w, by + bh - ty - 0.06,
+                     anchor=MSO_ANCHOR.MIDDLE)
+    write_rich_paragraph(tb.text_frame, text, size=size, theme=theme, color=txt_color,
+                         bold=style == "solid",
+                         align=PP_ALIGN.CENTER if style == "outline" else PP_ALIGN.LEFT,
+                         first=True)
+
+
+# ---------- pyramid ----------
+
+def _polygon(slide, pts, fill):
+    from pptx.util import Emu
+    emu = [(int(Inches(px)), int(Inches(py))) for px, py in pts]
+    ff = slide.shapes.build_freeform(emu[0][0], emu[0][1], scale=1.0)
+    ff.add_line_segments(emu[1:], close=True)
+    shp = ff.convert_to_shape()
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = fill
+    shp.line.fill.background()
+    shp.shadow.inherit = False
+    return shp
+
+
+def comp_pyramid(slide, theme, x, y, w, h, *, levels: Sequence[str], highlight=None,
+                 notes: Sequence[str] = (), note=None, tone=None, where=""):
+    """Positioning / hierarchy pyramid, top level first. `highlight`: index or
+    list of indices (the chosen position); `notes`: one note per level, or a
+    single `note` placed beside the highlighted level."""
+    pal, typo = theme.palette, theme.typography
+    n = max(len(levels), 1)
+    hl = set([highlight] if isinstance(highlight, int) else (highlight or []))
+    has_notes = bool(notes) or bool(note)
+    pw = min(w * (0.55 if has_notes else 1.0), h * 1.35)
+    ph = min(h, pw * 0.85)
+    px = x
+    py = y + (h - ph) / 2
+    gap = 0.05
+    band = (ph - gap * (n - 1)) / n
+    cx = px + pw / 2
+
+    def half(yy):  # half-width of the triangle at height yy
+        return (yy - py) / ph * pw / 2
+
+    # each label must fit on one line at the narrowest point it sits on: the top
+    # level's label sits at the base of the apex triangle
+    def text_w(i):
+        y1 = py + i * (band + gap)
+        return 2 * half(y1 + 0.72 * band if i == 0 else y1) * 0.85
+    lsize = min(fit_one_line(lv, text_w(i), 15, 8, True)
+                for i, lv in enumerate(levels)) if levels else 12
+    lsize = min(lsize, int(band * 72 / 1.6))
+    centers = []
+    for i, lv in enumerate(levels):
+        y1 = py + i * (band + gap)
+        y2 = y1 + band
+        fill = tone_rgb(theme, tone or "mid_blue") if i in hl else pal.footer_gray
+        if i == 0:
+            pts = [(cx, y1), (cx + half(y2), y2), (cx - half(y2), y2)]
+        else:
+            pts = [(cx - half(y1), y1), (cx + half(y1), y1), (cx + half(y2), y2),
+                   (cx - half(y2), y2)]
+        _polygon(slide, pts, fill)
+        ty = y1 + band * (0.4 if i == 0 else 0.0)
+        tb = add_textbox(slide, cx - half(y2), ty, 2 * half(y2), y2 - ty - (0.04 if i == 0 else 0),
+                         anchor=MSO_ANCHOR.MIDDLE if i else MSO_ANCHOR.BOTTOM)
+        tb.text_frame.word_wrap = False
+        write_paragraph(tb.text_frame, lv, size=lsize, bold=True, color=pal.white,
+                        family=typo.family, align=PP_ALIGN.CENTER, first=True)
+        centers.append((y1 + y2) / 2 + (band * 0.15 if i == 0 else 0))
+    nx = px + pw + 0.25
+    nw = x + w - nx
+    if notes and nw > 0.8:
+        nsize = min(fit_size([t], nw, band, max_size=14, min_size=MIN_PT) for t in notes)
+        for i, t in enumerate(notes[:n]):
+            if not t:
+                continue
+            add_line(slide, cx + half(centers[i]) + 0.05, centers[i], nx - 0.05, centers[i],
+                     color=pal.rule_gray, width_pt=0.75)
+            tb = add_textbox(slide, nx, centers[i] - band / 2, nw, band, anchor=MSO_ANCHOR.MIDDLE)
+            write_rich_paragraph(tb.text_frame, t, size=nsize, theme=theme, first=True)
+    elif note and nw > 0.8:
+        i = min(hl) if hl else n // 2
+        nsize = fit_size([note], nw, h * 0.6, max_size=15, min_size=MIN_PT)
+        nh = text_height_in([note], nw, nsize) + 0.1
+        ny = min(max(centers[i] - nh / 2, y), y + h - nh)
+        add_line(slide, cx + half(centers[i]) + 0.05, centers[i], nx - 0.05, centers[i],
+                 color=pal.rule_gray, width_pt=0.75)
+        tb = add_textbox(slide, nx, ny, nw, nh, anchor=MSO_ANCHOR.MIDDLE)
+        write_rich_paragraph(tb.text_frame, note, size=nsize, theme=theme, first=True)
+
+
+# ---------- sections ----------
+
+_MARKS = {"check": ("✓", "green"), "cross": ("✗", "red"), "dot": ("•", None)}
+
+
+def _set_mark(paragraph, char, rgb):
+    from lxml import etree
+    from pptx.oxml.ns import qn
+    pPr = paragraph._p.get_or_add_pPr()
+    for tag in ("a:buNone", "a:buChar", "a:buAutoNum", "a:buClr"):
+        for el in pPr.findall(qn(tag)):
+            pPr.remove(el)
+    if rgb is not None:
+        clr = etree.SubElement(pPr, qn("a:buClr"))
+        srgb = etree.SubElement(clr, qn("a:srgbClr"))
+        srgb.set("val", str(rgb))
+    bu = etree.SubElement(pPr, qn("a:buChar"))
+    bu.set("char", char)
+    pPr.set("indent", "-228600")
+    pPr.set("marL", "228600")
+
+
+def comp_sections(slide, theme, x, y, w, h, *, sections: Sequence[Dict], boxed=True,
+                  where=""):
+    """Stacked titled groups — e.g. Feasibility / Pros / Cons of one option.
+    sections: [{"title", "bullets"? | "body"?, "tone"?, "mark"?: check|cross|dot}].
+    Pros-like sections default to ✓ (tone green), cons-like to ✗ (red).
+    boxed=False drops the outline boxes (use inside a `panel`)."""
+    from .design import add_stage_banners
+    pal = theme.palette
+    secs = [dict(s) for s in sections]
+    head_h, gap, pad = 0.32, 0.12, 0.12
+    inner = w - 2 * pad
+    m = max(len(secs), 1)
+
+    def items(s):
+        return ([s["body"]] if s.get("body") else []) + list(s.get("bullets", []))
+
+    def need(s, sz):
+        return head_h + 0.06 + text_height_in(items(s) or [" "], inner, sz, para_gap_pt=4,
+                                              indent_in=0.25) + 2 * pad
+    size = MIN_PT
+    for sz in range(MAX_PT - 1, MIN_PT - 1, -1):
+        if sum(need(s, sz) for s in secs) + gap * (m - 1) <= h:
+            size = sz
+            break
+    warn_small("sections", where, size, "Shorten the section bullets.")
+    needs = [need(s, size) for s in secs]
+    extra = h - sum(needs) - gap * (m - 1)
+    add = min(extra / m, 0.4) if extra > 0 else 0.0
+    if extra < 0:  # even the minimum size does not fit: stay inside the region
+        k = (h - gap * (m - 1)) / sum(needs)
+        needs = [max(nh * k, head_h + 0.3) for nh in needs]
+    cy = y
+    for s, nh in zip(secs, needs):
+        sh = nh + add
+        tone = s.get("tone")
+        color = tone_rgb(theme, tone) if tone else pal.deep_navy
+        add_stage_banners(slide, theme, [(x, w, s.get("title", ""), "result", color)], cy,
+                          head_h, style="rule", size=13)
+        by = cy + head_h + 0.06
+        if boxed:
+            add_rect(slide, x, by, w, sh - head_h - 0.06, fill=pal.white, line=color,
+                     line_width=1.0)
+        tb = add_textbox(slide, x + pad, by + pad, inner, sh - head_h - 0.06 - 2 * pad,
+                         anchor=MSO_ANCHOR.MIDDLE)
+        mark = s.get("mark") or {"green": "check", "red": "cross"}.get(tone)
+        ch, mtone = _MARKS.get(mark, (None, None))
+        for k, t in enumerate(items(s)):
+            p = write_rich_paragraph(tb.text_frame, t, size=size, theme=theme,
+                                     bullet=ch is None, first=k == 0,
+                                     space_before=0 if k == 0 else 4)
+            if ch:
+                _set_mark(p, ch, tone_rgb(theme, mtone) if mtone else color)
+        cy += sh + gap
+
+
 # ---------- wrappers around full templates' drawers ----------
 
 def comp_cards(slide, theme, x, y, w, h, *, cards, columns=None, where=""):
@@ -334,11 +550,69 @@ def comp_table(slide, theme, x, y, w, h, *, where="", **kw):
     draw_table(slide, theme, x, y, w, h, **kw)
 
 
+# Diagram templates that draw cleanly into a region: template -> smallest region
+# (width, height in inches). Measured with the CATALOG example of each template:
+# every shape inside the region, text >= 9 pt, no word broken mid-word
+# (tests/test_regressions.py re-checks this). Denser content needs more room.
+# Not listed: cycle, swimlane, hub_spoke, risk_heatmap and venn draw labels outside
+# their plot or overflow a short region - use them as full slides.
+DIAGRAM_MIN = {
+    "bump": (6.0, 3.8), "dumbbell": (4.4, 3.4), "fishbone": (8.0, 4.5),
+    "heatmap": (4.4, 3.4), "journey": (7.0, 4.4), "layer_stack": (5.2, 3.8),
+    "marimekko": (6.0, 4.0), "positioning_scale": (6.0, 4.0), "radar": (6.0, 3.8),
+    "sankey": (4.4, 3.4), "slopegraph": (4.4, 3.4), "timeline": (6.0, 3.4),
+    "treemap": (6.0, 3.8), "value_chain": (7.0, 4.4),
+}
+
+
+def diagram_templates(columns) -> list:
+    """Names of the diagram templates used in a composite's columns."""
+    found = []
+    for col in columns or []:
+        for region in (col if isinstance(col, (list, tuple)) else [col]):
+            if isinstance(region, dict) and region.get("type") == "diagram":
+                found.append(str(region.get("template")))
+    return found
+
+
+def comp_diagram(slide, theme, x, y, w, h, *, template, where="", **kw):
+    """Draw a diagram template (`template`: its name) into the region. The
+    template's own arguments go alongside; title / subtitle / insight / source
+    belong to the composite, not here."""
+    from . import builder, validate
+    from .design import draw_into, warn_small
+    fn = builder._REGISTRY.get(template)
+    if fn is None:
+        raise ValueError(validate.unknown_template(template, sorted(DIAGRAM_MIN)))
+    name = builder.template_name(fn)
+    if name not in DIAGRAM_MIN:
+        raise ValueError(f"diagram: {template!r} cannot be drawn into a region. "
+                         f"Use one of: {', '.join(sorted(DIAGRAM_MIN))}")
+    chrome = [k for k in ("title", "subtitle", "insight", "insight_label", "source",
+                          "footnote", "page_number", "section_marker") if k in kw]
+    if chrome:
+        raise ValueError(f"diagram {name}: {', '.join(chrome)} belong on the composite, "
+                         "not on the diagram region")
+    errs = [m for lv, m in validate.signature_problems(fn, kw) if lv == "error"]
+    if errs:
+        raise ValueError(f"diagram {name}: " + "; ".join(errs))
+    min_w, min_h = DIAGRAM_MIN[name]
+    if w < min_w or h < min_h:
+        warn_small("diagram", where or name, 0,
+                   f"{name} needs a region of at least {min_w:.1f} x {min_h:.1f} in "
+                   f"(got {w:.1f} x {h:.1f}); give it a wider column or more height.")
+    prs = slide.part.package.presentation_part.presentation
+    with draw_into(slide, x, y, w, h):
+        fn(prs, title=where or name, theme=theme, **kw)
+
+
 COMPONENTS = {
     "flow": comp_flow, "kv_table": comp_kv_table, "metrics": comp_metrics,
     "cards": comp_cards, "pros_cons": comp_pros_cons, "list": comp_list,
     "bullets": comp_bullets, "text": comp_text, "chart": comp_chart,
     "table": comp_table, "phases": comp_phases,
+    "callout": comp_callout, "pyramid": comp_pyramid, "sections": comp_sections,
+    "diagram": comp_diagram,
 }
 
 
@@ -352,8 +626,16 @@ def draw_region(slide, theme: Theme, x, y, w, h, region: Dict, *, where=""):
     fn = COMPONENTS.get(kind)
     if fn is None:
         raise ValueError(f"Unknown region type {kind!r}. Available: {sorted(COMPONENTS)}")
+    region.pop("arrow", None)  # drawn by the composite (arrow from the region above)
     if panel:
-        add_rect(slide, x, y, w, h, fill=theme.palette.soft_gray)
+        from .design import tint
+        pal = theme.palette
+        if panel == "outline":
+            add_rect(slide, x, y, w, h, fill=pal.white, line=pal.mid_blue, line_width=1.0)
+        elif panel == "tint":
+            add_rect(slide, x, y, w, h, fill=tint(pal.light_blue, 0.85))
+        else:
+            add_rect(slide, x, y, w, h, fill=pal.soft_gray)
         x, y, w, h = x + 0.2, y + 0.12, w - 0.4, h - 0.24
     if heading:
         y += draw_heading(slide, theme, x, y, w, heading)

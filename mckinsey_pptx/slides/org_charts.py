@@ -16,14 +16,15 @@ from ..base import (
     write_paragraph, add_subtitle_placeholder,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..design import HAIRLINE_PT, check_focus, has_focus, is_focus
 
 
 # ---------- shared primitives ----------
 
 def _box(slide, theme, left, top, w, h, *, text, fill, color, bold=False,
-         size=None):
+         size=None, line=None, line_width=None):
     typo = theme.typography
-    add_rect(slide, left, top, w, h, fill=fill)
+    add_rect(slide, left, top, w, h, fill=fill, line=line, line_width=line_width)
     tb = add_textbox(slide, left + 0.05, top, w - 0.10, h,
                      anchor=MSO_ANCHOR.MIDDLE)
     write_paragraph(tb.text_frame, text,
@@ -32,13 +33,30 @@ def _box(slide, theme, left, top, w, h, *, text, fill, color, bold=False,
                     align=PP_ALIGN.CENTER, first=True)
 
 
-def _elbow(slide, theme, x1, y1, x2, y2):
-    """Draw a 2-segment elbow connector from (x1,y1) horizontal-then-vertical to (x2,y2)."""
+def _elbow(slide, theme, x1, y1, x2, y2, *, hot=False):
+    """Draw a 2-segment elbow connector from (x1,y1) horizontal-then-vertical to (x2,y2).
+    hot: part of the path to the focal node (accent, heavier)."""
     pal = theme.palette
     midx = (x1 + x2) / 2
-    add_line(slide, x1, y1, midx, y1, color=pal.rule_gray, width_pt=0.6)
-    add_line(slide, midx, y1, midx, y2, color=pal.rule_gray, width_pt=0.6)
-    add_line(slide, midx, y2, x2, y2, color=pal.rule_gray, width_pt=0.6)
+    c, w = (pal.bright_blue, 1.5) if hot else (pal.rule_gray, HAIRLINE_PT)
+    add_line(slide, x1, y1, midx, y1, color=c, width_pt=w)
+    add_line(slide, midx, y1, midx, y2, color=c, width_pt=w)
+    add_line(slide, midx, y2, x2, y2, color=c, width_pt=w)
+
+
+def _focal_style(theme, level, focal, on_path):
+    """(fill, text colour, line, bold) for a tree node.
+    level 0 root, 1 main, 2 secondary, 3 leaf."""
+    pal = theme.palette
+    if focal:
+        return pal.bright_blue, pal.white, None, True
+    if level == 0:
+        return pal.deep_navy, pal.white, None, True
+    if level == 1:
+        return pal.white, pal.deep_navy, pal.deep_navy, True
+    if level == 2:
+        return pal.white, pal.text_dark, (pal.bright_blue if on_path else pal.rule_gray), on_path
+    return pal.soft_gray, pal.text_dark, None, False
 
 
 # ---------- Issue tree ----------
@@ -48,10 +66,13 @@ def add_issue_tree(prs, *,
                    subtitle: Optional[str] = "[Insert subtitle]",
                    root: str = "[Main issue]",
                    main_drivers: Sequence[Dict],
+                   focus=None,
                    page_number=None, section_marker="Section marker",
                    source="xx", footnote="1. xx",
                    theme: Theme = DEFAULT_THEME):
-    """main_drivers: [{
+    """focus: the driver the title is about (its label, at any level) — filled in
+    the accent, with the branch from the root to it drawn in the accent too.
+    main_drivers: [{
         "label": "[Main drivers of issue]",
         "secondaries": [
             {"label": "[Secondary drivers of issue]",
@@ -81,6 +102,23 @@ def add_issue_tree(prs, *,
     x_main = x_root + col_w_root + gap
     x_sec = x_main + col_w_main + gap
     x_und = x_sec + col_w_sec + gap
+
+    def lab(v):
+        return v if isinstance(v, str) else v.get("label", "")
+    every = []
+    for m in main_drivers:
+        every.append(lab(m))
+        for s_ in m.get("secondaries", []) or []:
+            every.append(lab(s_))
+            every.extend(lab(u) for u in s_.get("underlying", []) or [])
+    check_focus("issue_tree", title, focus, every)
+
+    def hit(v):
+        return is_focus(focus, -1, lab(v))
+
+    def under(m):  # focal node at or below main driver m
+        return hit(m) or any(hit(s_) or any(hit(u) for u in s_.get("underlying", []) or [])
+                             for s_ in m.get("secondaries", []) or [])
 
     # Root box (big, deep navy)
     root_h = 1.6
@@ -116,14 +154,16 @@ def add_issue_tree(prs, *,
         m_box_h = max(m_box_h, 0.45)
         m_box_y = y_cursor + (m_height - m_box_h) / 2
 
-        _box(slide, theme, x_main, m_box_y, col_w_main, m_box_h,
-             text=m.get("label", "[Main drivers of issue]"),
-             fill=pal.bright_blue, color=pal.white, bold=True,
-             size=typo.body_size - 1)
-        # connector root -> main
+        m_path = under(m)
+        fill, col, line, bold = _focal_style(theme, 1, hit(m), m_path)
+        # connector root -> main (drawn first, under the boxes)
         _elbow(slide, theme,
                x_root + col_w_root, main_root_y,
-               x_main, m_box_y + m_box_h / 2)
+               x_main, m_box_y + m_box_h / 2, hot=m_path)
+        _box(slide, theme, x_main, m_box_y, col_w_main, m_box_h,
+             text=m.get("label", "[Main drivers of issue]"),
+             fill=fill, color=col, bold=bold, size=typo.body_size - 1,
+             line=line, line_width=1.25 if line else None)
 
         sec_y = y_cursor
         for s in secs:
@@ -133,22 +173,25 @@ def add_issue_tree(prs, *,
             s_box_h = max(s_box_h, 0.40)
             s_box_y = sec_y + (s_height - s_box_h) / 2
 
-            _box(slide, theme, x_sec, s_box_y, col_w_sec, s_box_h,
-                 text=s.get("label", "[Secondary drivers of issue]"),
-                 fill=pal.soft_gray, color=pal.text_dark, bold=False,
-                 size=typo.body_size - 1)
+            s_path = hit(s) or any(hit(u) for u in unds)
             _elbow(slide, theme,
                    x_main + col_w_main, m_box_y + m_box_h / 2,
-                   x_sec, s_box_y + s_box_h / 2)
+                   x_sec, s_box_y + s_box_h / 2, hot=s_path)
+            fill, col, line, bold = _focal_style(theme, 2, hit(s), s_path)
+            _box(slide, theme, x_sec, s_box_y, col_w_sec, s_box_h,
+                 text=s.get("label", "[Secondary drivers of issue]"),
+                 fill=fill, color=col, bold=bold, size=typo.body_size - 1,
+                 line=line, line_width=HAIRLINE_PT if line else None)
 
             uy = sec_y
             for u in unds:
-                _box(slide, theme, x_und, uy, col_w_und, und_h,
-                     text=u, fill=pal.soft_gray, color=pal.text_dark,
-                     bold=False, size=typo.body_size - 2)
                 _elbow(slide, theme,
                        x_sec + col_w_sec, s_box_y + s_box_h / 2,
-                       x_und, uy + und_h / 2)
+                       x_und, uy + und_h / 2, hot=hit(u))
+                fill, col, line, bold = _focal_style(theme, 3, hit(u), False)
+                _box(slide, theme, x_und, uy, col_w_und, und_h,
+                     text=lab(u), fill=fill, color=col,
+                     bold=bold, size=typo.body_size - 2)
                 uy += und_h + und_gap
             sec_y += s_height
         y_cursor += m_height
@@ -162,11 +205,14 @@ def add_org_chart(prs, *,
                   subtitle: Optional[str] = "[Insert subtitle]",
                   ceo: str = "[Name/title/role]",
                   branches: Sequence[Dict],
+                  focus=None,
                   page_number=None, section_marker="Section marker",
                   source="xx", footnote="1. xx",
                   theme: Theme = DEFAULT_THEME):
     """branches: [{"head": "[Name/title/role]", "reports": ["[Name/title/role]", ...]}]
     Maximum 5-6 branches recommended.
+    focus: the head or report the title is about (its text) — filled in the
+           accent, with the reporting line to it drawn in the accent.
     """
     slide = blank_slide(prs)
     add_chrome(slide, title=title, theme=theme, page_number=page_number,
@@ -181,6 +227,15 @@ def add_org_chart(prs, *,
 
     box_w = 1.85
     box_h = 0.45
+
+    every = [b.get("head", "") for b in branches] + [r for b in branches
+                                                      for r in b.get("reports", []) or []]
+    check_focus("org_chart", title, focus, every)
+
+    def hit(t):
+        return is_focus(focus, -1, t)
+    hot_branch = [hit(b.get("head", "")) or any(hit(r) for r in b.get("reports", []) or [])
+                  for b in branches]
 
     # CEO at top center
     ceo_x = layout.margin_left_in + (width - box_w) / 2
@@ -200,24 +255,35 @@ def add_org_chart(prs, *,
 
     # Vertical line from CEO down + horizontal connector
     spine_y = ceo_y + box_h + 0.30
+    cool, hot = (pal.rule_gray, HAIRLINE_PT), (pal.bright_blue, 1.5)
+    any_hot = any(hot_branch)
+    c, w = hot if any_hot else cool
     add_line(slide, ceo_x + box_w / 2, ceo_y + box_h,
-             ceo_x + box_w / 2, spine_y, color=pal.rule_gray, width_pt=0.6)
+             ceo_x + box_w / 2, spine_y, color=c, width_pt=w)
     if n > 1:
         add_line(slide, head_xs[0] + box_w / 2, spine_y,
                  head_xs[-1] + box_w / 2, spine_y,
-                 color=pal.rule_gray, width_pt=0.6)
-    for hx in head_xs:
+                 color=pal.rule_gray, width_pt=HAIRLINE_PT)
+    for hx, hb in zip(head_xs, hot_branch):
+        if hb:  # the stretch of the spine that leads to the focal branch
+            add_line(slide, ceo_x + box_w / 2, spine_y, hx + box_w / 2, spine_y,
+                     color=pal.bright_blue, width_pt=1.5)
+    for hx, hb in zip(head_xs, hot_branch):
+        c, w = hot if hb else cool
         add_line(slide, hx + box_w / 2, spine_y,
-                 hx + box_w / 2, head_y, color=pal.rule_gray, width_pt=0.6)
+                 hx + box_w / 2, head_y, color=c, width_pt=w)
 
     # Heads + reports
     reports_top = head_y + box_h + 0.30
     avail_h = body_bottom - reports_top
-    for hx, br in zip(head_xs, branches):
+    for hx, br, hb in zip(head_xs, branches, hot_branch):
+        hf = hit(br.get("head", ""))
         _box(slide, theme, hx, head_y, box_w, box_h,
              text=br.get("head", "[Name/title/role]"),
-             fill=pal.mid_blue, color=pal.white, bold=False,
-             size=typo.body_size - 2)
+             fill=pal.bright_blue if hf else pal.white,
+             color=pal.white if hf else pal.deep_navy, bold=True,
+             size=typo.body_size - 2,
+             line=None if hf else pal.deep_navy, line_width=None if hf else 1.0)
         reports = br.get("reports", []) or []
         if not reports:
             continue
@@ -229,15 +295,13 @@ def add_org_chart(prs, *,
         add_line(slide, hx + box_w / 2, head_y + box_h,
                  hx + box_w / 2, reports_top + rh / 2 + (len(reports) - 1)
                  * (rh + rg) - 0.0,
-                 color=pal.rule_gray, width_pt=0.5)
+                 color=pal.rule_gray, width_pt=HAIRLINE_PT)
         for r in reports:
+            rf = hit(r)
             _box(slide, theme, hx, ry, box_w, rh, text=r,
-                 fill=pal.soft_gray, color=pal.text_dark,
-                 bold=False, size=typo.body_size - 3)
-            # Tee from spine
-            add_line(slide, hx + box_w / 2, ry + rh / 2,
-                     hx, ry + rh / 2,
-                     color=pal.rule_gray, width_pt=0.5)
+                 fill=pal.bright_blue if rf else pal.soft_gray,
+                 color=pal.white if rf else pal.text_dark,
+                 bold=rf, size=typo.body_size - 2)
             ry += rh + rg
     return slide
 

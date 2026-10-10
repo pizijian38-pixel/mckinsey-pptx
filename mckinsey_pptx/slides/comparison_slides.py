@@ -16,6 +16,7 @@ from ..base import (
     write_paragraph,
 )
 from ..theme import Theme, DEFAULT_THEME
+from ..labels import loc
 
 
 # Harvey-ball levels: 0 = empty, 4 = full
@@ -137,7 +138,7 @@ def add_comparison_table(prs, *,
              fill=pal.soft_gray)
     tb = add_textbox(slide, layout.margin_left_in + 0.10, body_top,
                      crit_w - 0.20, head_h, anchor=MSO_ANCHOR.MIDDLE)
-    write_paragraph(tb.text_frame, "Criteria", size=typo.body_size, bold=True,
+    write_paragraph(tb.text_frame, loc(theme, "Criteria"), size=typo.body_size, bold=True,
                     color=pal.text_dark, family=typo.family, first=True)
     for i, opt in enumerate(options):
         ox = layout.margin_left_in + crit_w + i * opt_w

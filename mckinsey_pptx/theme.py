@@ -75,6 +75,9 @@ class Theme:
     brand_text: str = ""
     # Prefix for the `source=` line in the footer.
     source_label: str = "Source: "
+    # Slide language ("en" | "zh" | "ko" | "ja"): default labels such as
+    # "Key insight" are drawn in this language (see labels.py).
+    lang: str = "en"
 
 
 DEFAULT_THEME = Theme()
@@ -98,6 +101,7 @@ def make_zh_theme(company: Optional[str] = None, *,
         copyright_text=f"ⓒ {year} {company}" if company else "",
         brand_text=company or "",
         source_label="资料来源：",
+        lang="zh",
     )
 
 
@@ -162,5 +166,6 @@ def make_theme(company: Optional[str] = None, *, lang: str = "en",
         copyright_text=f"ⓒ {year} {company}" if company else "",
         brand_text=company or "",
         source_label=label,
+        lang=lang if lang in _LANG_DEFAULTS else "en",
     )
     return make_brand_theme(brand, accent, base=t) if brand else t

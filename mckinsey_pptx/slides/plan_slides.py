@@ -8,30 +8,10 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches
 
 from ..base import add_chrome, add_line, add_oval, add_rect, add_textbox, blank_slide, write_paragraph
-from ..design import (add_callout_bar, fit_one_line, fit_size, text_width_pt, tone_rgb,
+from ..design import (add_callout_bar, fit_one_line, fit_size, text_height_in, text_width_pt, tone_rgb,
                       warn_small, write_rich_paragraph)
 from ..theme import Theme, DEFAULT_THEME
-
-
-def _frame(prs, theme, title, subtitle, insight, insight_label, **chrome):
-    slide = blank_slide(prs)
-    add_chrome(slide, title=title, theme=theme, **chrome)
-    pal, typo, layout = theme.palette, theme.typography, theme.layout
-    left = layout.margin_left_in
-    width = layout.slide_width_in - layout.margin_left_in - layout.margin_right_in
-    top = layout.body_top_in + 0.05
-    bottom = layout.footer_top_in - 0.25
-    if subtitle:
-        tb = add_textbox(slide, left, top, width, 0.35)
-        write_paragraph(tb.text_frame, subtitle, size=typo.section_title_size,
-                        bold=True, color=pal.text_dark, family=typo.family, first=True)
-        top += 0.45
-    if insight:
-        h = 0.7
-        add_callout_bar(slide, theme, left, bottom - h, width, h, insight,
-                        label=insight_label)
-        bottom -= h + 0.25
-    return slide, left, top, width, bottom
+from .evaluation_slides import _frame
 
 
 def _diamond(slide, cx, cy, d, rgb):
@@ -205,4 +185,177 @@ def add_timeline(prs, *,
         if e.get("body"):
             write_rich_paragraph(tb.text_frame, e["body"], size=size - 1, theme=theme,
                                  align=PP_ALIGN.CENTER, space_before=2)
+    return slide
+
+
+# ---------- phase grid ----------
+
+def add_phase_grid(prs, *,
+                   title: str = "[Phase grid / Insert action title]",
+                   stages: Sequence[str],
+                   rows: Sequence[Dict],
+                   side: Optional[Dict] = None,
+                   timeline: bool = True,
+                   subtitle: Optional[str] = None,
+                   insight: Optional[str] = None,
+                   insight_label: Optional[str] = "Key insight",
+                   page_number=None, section_marker=None,
+                   source=None, footnote=None,
+                   theme: Theme = DEFAULT_THEME):
+    """Implementation plan as a grid: row labels (channels, partners, goals,
+    resources ...) x stages (Stage 1 / Stage 2, Short / Mid / Long term, years).
+    stages: header per column, left -> right.
+    rows: [{"label": str, "cells": [cell per stage], "kpi"?: str}]
+          cell = None | str | [bullets] | {"body"?, "bullets"?, "span"?: int, "tone"?}
+          span: the cell covers that many stages (a bar across years);
+          kpi: a full-width band under the row ("KPI: 2M revenue, 300% CAGR").
+    side: {"title": str, "items": [str | {"title", "bullets"? | "body"?}]} —
+          a panel on the right (risk mitigation, enablers), split by a dashed line.
+    """
+    from ..design import add_stage_banners, set_dashed, tint
+    from ..labels import loc
+    from .logic_slides import _cell, _cell_h, _write_cell
+    slide, left, top, width, bottom = _frame(
+        prs, theme, title, subtitle, insight, insight_label, page_number=page_number,
+        section_marker=section_marker, source=source, footnote=footnote)
+    pal, typo = theme.palette, theme.typography
+    sw_ = width * 0.29 if side else 0.0
+    sg = 0.45 if side else 0.0
+    gw = width - sw_ - sg
+    lw = 1.55
+    n = max(len(stages), 1)
+    cg = 0.12
+    cw = (gw - lw - 0.12 - cg * (n - 1)) / n
+    xs = [left + lw + 0.12 + i * (cw + cg) for i in range(n)]
+
+    # headers (+ timeline)
+    head_h = 0.38
+    hy = top + (0.12 if timeline else 0)
+    if timeline:
+        ly = hy + head_h + 0.12
+        add_line(slide, xs[0], ly, xs[-1] + cw, ly, color=pal.grid_gray, width_pt=2.5)
+        for x in xs:
+            add_oval(slide, x + cw / 2 - 0.07, ly - 0.07, 0.14, 0.14, fill=pal.white,
+                     line=pal.mid_blue, line_width=1.5)
+    hs = min(fit_size([t], cw - 0.3, head_h - 0.04, max_size=14, min_size=10, bold=True)
+             for t in stages)
+    for x, t in zip(xs, stages):
+        tw = min(cw, text_width_pt(t, hs, True) / 72 / 0.9 + 0.5)
+        add_rect(slide, x + (cw - tw) / 2, hy, tw, head_h, fill=pal.deep_navy)
+        tb = add_textbox(slide, x + (cw - tw) / 2, hy, tw, head_h, anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, t, size=hs, bold=True, color=pal.white,
+                        family=typo.family, align=PP_ALIGN.CENTER, first=True)
+    body_top = hy + head_h + (0.3 if timeline else 0.15)
+
+    # lay out cells per row with spans
+    def layout_row(r):
+        out, col = [], 0
+        for c in r.get("cells", []):
+            span = int(c.get("span", 1)) if isinstance(c, dict) else 1
+            if col >= n:
+                break
+            span = max(1, min(span, n - col))
+            out.append((col, span, c))
+            col += span
+        return out
+
+    laid = [layout_row(r) for r in rows]
+    kpi_h = 0.4
+    g = 0.14
+    m = max(len(rows), 1)
+
+    def width_of(span):
+        return span * cw + (span - 1) * cg
+
+    def need(i, s):
+        hh = [_cell_h(c, width_of(sp) - 0.3, s) + 0.24 for _, sp, c in laid[i] if c]
+        lab = text_height_in([rows[i].get("label", "")], lw - 0.2, s + 1, bold=True) + 0.2
+        return max(hh + [lab, 0.5])
+
+    n_kpi = sum(1 for r in rows if r.get("kpi"))
+    avail = bottom - body_top - g * (m - 1) - n_kpi * (kpi_h + 0.06)
+    size = 10
+    for s in range(15, 9, -1):
+        if sum(need(i, s) for i in range(len(rows))) <= avail:
+            size = s
+            break
+    warn_small("phase_grid", title, size, "Shorten the cells or split the plan over two slides.")
+    needs = [need(i, size) for i in range(len(rows))]
+    extra = avail - sum(needs)
+    add = min(extra / m, 0.5) if extra > 0 else 0.0
+    y = body_top
+    lsize = min(size + 1, min(fit_one_line(max(str(r.get("label", "")).split() or [""], key=len),
+                                           lw - 0.2, 15, 10, True) for r in rows))
+    for i, r in enumerate(rows):
+        rh = needs[i] + add
+        add_rect(slide, left, y, lw, rh, fill=pal.light_gray)
+        tb = add_textbox(slide, left + 0.1, y, lw - 0.2, rh, anchor=MSO_ANCHOR.MIDDLE)
+        write_rich_paragraph(tb.text_frame, r.get("label", ""), size=lsize, theme=theme,
+                             bold=True, align=PP_ALIGN.CENTER, first=True)
+        for col, sp, c in laid[i]:
+            if not c:
+                continue
+            x, w = xs[col], width_of(sp)
+            tone = c.get("tone") if isinstance(c, dict) else None
+            solid = tone in ("navy", "blue", "mid_blue")
+            if solid:
+                add_rect(slide, x, y, w, rh, fill=tone_rgb(theme, tone))
+            elif tone:
+                add_rect(slide, x, y, w, rh, fill=tint(tone_rgb(theme, tone), 0.82))
+            else:
+                add_rect(slide, x, y, w, rh, fill=pal.white, line=pal.grid_gray, line_width=1.0)
+            body, bullets = _cell(c)
+            _write_cell(slide, theme, x + 0.15, y + 0.1, w - 0.3, rh - 0.2, c, size,
+                        color=pal.white if solid else None, bold=solid,
+                        align=PP_ALIGN.CENTER if (sp > 1 and not bullets) else PP_ALIGN.LEFT)
+        y += rh
+        if r.get("kpi"):
+            y += 0.06
+            add_rect(slide, left, y, lw, kpi_h, fill=pal.status_red)
+            tb = add_textbox(slide, left, y, lw, kpi_h, anchor=MSO_ANCHOR.MIDDLE)
+            write_paragraph(tb.text_frame, loc(theme, "KPI"), size=13, bold=True, italic=True,
+                            color=pal.white, family=typo.family, align=PP_ALIGN.CENTER,
+                            first=True)
+            kx = xs[0]
+            add_rect(slide, kx, y, xs[-1] + cw - kx, kpi_h, fill=tint(pal.status_red, 0.15))
+            ks = fit_size([r["kpi"]], xs[-1] + cw - kx - 0.3, kpi_h - 0.04, max_size=13,
+                          min_size=10)
+            tb = add_textbox(slide, kx + 0.15, y, xs[-1] + cw - kx - 0.3, kpi_h,
+                             anchor=MSO_ANCHOR.MIDDLE)
+            write_rich_paragraph(tb.text_frame, r["kpi"], size=ks, theme=theme, color=pal.white,
+                                 bold=True, align=PP_ALIGN.CENTER, first=True)
+            y += kpi_h
+        y += g
+
+    if side:
+        sx = left + gw + sg
+        ln = add_line(slide, sx - sg / 2, top, sx - sg / 2, bottom, color=pal.footer_gray,
+                      width_pt=1.0)
+        from pptx.enum.dml import MSO_LINE_DASH_STYLE
+        ln.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+        st = loc(theme, side.get("title", "Risks and mitigation"))
+        add_rect(slide, sx + 0.2, top, sw_ - 0.4, 0.38, fill=pal.deep_navy)
+        tb = add_textbox(slide, sx + 0.2, top, sw_ - 0.4, 0.38, anchor=MSO_ANCHOR.MIDDLE)
+        write_paragraph(tb.text_frame, st, size=13, bold=True, color=pal.white,
+                        family=typo.family, align=PP_ALIGN.CENTER, first=True)
+        items = [it if isinstance(it, dict) else {"title": str(it)} for it in side.get("items", [])]
+        paras = []
+        for it in items:
+            paras.append(it.get("title", ""))
+            paras += ([it["body"]] if it.get("body") else []) + list(it.get("bullets", []))
+        ss = fit_size(paras or [" "], sw_ - 0.3, bottom - top - 0.55, max_size=14, min_size=10,
+                      para_gap_pt=5, indent_in=0.22)
+        warn_small("phase_grid", title, ss, "Shorten the side panel.")
+        tb = add_textbox(slide, sx, top + 0.55, sw_, bottom - top - 0.55)
+        first = True
+        for it in items:
+            if it.get("title"):
+                p = write_rich_paragraph(tb.text_frame, "✓ " + it["title"], size=ss, theme=theme,
+                                         color=pal.deep_navy, bold=True, first=first,
+                                         space_before=None if first else 8)
+                first = False
+            for t in ([it["body"]] if it.get("body") else []) + list(it.get("bullets", [])):
+                write_rich_paragraph(tb.text_frame, t, size=ss, theme=theme, bullet=True,
+                                     first=first, space_before=None if first else 4)
+                first = False
     return slide

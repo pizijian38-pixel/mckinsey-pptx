@@ -1,4 +1,6 @@
-"""Check a generated deck against its source material.
+"""AGENTS: you do not need to read this file — SKILL.md Step 6 and each section of its report say what to do.
+
+Check a generated deck against its source material.
 
     python scripts/deck_check.py output/deck.pptx --source inputs/outline.docx [--source more.xlsx ...]
 
@@ -10,9 +12,14 @@ Reports, per deck:
   5. Claims / quoted terms / vocabulary not in the sources -> possible invention
   6. Same template many slides in a row, no chart, or a parallel group
      (group=) whose slides use different templates          -> layout issues
-  7. Body text below 12pt                                  -> hard to read
+  7. Body text below 12pt (diagram labels below 10pt)     -> hard to read
   8. Footer "Source:" misuse (caption as source, wrong language)
   9. Insight bullets that only restate a table row
+ 10. English default labels ("Key insight", "Weighted total" ...) left in a
+     Chinese / Korean / Japanese deck
+ 11. Layout mix (advisory, never fails): text layouts on more than half of the
+     content slides -> a reminder to check for relationships a diagram shows better
+ 12. With --plan: slides whose template differs from the slide plan
 
 Sources: .docx .pptx .md .txt .csv .xlsx (.pdf if pypdf is installed).
 Exit code 1 if anything is flagged, so a build script can gate on it.
@@ -20,6 +27,7 @@ Exit code 1 if anything is flagged, so a build script can gate on it.
 from __future__ import annotations
 
 import argparse
+import html
 import re
 import sys
 import zipfile
@@ -28,11 +36,21 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Emu
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+try:
+    from mckinsey_pptx.labels import english_defaults
+    _EN_LABELS = {t.lower() for t in english_defaults()}
+except Exception:  # checker still runs without the package
+    _EN_LABELS = set()
+
 # A leading sign counts only when it isn't a range dash ("30%-50%", "12-18").
 NUM = re.compile(r"(?:(?<![\w.%)])[-+−])?(?<![\w.])\d{1,3}(?:,\d{3})+(?:\.\d+)?"
                  r"|(?:(?<![\w.%)])[-+−])?(?<![\w.])\d+(?:\.\d+)?")
 # Outline scaffolding ("Slide 13:", "Table 2") is not data.
 SCAFFOLD = re.compile(r"\b(?:slide|table|chart|figure|page|section|第)\s*\d+\b", re.I)
+# Emphasis markup that reached the slide as characters: the template does not render it.
+LITERAL_MARKUP = re.compile(
+    r"\*\*[^*\n]+\*\*|\{(?:navy|blue|mid_blue|light_blue|red|green|amber|gray|gold)\|")
 PLACEHOLDER = re.compile(r"\[(?:insert|description|key takeaway|lorem)[^\]]*\]|\blorem ipsum\b|^xx$|\b1\. xx\b|Source: xx",
                          re.I)
 CJK = re.compile(r"[⺀-鿿가-힯＀-￯]")
@@ -44,7 +62,9 @@ def _docx_text(path: Path) -> str:
     with zipfile.ZipFile(path) as z:
         xml = z.read("word/document.xml").decode("utf8")
     xml = re.sub(r"</w:p>|</w:tc>", "\n", xml)
-    return re.sub(r"<[^>]+>", "", xml)
+    # &quot; &amp; &lt; ... are XML entities: decode them, or quoted terms and
+    # words next to "&" never match the deck text
+    return html.unescape(re.sub(r"<[^>]+>", "", xml))
 
 
 def _pptx_text(path: Path) -> str:
@@ -70,7 +90,10 @@ def _pdf_text(path: Path) -> str:
     return "\n".join(p.extract_text() or "" for p in pypdf.PdfReader(str(path)).pages)
 
 
-_NUMBERING = re.compile(r"(?m)^\s*#{0,6}\s*\d{1,2}(?:\.\d{1,2})*[.)、]\s*")
+# List / heading numbering ("3. Market", "2) Risks", "1.2. Scope", "4、").
+# The marker must be followed by a space or the line end, so a table cell that
+# holds only "24.4" or "8.0" keeps its number.
+_NUMBERING = re.compile(r"(?m)^[ \t]*#{0,6}[ \t]*\d{1,2}(?:\.\d{1,2})*(?:[.)](?=[ \t]|$)|、)[ \t]*")
 
 
 def source_text(path: Path) -> str:
@@ -88,7 +111,66 @@ def _raw_source_text(path: Path) -> str:
         return _xlsx_text(path)
     if ext == ".pdf":
         return _pdf_text(path)
+    if ext in (".csv", ".tsv"):
+        return _csv_text(path, "\t" if ext == ".tsv" else ",")
     return path.read_text(encoding="utf8", errors="ignore")
+
+
+def source_table_cells(path: Path):
+    """[(table number, cell text)] for every table in a source file."""
+    ext = path.suffix.lower()
+    tables = []
+    try:
+        if ext == ".docx":
+            with zipfile.ZipFile(path) as z:
+                xml = z.read("word/document.xml").decode("utf8")
+            for tbl in re.findall(r"<w:tbl>.*?</w:tbl>", xml, re.S):
+                cells = [html.unescape(re.sub(r"<[^>]+>", " ", c))
+                         for c in re.findall(r"<w:tc>.*?</w:tc>", tbl, re.S)]
+                tables.append(cells)
+        elif ext == ".pptx":
+            for sl in Presentation(str(path)).slides:
+                for sh in _iter_shapes(sl.shapes):
+                    if getattr(sh, "has_table", False) and sh.has_table:
+                        tables.append([c.text for r in sh.table.rows for c in r.cells])
+        elif ext in (".csv", ".tsv"):
+            tables.append([c for line in _csv_text(path, "\t" if ext == ".tsv" else ",").splitlines()
+                           for c in line.split(" | ")])
+        elif ext in (".md", ".txt"):
+            cur = []
+            for line in path.read_text(encoding="utf8", errors="ignore").splitlines():
+                if line.strip().startswith("|"):
+                    cur += [c for c in line.strip().strip("|").split("|")
+                            if not re.fullmatch(r"\s*:?-{2,}:?\s*", c)]
+                elif cur:
+                    tables.append(cur)
+                    cur = []
+            if cur:
+                tables.append(cur)
+    except Exception:  # noqa: BLE001 - a source we cannot parse has no table check
+        return []
+    return [(n, re.sub(r"\s+", " ", c).strip()) for n, cells in enumerate(tables, start=1)
+            for c in cells]
+
+
+def missing_table_text(cells, deck_stems: set) -> list:
+    """Source table cells with real wording (3+ content words) of which fewer than
+    half the words appear anywhere in the deck: a text column that was dropped
+    (Crest run: a slopegraph kept the shares and lost "Trend Interpretation")."""
+    out = []
+    for n, text in cells:
+        words = {_stem(w) for w in _WORD.findall(text) if w.lower() not in _STOP}
+        if len(words) >= 3 and len(words & deck_stems) / len(words) < 0.5:
+            out.append((n, text))
+    return out
+
+
+def _csv_text(path: Path, delim: str) -> str:
+    """One line per row, cells joined by ' | ': a delimiter comma is never read as
+    a thousands separator ("APAC,980,1010" is 980 and 1010, not 9801010)."""
+    import csv
+    with open(path, newline="", encoding="utf-8-sig", errors="ignore") as f:
+        return "\n".join(" | ".join(c.strip() for c in row) for row in csv.reader(f, delimiter=delim))
 
 
 def _iter_shapes(shapes):
@@ -111,6 +193,42 @@ def _frames(slide):
                     yield cell.text_frame, cols[ci].width
 
 
+def _split_word_frames(slide):
+    """(text_frame, inner width in points) for shapes and table cells."""
+    for sh in _iter_shapes(slide.shapes):
+        if sh.has_text_frame and sh.width:
+            tf = sh.text_frame
+            yield tf, (sh.width - (tf.margin_left or 0) - (tf.margin_right or 0)) / 12700
+        if getattr(sh, "has_table", False) and sh.has_table:
+            cols = sh.table.columns
+            for row in sh.table.rows:
+                for ci, cell in enumerate(row.cells):
+                    w = cols[ci].width - (cell.margin_left or 0) - (cell.margin_right or 0)
+                    yield cell.text_frame, w / 12700
+
+
+def broken_words(slide):
+    """Words wider than their box: PowerPoint splits them mid-word ("Explosio-n"
+    in a narrow table column, "Ecosyste-m" in a hub circle). [(word, size)]"""
+    try:
+        from mckinsey_pptx.metrics import text_width_pt
+    except Exception:  # checker still runs without the package
+        return []
+    out = []
+    for tf, inner in _split_word_frames(slide):
+        if inner <= 0:
+            continue
+        for p in tf.paragraphs:
+            for r in p.runs:
+                size = r.font.size.pt if r.font.size else None
+                if not size:
+                    continue
+                for w in re.findall(r"[A-Za-z][A-Za-z'’-]{4,}", r.text):
+                    if text_width_pt(w, size, bool(r.font.bold)) > inner * 1.02:
+                        out.append((w, size))
+    return out
+
+
 def _chart_text(slide) -> str:
     """Category labels and values of native charts (they hold no text frames)."""
     out = []
@@ -128,8 +246,37 @@ def _chart_text(slide) -> str:
 _CHROME = re.compile(r"^\s*(?:ⓒ|©|copyright\b).*$", re.I | re.M)
 
 
+def _content_frames(slide):
+    """Text frames minus sequence-number chrome (shapes named 'chrome:*')."""
+    for sh in _iter_shapes(slide.shapes):
+        if sh.has_text_frame and not (sh.name or "").startswith("chrome:"):
+            yield sh.text_frame
+        if getattr(sh, "has_table", False) and sh.has_table:
+            for row in sh.table.rows:
+                for cell in row.cells:
+                    yield cell.text_frame
+
+
+def derived_numbers(slide) -> set[str]:
+    """Numbers the template computed itself (shares, totals, weighted scores):
+    shapes named 'derived:*', or values listed in a shape's description
+    ('derived:0.40; 1.20'). They need no source; section [2] still counts them."""
+    out: set[str] = set()
+    for sh in _iter_shapes(slide.shapes):
+        if (sh.name or "").startswith("derived:"):
+            if sh.has_text_frame:
+                out |= numbers(sh.text_frame.text)
+        try:
+            descr = sh._element.xpath(".//p:cNvPr")[0].get("descr") or ""
+        except (IndexError, AttributeError):
+            descr = ""
+        if descr.startswith("derived:"):
+            out |= numbers(descr[len("derived:"):])
+    return out
+
+
 def slide_text(slide) -> str:
-    text = "\n".join([tf.text for tf, _ in _frames(slide)] + [_chart_text(slide)])
+    text = "\n".join([tf.text for tf in _content_frames(slide)] + [_chart_text(slide)])
     return _CHROME.sub(" ", text)         # footer "ⓒ 2026 Acme  3" is chrome
 
 
@@ -152,6 +299,29 @@ def _norm(n: str) -> str:
 
 def numbers(text: str) -> set[str]:
     return {_norm(m) for m in NUM.findall(text)}
+
+
+def arithmetic(n: str, operands) -> str | None:
+    """'21 = 16 + 5' when n is the sum or difference of two source numbers shown
+    on the same slide (a combined share, a gap, a change). Below 10 too many
+    pairs match by chance, so small numbers are never explained this way."""
+    try:
+        v = float(n)
+    except ValueError:
+        return None
+    if v < 10:
+        return None
+    ops = sorted({o for o in operands if o != n}, key=lambda o: float(o))
+    vals = [(o, float(o)) for o in ops]
+    for i, (a, x) in enumerate(vals):
+        for b, y in vals[i:]:
+            if a == b:
+                continue
+            if abs(x + y - v) < 1e-6:
+                return f"{n} = {b} + {a}"
+            if abs(abs(y - x) - v) < 1e-6:
+                return f"{n} = {b} - {a}"
+    return None
 
 
 def fill_ratio(slide, slide_w, slide_h) -> float:
@@ -298,15 +468,107 @@ _FAMILY = {"swot": "card_grid"}
 _TEXT_TEMPLATES = {"card_grid", "card_rows", "swot", "executive_summary",
                    "executive_summary_takeaways", "three_trends_icons",
                    "three_trends_table", "three_trends_numbered", "five_key_areas",
-                   "overview_areas", "two_column_compare", "pros_cons"}
+                   "overview_areas", "two_column_compare", "pros_cons", "logic_grid"}
+
+
+# [11] Layout mix. Text layouts (cards, rows, tables, lists) vs everything else,
+# counted over content slides only (aliases included: the record keeps the name
+# the build used).
+_TEXT_LAYOUTS = (_TEXT_TEMPLATES - {"executive_summary", "executive_summary_takeaways"}) | {
+    "cards", "card_rows", "before_after", "logic_chain", "data_table", "table",
+    "phases_table_4", "process_activities", "three_trends_table"}
+_NON_CONTENT = {"cover_slide", "cover", "section_divider", "agenda", "executive_summary",
+                "executive_summary_paragraph", "executive_summary_takeaways",
+                "storyline_summary", "dark_navy_summary", "quote_slide", "quote",
+                "stat_hero", "big_number", "strategic_challenge", "key_question"}
+TEXT_SHARE_REMINDER = 0.5
+
+# [7] Diagrams whose text is short labels on marks (bubbles, nodes, blocks,
+# axis ends) are held to a 10pt floor, and so are composite slides with a diagram
+# region; body text everywhere else to 12pt.
+_LABEL_TEMPLATES = {
+    "bubble_chart", "bubble_chart_takeaways", "growth_share", "bcg_matrix",
+    "prioritization_matrix", "matrix_2x2", "matrix", "issue_tree", "org_chart",
+    "marimekko", "mekko", "treemap", "sankey", "slopegraph", "slope", "dumbbell",
+    "heatmap", "heat_map", "radar", "spider", "venn", "bump", "rank_chart",
+    "cycle", "flywheel", "risk_heatmap", "risk_matrix", "hub_spoke", "swimlane",
+    "layer_stack", "layers", "journey", "customer_journey", "funnel",
+    "process_flow", "process_flow_horizontal"}
+LABEL_MIN_PT, BODY_MIN_PT = 10, 12
+
+
+def size_floor(slide) -> int:
+    """Smallest dominant body size [7] accepts on this slide."""
+    return LABEL_MIN_PT if template_of(slide) in _LABEL_TEMPLATES or diagrams_of(slide) \
+        else BODY_MIN_PT
+
+
+def layout_mix(templates):
+    """(text-layout slide numbers, content slide count) — slides 1-based."""
+    content = [(i, t) for i, t in enumerate(templates, start=1)
+               if t and t not in _NON_CONTENT]
+    return [i for i, t in content if t in _TEXT_LAYOUTS], len(content)
+
+
+_PERIOD = re.compile(r"^\s*(?:(?:19|20)\d{2}\s*[A-Za-z]{0,4}|FY\s?\d{2,4}|[QH][1-4](?:\s?\d{2,4})?"
+                     r"|\d{4}\s*(?:Est\.?|E|F|A))\s*$", re.I)
+
+
+def period_table(slide) -> bool:
+    """A table whose columns (or rows) are 3+ periods and whose cells are numbers:
+    a time series laid out as a table."""
+    for sh in _iter_shapes(slide.shapes):
+        if getattr(sh, "has_table", False) and sh.has_table:
+            rows = list(sh.table.rows)
+            head = [c.text for c in rows[0].cells] if rows else []
+            first_col = [r.cells[0].text for r in rows]
+            if (sum(bool(_PERIOD.match(h)) for h in head) >= 3
+                    or sum(bool(_PERIOD.match(h)) for h in first_col) >= 3):
+                return numeric_share(slide) >= 0.6
+    return False
+
+
+_PERIOD_IN = re.compile(r"\b(?:(?:19|20)\d{2}|FY\s?\d{2,4}|[QH][1-4])\b", re.I)
+_NUMBER_CELL = re.compile(r"[\s<>~≈+\-−$€£¥]*[\d.,]+\s*(?:%|pts?|[xMBK]|bn|m)?\s*", re.I)
+
+
+def two_point_table(slide) -> bool:
+    """A table with exactly two period columns ("2023 share", "2024 share") of
+    numbers for 3+ rows: change between two points per item, which a slopegraph
+    or dumbbell shows (Crest run: the "K-shaped" price-tier shift stayed a table)."""
+    for sh in _iter_shapes(slide.shapes):
+        if not (getattr(sh, "has_table", False) and sh.has_table):
+            continue
+        rows = list(sh.table.rows)
+        if len(rows) < 4:
+            continue
+        head = [c.text for c in rows[0].cells]
+        cols = [j for j, h in enumerate(head) if _PERIOD_IN.search(h)]
+        if len(cols) != 2:
+            continue
+        body = rows[1:]
+        if all(_NUMBER_CELL.fullmatch(r.cells[j].text.strip() or "x") for r in body for j in cols):
+            return True
+    return False
 
 
 def _record(slide):
     name = slide._element.cSld.get("name") or ""
     if not name.startswith("mp:"):
         return None, None
-    tpl, _, group = name[3:].partition("|")
-    return tpl, (group or None)
+    parts = name[3:].split("|")      # mp:<template>[|<group>][|d=<diagram>,...]
+    group = parts[1] if len(parts) > 1 else ""
+    return parts[0], (group or None)
+
+
+def diagrams_of(slide):
+    """Diagram templates drawn inside a composite slide (empty for other slides)."""
+    name = slide._element.cSld.get("name") or ""
+    _, _, rest = name.partition("|")
+    for part in rest.split("|"):
+        if part.startswith("d="):
+            return part[2:].split(",")
+    return []
 
 
 def template_of(slide):
@@ -344,6 +606,8 @@ def body_size(slide, slide_h) -> float | None:
     for sh in _iter_shapes(slide.shapes):
         if not sh.has_text_frame or sh.top is None:
             continue
+        if (sh.name or "").startswith("chrome:"):     # step numbers, captions
+            continue
         if sh.top < top_cut or sh.top > bottom_cut:
             continue
         for p in sh.text_frame.paragraphs:
@@ -354,6 +618,22 @@ def body_size(slide, slide_h) -> float | None:
 
 
 _SRC_LABEL = re.compile(r"^(Source:|Sources:|资料来源：|來源：|출처:|出典：)\s*(.*)$")
+
+
+def english_labels(slide):
+    """Known English default labels drawn on the slide (whole text or 'Label: ...')."""
+    hits = set()
+    for tf, _ in _frames(slide):
+        for p in tf.paragraphs:
+            t = p.text.strip()
+            if not t:
+                continue
+            low = t.lower().rstrip(":")
+            if low in _EN_LABELS:
+                hits.add(t.rstrip(":"))
+            elif ":" in t and t.split(":", 1)[0].lower() in _EN_LABELS:
+                hits.add(t.split(":", 1)[0])
+    return hits
 
 
 def source_issues(slide, deck_is_cjk: bool):
@@ -375,6 +655,16 @@ def source_issues(slide, deck_is_cjk: bool):
     return out
 
 
+# Sections that flagged something, with the slides concerned: {"[1]": [3, 5], ...}.
+# run_deck prints it so an agent sees which sections to open, not a list of all of them.
+FINDINGS: dict = {}
+
+
+def _note(section: str, slides) -> None:
+    FINDINGS.setdefault(section, [])
+    FINDINGS[section] += [s for s in slides if s not in FINDINGS[section]]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("deck")
@@ -382,6 +672,8 @@ def main(argv=None) -> int:
                     help="source file the deck was built from (repeatable)")
     ap.add_argument("--sparse", type=float, default=0.12,
                     help="flag slides whose text fill ratio is below this")
+    ap.add_argument("--plan", help="the slide plan (output/<slug>_plan.md): report where "
+                                   "the deck differs from it")
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="print every slide's text fill ratio")
     args = ap.parse_args(argv)
@@ -389,6 +681,7 @@ def main(argv=None) -> int:
     prs = Presentation(args.deck)
     sw, sh = prs.slide_width, prs.slide_height
     flagged = False
+    FINDINGS.clear()
 
     src_nums: set[str] = set()
     src_all = ""
@@ -403,18 +696,26 @@ def main(argv=None) -> int:
 
     print(f"Deck: {args.deck}  ({len(prs.slides)} slides)")
     deck_nums_all: set[str] = set()
-    sparse, leftovers, invented = [], [], []
+    sparse, leftovers, invented, computed, split = [], [], [], [], []
     risky, quoted_new, novel, small, src_bad, restates = [], [], [], [], [], []
+    en_labels = []
     templates, groups = [], []
     for i, slide in enumerate(prs.slides, start=1):
         text = slide_text(slide)
-        nums = numbers(text)
+        nums = numbers(_NUMBERING.sub(" ", text))      # "2. Risk" is a list number
         # page number and axis zero are chrome, not content
         nums.discard(str(i))
         nums.discard("0")
         deck_nums_all |= nums
         if args.source:
-            new = sorted(n for n in nums if n not in src_nums)
+            derived = derived_numbers(slide)
+            new = sorted(n for n in nums if n not in src_nums and n not in derived)
+            shown_src = nums & src_nums
+            sums = {n: arithmetic(n, shown_src) for n in new}
+            sums = {n: s for n, s in sums.items() if s}
+            if sums:
+                computed.append((i, sorted(sums.values())))
+            new = [n for n in new if n not in sums]
             if new:
                 invented.append((i, new))
         ratio = fill_ratio(slide, sw, sh)
@@ -435,15 +736,23 @@ def main(argv=None) -> int:
         if rr:
             restates.append((i, rr))
         bs = body_size(slide, sh)
-        if bs is not None and bs < 12 and i > 1:
-            small.append((i, bs))
+        floor = size_floor(slide)
+        if bs is not None and bs < floor and i > 1:
+            small.append((i, bs, floor))
+        bw = broken_words(slide)
+        if bw:
+            split.append((i, sorted({w for w, _ in bw})))
+        if deck_is_cjk and _EN_LABELS:
+            hits = sorted(english_labels(slide))
+            if hits:
+                en_labels.append((i, hits))
         issues = source_issues(slide, deck_is_cjk)
         if issues:
             src_bad.append((i, issues))
         templates.append(template_of(slide))
         groups.append(group_of(slide))
         hits = {m.group(0) for line in text.splitlines()
-                for m in [PLACEHOLDER.search(line.strip())] if m}
+                for m in [PLACEHOLDER.search(line.strip()) or LITERAL_MARKUP.search(line)] if m}
         if hits:
             leftovers.append((i, sorted(hits)))
 
@@ -451,16 +760,43 @@ def main(argv=None) -> int:
         print("\n[1] Numbers not found in the sources (verify or remove):")
         if invented:
             flagged = True
+            _note("[1]", [i for i, _ in invented])
             for i, ns in invented:
                 print(f"  slide {i}: {', '.join(ns)}")
+            print("  -> source mode: delete each one or trace it to a source sentence; a figure "
+                  "computed another way (a ratio, a CAGR) may stay if the report shows the "
+                  "calculation. Brief mode: list it as illustrative.")
         else:
             print("  none")
+        if computed:
+            print("  ok, computed from source numbers on the same slide (say so in the report): "
+                  + "; ".join(f"slide {i}: {', '.join(c)}" for i, c in computed))
         used = src_nums & deck_nums_all
         cov = len(used) / len(src_nums) if src_nums else 1.0
         print(f"\n[2] Source numbers used in the deck: {len(used)}/{len(src_nums)} ({cov:.0%})")
         missing = sorted(src_nums - deck_nums_all, key=lambda x: (len(x), x))
         if missing:
             print(f"  not used: {', '.join(missing[:60])}{' ...' if len(missing) > 60 else ''}")
+            if cov < 0.9:
+                print("  -> aim for 90%: show each missing figure, or say in the report why it "
+                      "was left out. Never add numbers just to raise this.")
+        deck_stems = {_stem(w) for s_ in prs.slides for w in _WORD.findall(slide_text(s_))}
+        lost = [hit for s in args.source for hit in missing_table_text(
+            source_table_cells(Path(s)), deck_stems)]
+        print("\n[2b] Source table text not in the deck (a dropped column or row):")
+        if lost:
+            flagged = True
+            _note("[2b]", [])
+            by_table = {}
+            for n, text in lost:
+                by_table.setdefault(n, []).append(text)
+            for n, texts in by_table.items():
+                shown = "; ".join(f"'{t[:55]}{'…' if len(t) > 55 else ''}'" for t in texts[:4])
+                print(f"  table {n}: {shown}" + (f" (+{len(texts) - 4} more)" if len(texts) > 4 else ""))
+            print("  -> put it on the slide (a table column, the cards, or composite[diagram + "
+                  "table]) or say in the report why it was left out.")
+        else:
+            print("  none")
 
     print(f"\n[3] Thin text slides (advisory; source mode, text templates, fill < {args.sparse:.0%}):")
     if sparse:
@@ -470,9 +806,11 @@ def main(argv=None) -> int:
     else:
         print("  none")
 
-    print("\n[4] Leftover placeholders:")
+    print("\n[4] Leftover placeholders and literal markup (**bold** / {red|..} printed as "
+          "characters: remove it, this template does not render it):")
     if leftovers:
         flagged = True
+        _note("[4]", [i for i, _ in leftovers])
         for i, hits in leftovers:
             print(f"  slide {i}: {hits}")
     else:
@@ -483,6 +821,7 @@ def main(argv=None) -> int:
         print("  a) forbidden claim types (new targets / partners / formats ...) — remove or trace:")
         if risky:
             flagged = True
+            _note("[5a]", [i for i, _ in risky])
             for i, r in risky:
                 print(f"     slide {i}: {', '.join(r)}")
         else:
@@ -490,6 +829,7 @@ def main(argv=None) -> int:
         print("  b) quoted terms not in the sources — remove or trace:")
         if quoted_new:
             flagged = True
+            _note("[5b]", [i for i, _ in quoted_new])
             for i, q in quoted_new:
                 print(f"     slide {i}: {'; '.join(q)}")
         else:
@@ -497,9 +837,17 @@ def main(argv=None) -> int:
         n_novel = sum(len(w) for _, w in novel)
         print(f"  c) vocabulary not in the sources ({n_novel} words) — review each slide;"
               " delete points that add facts, keep plain explanation:")
-        for i, ws in novel:
-            shown = ", ".join(ws[:14]) + (" ..." if len(ws) > 14 else "")
+        # advisory and long: the slides with the most new words, a few words each
+        # (-v lists every slide) — hosts that keep only the end of the output
+        # would otherwise lose the sections above it
+        top = novel if args.verbose else sorted(novel, key=lambda x: -len(x[1]))[:5]
+        for i, ws in sorted(top):
+            shown = ", ".join(ws[:8]) + (" ..." if len(ws) > 8 else "")
             print(f"     slide {i} ({len(ws)}): {shown}")
+        if len(top) < len(novel):
+            shown_slides = {i for i, _ in top}
+            rest = [i for i, _ in novel if i not in shown_slides]
+            print(f"     also: slides {', '.join(map(str, rest))} (fewer new words)")
 
     print("\n[6] Layout variety:")
     known = [t for t in templates if t]
@@ -521,6 +869,7 @@ def main(argv=None) -> int:
                 run_key, run_n, start = key, 1, i
         for t, a, b in runs:
             flagged = True
+            _note("[6]", range(a, b + 1))
             print(f"  slides {a}-{b}: {b - a + 1} x {t} in a row (max 3) — re-express one, "
                   "or mark parallel slides with group=")
         mixed = {}
@@ -530,6 +879,7 @@ def main(argv=None) -> int:
         for g, members in mixed.items():
             if len({_FAMILY.get(t, t) for _, t in members}) > 1:
                 flagged = True
+                _note("[6]", [i for i, _ in members])
                 desc = ", ".join(f"{i} ({t})" for i, t in members)
                 print(f"  group '{g}' mixes templates: slides {desc} — parallel slides "
                       "should share one layout")
@@ -538,23 +888,30 @@ def main(argv=None) -> int:
                           if template_of(s_) in ("data_table", None) and numeric_share(s_) >= 0.5]
         if n_charts == 0 and numeric_tables:
             flagged = True
+            _note("[6]", numeric_tables)
             print(f"  no chart, but slide(s) {', '.join(map(str, numeric_tables))} show a mostly "
                   "numeric table — chart the series (scores / ratings may stay tables)")
         bad_groups = [g for g, m in mixed.items() if len({_FAMILY.get(t, t) for _, t in m}) > 1]
         if not runs and not bad_groups and not (n_charts == 0 and numeric_tables):
             print(f"  ok ({n_charts} chart slide(s))")
 
-    print("\n[7] Small body text (< 12pt):")
-    if small:
+    print("\n[7] Small text (body < 12pt; diagram labels < 10pt) and words split mid-word:")
+    if small or split:
         flagged = True
-        for i, bs in small:
-            print(f"  slide {i}: {bs:g}pt — shorten bullets, drop subtitle/insight, or split")
+        _note("[7]", sorted({i for i, _, _ in small} | {i for i, _ in split}))
+        for i, bs, floor in small:
+            print(f"  slide {i}: {bs:g}pt (min {floor}pt) — shorten bullets, drop "
+                  "subtitle/insight, or split")
+        for i, ws in split:
+            print(f"  slide {i}: split mid-word: {', '.join(ws[:6])} — widen that column "
+                  "(col_widths=), use a shorter word, or give the shape more room")
     else:
         print("  none")
 
     print("\n[8] Footer source line:")
     if src_bad:
         flagged = True
+        _note("[8]", [i for i, _ in src_bad])
         for i, iss in src_bad:
             for x in iss:
                 print(f"  slide {i}: {x}")
@@ -563,11 +920,62 @@ def main(argv=None) -> int:
     print("\n[9] Insight text that only restates a table row (synthesise instead):")
     if restates:
         flagged = True
+        _note("[9]", [i for i, _ in restates])
         for i, rr in restates:
             for t in rr:
                 print(f"  slide {i}: {t}")
     else:
         print("  none")
+
+    print("\n[10] English default labels in a CJK deck (build with make_theme(lang=...)"
+          " or pass translated labels):")
+    if en_labels:
+        flagged = True
+        _note("[10]", [i for i, _ in en_labels])
+        for i, hits in en_labels:
+            print(f"  slide {i}: {', '.join(hits)}")
+    else:
+        print("  none")
+
+    # Advisory only: never sets `flagged`. Text layouts are right for lists; the
+    # reminder is to look again at slides whose content is a relationship.
+    print("\n[11] Layout mix (advisory — a reminder, never a failure):")
+    text_slides, n_content = layout_mix(templates)
+    if n_content and len(text_slides) / n_content > TEXT_SHARE_REMINDER:
+        print(f"  reminder: text layouts on {len(text_slides)} of {n_content} content slides "
+              f"({len(text_slides) / n_content:.0%}) — slides {', '.join(map(str, text_slides))}.")
+        print("  Check each: if it shows a flow, a share, a change, a ranking, causes or an "
+              "overlap, a diagram says it faster (python scripts/catalog.py for the index). "
+              "Keep text where the content really is a list.")
+    else:
+        print(f"  ok ({len(text_slides)} of {n_content} content slides use text layouts)")
+    two_point = [i for i, s_ in enumerate(prs.slides, start=1) if two_point_table(s_)]
+    if two_point:
+        print(f"  reminder: slide(s) {', '.join(map(str, two_point))} compare two periods per "
+              "item in a table — the change per item is a `slopegraph` (direction) or "
+              "`dumbbell` (gap); to keep the text columns, use composite[diagram:slopegraph "
+              "+ table].")
+    series_tables = [i for i, s_ in enumerate(prs.slides, start=1) if period_table(s_)]
+    if series_tables:
+        print(f"  reminder: slide(s) {', '.join(map(str, series_tables))} show numbers by period "
+              "as a table — a line chart (every series, the focal one highlighted) shows the "
+              "trend; keep the table only if exact values per cell are the point.")
+
+    if args.plan:
+        import plan_check
+        print("\n[12] Plan vs deck (update the plan row, or fix the slide, so the report "
+              "matches the deck):")
+        rows = plan_check.parse_plan(Path(args.plan).read_text(encoding="utf-8-sig"))
+        built = [(template_of(s_), diagrams_of(s_)) for s_ in prs.slides]
+        diffs = plan_check.compare_with_deck(rows, built) if rows else [
+            (0, "no plan table found in the plan file")]
+        if diffs:
+            flagged = True
+            _note("[12]", [n for n, _ in diffs if n])
+            for _, msg in diffs:
+                print(f"  {msg}")
+        else:
+            print(f"  ok ({len(rows)} slides match the plan)")
 
     return 1 if flagged else 0
 
