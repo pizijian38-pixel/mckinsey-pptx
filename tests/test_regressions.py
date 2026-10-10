@@ -422,10 +422,10 @@ def test_catalog_lookup():
     rows = [l for l in out.getvalue().splitlines() if l[:3].strip().rstrip(".").isdigit()]
     _, templates, _ = catalog.load()
     assert len(rows) == len(templates) >= 80, len(rows)
-    err = io.StringIO()
-    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
         assert catalog.main(["sankee"]) == 1
-    assert "sankey" in err.getvalue()
+    assert "Did you mean: sankey" in out.getvalue()
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         catalog.main(["--icons"])
@@ -505,6 +505,16 @@ def test_run_deck_builds_checks_and_renders():
         text = log.getvalue()
         assert code == 0, text[-800:]
         assert "demo.pptx" in text and "build : ok" in text and "check : clean" in text
+        # the full report is kept next to the deck; a short one needs no pointer
+        assert (out / "report_demo.txt").read_text(encoding="utf-8").startswith("== 1. build")
+        assert "\nreport: " not in text
+        run_deck.REPORT_BUDGET, saved = 100, run_deck.REPORT_BUDGET
+        try:
+            with contextlib.redirect_stdout(io.StringIO()) as log2:
+                run_deck.main([str(script), "--no-render"])
+        finally:
+            run_deck.REPORT_BUDGET = saved
+        assert log2.getvalue().rstrip().splitlines()[-1].startswith("report: "), log2.getvalue()[-300:]
         if render:
             prev = out / "preview_demo"
             assert (prev / "contact_sheet.png").exists() and list(prev.glob("slide-*.png")), text[-600:]
@@ -1042,6 +1052,102 @@ _PLAN = """| # | Source section | Required elements | Message (action title) | R
 """
 
 
+def test_sums_and_differences_of_source_numbers_are_derived():
+    """Crest run: the agent deleted "16% + 5% = 21%" and "40% + 25% = 65% of the
+    budget" to clear [1] — a real insight lost. A sum or difference of two source
+    numbers on the same slide is now accepted and listed; small numbers and
+    numbers with no such pair are still flagged."""
+    assert deck_check.arithmetic("21", {"16", "5", "12"}) == "21 = 16 + 5"
+    assert deck_check.arithmetic("65", {"40", "25", "20", "15"}) == "65 = 40 + 25"
+    assert deck_check.arithmetic("4", {"16", "12"}) is None           # < 10: chance
+    assert deck_check.arithmetic("37", {"16", "5", "12"}) is None
+    assert deck_check.arithmetic("2.6", {"8.5", "5.9"}) is None
+    assert deck_check.arithmetic("12.5", {"20.5", "8"}) == "12.5 = 20.5 - 8"
+    b = PresentationBuilder(on_error="raise")
+    b.add("cover_slide", title="Probe")
+    b.add("card_grid", title="High-end tiers reach 21% of the market",
+          cards=[{"title": "50-100 RMB", "body": "16% share"},
+                 {"title": ">100 RMB", "body": "5% share"},
+                 {"title": "Outlook", "body": "Leader holds 37% of high-end"}],
+          source="", footnote="")
+    with tempfile.TemporaryDirectory() as d:
+        deck, src = Path(d) / "d.pptx", Path(d) / "s.md"
+        b.save(str(deck))
+        src.write_text("High-end 50-100 RMB: 16%. Ultra-high >100 RMB: 5%. 50 100", encoding="utf8")
+        report = _check_report(deck, src)
+        hits = _section(report, "[1] Numbers", "[2] Source")
+        assert hits[0] == "slide 2: 37", hits
+        assert "slide 2: 21 = 16 + 5" in report, report
+
+
+def test_long_titles_warn_at_build():
+    """Crest run: 14 of 20 titles were 79-97 characters and shrank to 18pt or
+    wrapped; the rule lived only in SKILL.md prose. The build now warns."""
+    long_t = "Four structural weaknesses constrain Crest: past penalties, complexity, dilution, and channel lag"
+    ok_t = "Four structural weaknesses constrain Crest's growth"
+    zh_t = "佳洁士市场份额从8.8%下滑至8.0%，而云南白药与舒客等本土品牌持续扩大领先优势并抢占高端市场"
+    def title_warns(t):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            PresentationBuilder().add("card_rows", title=t, rows=[{"title": "A", "body": "b"}])
+        return "title is" in err.getvalue()
+    assert title_warns(long_t)
+    assert not title_warns(ok_t)
+    assert title_warns(zh_t)
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        PresentationBuilder().add("cover_slide", title=long_t)
+    assert "title is" not in err.getvalue()          # full-bleed pages are exempt
+
+
+def test_two_period_table_gets_a_slopegraph_hint():
+    """Crest slide 6 (price tiers, 2023 vs 2024 share + a text column) stayed a
+    table in both runs; the generic [11] reminder never named it."""
+    b = PresentationBuilder(on_error="raise")
+    b.add("cover_slide", title="Probe")
+    b.add("data_table", title="High-end tiers gained share as the middle shrank",
+          columns=["Price tier", "2023 share", "2024 share", "Trend"],
+          rows=[["<20 RMB", "34%", "32%", "Trade-up"], ["20-50 RMB", "50%", "47%", "Squeezed"],
+                ["50-100 RMB", "12%", "16%", "Efficacy"], [">100 RMB", "4%", "5%", "Gifting"]],
+          source="", footnote="")
+    b.add("data_table", title="Owners and dates for each workstream",
+          columns=["Workstream", "Owner", "Start", "End"],
+          rows=[["Pricing", "Ann", "Q1", "Q2"], ["Channels", "Bo", "Q2", "Q3"],
+                ["Brand", "Cy", "Q1", "Q4"]], source="", footnote="")
+    with tempfile.TemporaryDirectory() as d:
+        deck = Path(d) / "d.pptx"
+        b.save(str(deck))
+        _, report = _check(deck)
+    assert "slide(s) 2 compare two periods" in report, report[-800:]
+    assert "slide(s) 2, 3" not in report
+
+
+def test_catalog_output_fits_a_tail_window():
+    """Antigravity shows only the last ~8,100 characters of a command's output.
+    The index lost its first 34 templates, multi-template lookups lost their
+    first entries, and `--plan` lost its problem list (printed first). Every
+    catalog output now stays under catalog.BUDGET with the key lines last."""
+    import catalog
+    _, templates, _ = catalog.load()
+    every = [t["names"][0] for t in templates]
+    calls = [[], ["--guide"], ["--icons", "--theme"], ["--options"], ["--spines"], ["--focus"],
+             ["composite"], ["composite", "--part", "2"], every[:12], every[40:]]
+    for argv in calls:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            catalog.main(list(argv))
+        text = out.getvalue()
+        assert len(text) <= catalog.BUDGET, (argv[:3], len(text))
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        catalog.main(every[40:])
+    text = out.getvalue()
+    left = text.split("NOT shown (output limit): ", 1)[1].split(" — run:", 1)[0].split(", ")
+    shown = [n for n in every[40:] if f"(`{n}`" in text]
+    assert sorted(shown + left) == sorted(every[40:]), (len(shown), len(left))
+    assert "- `columns: list`" in text or "columns" in text      # arguments are kept
+
+
 def test_plan_table_is_parsed_and_checked():
     import plan_check
     rows = plan_check.parse_plan(_PLAN)
@@ -1070,8 +1176,9 @@ def test_catalog_plan_prints_only_the_entries_the_plan_uses():
         with contextlib.redirect_stdout(out):
             code = catalog.main(["--plan", str(plan)])
         text = out.getvalue()
-        assert code == 0 and "no problems" in text, text[:400]
-        assert "(`composite`" in text and "(`radar`" in text and "(`card_grid`" in text
+        assert code == 0 and text.rstrip().splitlines()[-2] == "  no problems — build it", text[-400:]
+        for name in ("composite", "radar", "card_grid"):    # shown, or named as left out
+            assert f"(`{name}`" in text or (f"NOT shown" in text and name in text), name
         assert "(`sankey`" not in text
         plan.write_text(_PLAN.replace("card_grid", "card_gird"), encoding="utf-8")
         out = io.StringIO()

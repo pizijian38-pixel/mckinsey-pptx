@@ -45,8 +45,8 @@ communicates**, and you can defend each choice.
    reuse them; use a new slug if the name is taken. Edit an existing script
    only when the user asks to change that deck (see Iterating).
 4. **Everything you need is in this file and `catalog.py`.** Don't read, grep
-   or search the package source, `deck_check.py` or `assets/`. If something
-   isn't there, say so in the report instead of reverse-engineering it.
+   or search the package source, `deck_check.py` or `assets/`. If it isn't there,
+   say so in the report.
 5. **The checker is a reviewer, not a score.** Fix the deck, not the report;
    never add numbers or words to raise coverage or clear a finding. Advisory
    sections ([2] [3] [5c] [11]) never require changing a correct slide. If a
@@ -403,23 +403,23 @@ fix. Brief mode: no `--source`. Add `--no-render` while iterating.
 
 Each flagged checker section prints what to do. The rules that don't fit on a
 report line:
-- **[1] numbers not in the sources:** source mode — delete or trace to the
-  source; a derived figure is fine if the report says how it was computed.
-  Brief mode — list as illustrative.
+- **[1] numbers not in the sources:** a sum or difference of two source
+  numbers on the slide is accepted and listed — cite it in the report; delete
+  or trace anything else. Brief mode: list as illustrative.
 - **[2] coverage:** aim ≥ 90% of source numbers used; for each unused one,
   show it or say why it was left out. Never add numbers to raise it.
 - **[5] content not in the sources:** apply rule 5's test to every point
   flagged; plain explanatory words are fine, new facts, features, places or
   behaviours are not.
-- **[3] [11] advisory:** a short slide beats a padded one; [11] is a prompt to
-  re-check text layouts against the relationship table.
+- **[3] [11] advisory:** a short slide beats a padded one; [11] names slides
+  to re-check against the relationship table.
 - **[12] plan vs deck:** update the plan row or fix the slide so the report
   matches the deck.
-- Build WARNINGs (`text fitted at Npt`, `focus` missing or matching nothing)
-  count as findings: fix the call.
+- Build WARNINGs (text fitted small, title too long, `focus`) are findings.
 
-Fix and rebuild until the checker is clean or every remaining item is
-explained in the report.
+Fix with targeted edits to the build script — never rewrite the whole file —
+and rebuild until the checker is clean or every remaining item is explained
+in the report.
 
 ## Step 7 — Inspect the previews (mandatory when they rendered)
 

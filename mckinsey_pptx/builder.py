@@ -438,6 +438,29 @@ def title_names(title: str, labels: Sequence[str]) -> List[str]:
     return hits
 
 
+TITLE_MIN_PT = 20       # below this the title reads as a different size per slide
+
+
+def _check_title_length(name, kw):
+    """A title that only fits one line by shrinking below TITLE_MIN_PT (or not at
+    all) is too long: the Crest run produced 14 titles of 79-97 characters."""
+    title = kw.get("title")
+    if name in _FULL_BLEED or not isinstance(title, str):
+        return
+    from .metrics import fit_one_line, plain, text_width_pt  # noqa: F401
+    theme = kw.get("theme")
+    lay, typo = theme.layout, theme.typography
+    width = (lay.slide_width_in - lay.margin_left_in - lay.margin_right_in
+             - lay.section_marker_w_in - 0.2)
+    size = fit_one_line(title, width, typo.title_size, min(18, typo.title_size), bold=True)
+    if size < TITLE_MIN_PT:
+        import sys
+        fits = text_width_pt(plain(title), size, bold=True) / 72 <= width
+        print(f"[mckinsey_pptx] WARNING {name} \"{title[:40]}\": title is {len(title)} chars, "
+              + (f"shrinks to {size}pt" if fits else "wraps") + " — cut to ~75 (34 CJK), "
+              "rest to subtitle", file=sys.stderr)
+
+
 def _check_title_focus(name, kw):
     labels = focus_candidates(name, kw)
     if labels is None or kw.get("focus") is not None or kw.get("highlight") is not None:
@@ -544,6 +567,7 @@ class PresentationBuilder:
             self._fail(name, kwargs, errs)
             return None
         _check_title_focus(name, kwargs)
+        _check_title_length(name, kwargs)
         if self.on_error == "raise":
             out = fn(self.prs, **kwargs)
         else:

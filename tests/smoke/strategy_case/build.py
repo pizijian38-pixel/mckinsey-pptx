@@ -65,7 +65,7 @@ def build(out_dir: Path) -> Path:
           **N)
 
     b.add("logic_grid", kicker="Situation (1/3) | Firm analysis",
-          title="Northwind wins young customers on social space and value, but both are easy to copy",
+          title="Northwind wins the young on social space and value; both are easy to copy",
           stages=["Customer need", "What Northwind does", "Performance"],
           conclusion_label="Implication",
           rows=[{"label": "Social space", "icon": "users",

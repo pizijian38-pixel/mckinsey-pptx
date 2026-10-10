@@ -146,6 +146,10 @@ def to_pngs(pdf: Path, outdir: Path, dpi: int):
     except ImportError:
         return [], ("no PDF rasteriser: install poppler (pdftoppm) or run "
                     f"'{Path(sys.executable).name} -m pip install pymupdf'. The PDF is at {pdf}")
+    try:            # LibreOffice PDFs trigger one harmless "MuPDF error" line per page;
+        fitz.TOOLS.mupdf_display_errors(False)      # they pushed the summary out of view
+    except AttributeError:
+        pass
     doc = fitz.open(str(pdf))
     width = len(str(doc.page_count))
     pngs = []
@@ -224,6 +228,43 @@ def report_env() -> int:
 
 # ---------------------------------------------------------------- main
 
+REPORT_BUDGET = 6500     # some hosts (Antigravity) show only the last ~8,100 characters
+
+
+class _Tee:
+    """Copy of everything printed, so a long report can also be written to a file."""
+
+    def __init__(self, stream):
+        self.stream, self.parts = stream, []
+
+    def write(self, s):
+        self.parts.append(s)
+        return self.stream.write(s)
+
+    def flush(self):
+        self.stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+    def text(self):
+        return "".join(self.parts)
+
+
+def _report_line(tee, folder: Path, stem: str) -> None:
+    """Write the full report next to the deck; if it is longer than hosts show,
+    say where it is (printed last, so it is never the part that gets cut)."""
+    text = tee.text()
+    path = folder / f"report_{stem}.txt"
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError:
+        return
+    if len(text) > REPORT_BUDGET:
+        print(f"report: {path} — this output is long and the start may be cut off where "
+              "you read it; open the file to see every finding")
+
+
 def main(argv=None) -> int:
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -257,12 +298,22 @@ def main(argv=None) -> int:
               "of the attached file (do not retype it).")
         return 1
 
+    tee = _Tee(sys.stdout)
+    sys.stdout = tee
+    try:
+        return _run(args, script, tee)
+    finally:
+        sys.stdout = tee.stream
+
+
+def _run(args, script: Path, tee) -> int:
     print("== 1. build " + "=" * 60)
     code, warnings, t0, listed = run_build(script)
     if code != 0:
         what = ("every slide that could not be built is listed above — fix them all, then re-run"
                 if listed else "read the traceback above")
         print(f"\n== summary ==\nbuild : FAILED (exit {code}) — {what}")
+        _report_line(tee, script.resolve().parent, script.stem)
         return 1
     if args.deck:
         deck = Path(args.deck)
@@ -307,6 +358,7 @@ def main(argv=None) -> int:
         check_line = "clean"
     print("check : " + check_line + "  ([2] [3] [5c] [11] are advisory)")
     print(f"render: {render_line}")
+    _report_line(tee, deck.parent, deck.stem)
     return 1 if (warnings or flagged) else 0
 
 

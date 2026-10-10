@@ -214,6 +214,29 @@ def numbers(text: str) -> set[str]:
     return {_norm(m) for m in NUM.findall(text)}
 
 
+def arithmetic(n: str, operands) -> str | None:
+    """'21 = 16 + 5' when n is the sum or difference of two source numbers shown
+    on the same slide (a combined share, a gap, a change). Below 10 too many
+    pairs match by chance, so small numbers are never explained this way."""
+    try:
+        v = float(n)
+    except ValueError:
+        return None
+    if v < 10:
+        return None
+    ops = sorted({o for o in operands if o != n}, key=lambda o: float(o))
+    vals = [(o, float(o)) for o in ops]
+    for i, (a, x) in enumerate(vals):
+        for b, y in vals[i:]:
+            if a == b:
+                continue
+            if abs(x + y - v) < 1e-6:
+                return f"{n} = {b} + {a}"
+            if abs(abs(y - x) - v) < 1e-6:
+                return f"{n} = {b} - {a}"
+    return None
+
+
 def fill_ratio(slide, slide_w, slide_h) -> float:
     """Estimated share of the slide covered by text ink (0-1)."""
     ink = 0.0
@@ -418,6 +441,30 @@ def period_table(slide) -> bool:
     return False
 
 
+_PERIOD_IN = re.compile(r"\b(?:(?:19|20)\d{2}|FY\s?\d{2,4}|[QH][1-4])\b", re.I)
+_NUMBER_CELL = re.compile(r"[\s<>~≈+\-−$€£¥]*[\d.,]+\s*(?:%|pts?|[xMBK]|bn|m)?\s*", re.I)
+
+
+def two_point_table(slide) -> bool:
+    """A table with exactly two period columns ("2023 share", "2024 share") of
+    numbers for 3+ rows: change between two points per item, which a slopegraph
+    or dumbbell shows (Crest run: the "K-shaped" price-tier shift stayed a table)."""
+    for sh in _iter_shapes(slide.shapes):
+        if not (getattr(sh, "has_table", False) and sh.has_table):
+            continue
+        rows = list(sh.table.rows)
+        if len(rows) < 4:
+            continue
+        head = [c.text for c in rows[0].cells]
+        cols = [j for j, h in enumerate(head) if _PERIOD_IN.search(h)]
+        if len(cols) != 2:
+            continue
+        body = rows[1:]
+        if all(_NUMBER_CELL.fullmatch(r.cells[j].text.strip() or "x") for r in body for j in cols):
+            return True
+    return False
+
+
 def _record(slide):
     name = slide._element.cSld.get("name") or ""
     if not name.startswith("mp:"):
@@ -562,7 +609,7 @@ def main(argv=None) -> int:
 
     print(f"Deck: {args.deck}  ({len(prs.slides)} slides)")
     deck_nums_all: set[str] = set()
-    sparse, leftovers, invented = [], [], []
+    sparse, leftovers, invented, computed = [], [], [], []
     risky, quoted_new, novel, small, src_bad, restates = [], [], [], [], [], []
     en_labels = []
     templates, groups = [], []
@@ -576,6 +623,12 @@ def main(argv=None) -> int:
         if args.source:
             derived = derived_numbers(slide)
             new = sorted(n for n in nums if n not in src_nums and n not in derived)
+            shown_src = nums & src_nums
+            sums = {n: arithmetic(n, shown_src) for n in new}
+            sums = {n: s for n, s in sums.items() if s}
+            if sums:
+                computed.append((i, sorted(sums.values())))
+            new = [n for n in new if n not in sums]
             if new:
                 invented.append((i, new))
         ratio = fill_ratio(slide, sw, sh)
@@ -620,11 +673,14 @@ def main(argv=None) -> int:
             _note("[1]", [i for i, _ in invented])
             for i, ns in invented:
                 print(f"  slide {i}: {', '.join(ns)}")
-            print("  -> source mode: delete each one or trace it to a source sentence (a "
-                  "difference or total is fine if the report says how it was computed); "
-                  "brief mode: list it as illustrative.")
+            print("  -> source mode: delete each one or trace it to a source sentence; a figure "
+                  "computed another way (a ratio, a CAGR) may stay if the report shows the "
+                  "calculation. Brief mode: list it as illustrative.")
         else:
             print("  none")
+        if computed:
+            print("  ok, computed from source numbers on the same slide (say so in the report): "
+                  + "; ".join(f"slide {i}: {', '.join(c)}" for i, c in computed))
         used = src_nums & deck_nums_all
         cov = len(used) / len(src_nums) if src_nums else 1.0
         print(f"\n[2] Source numbers used in the deck: {len(used)}/{len(src_nums)} ({cov:.0%})")
@@ -674,9 +730,17 @@ def main(argv=None) -> int:
         n_novel = sum(len(w) for _, w in novel)
         print(f"  c) vocabulary not in the sources ({n_novel} words) — review each slide;"
               " delete points that add facts, keep plain explanation:")
-        for i, ws in novel:
-            shown = ", ".join(ws[:14]) + (" ..." if len(ws) > 14 else "")
+        # advisory and long: the slides with the most new words, a few words each
+        # (-v lists every slide) — hosts that keep only the end of the output
+        # would otherwise lose the sections above it
+        top = novel if args.verbose else sorted(novel, key=lambda x: -len(x[1]))[:5]
+        for i, ws in sorted(top):
+            shown = ", ".join(ws[:8]) + (" ..." if len(ws) > 8 else "")
             print(f"     slide {i} ({len(ws)}): {shown}")
+        if len(top) < len(novel):
+            shown_slides = {i for i, _ in top}
+            rest = [i for i, _ in novel if i not in shown_slides]
+            print(f"     also: slides {', '.join(map(str, rest))} (fewer new words)")
 
     print("\n[6] Layout variety:")
     known = [t for t in templates if t]
@@ -775,6 +839,12 @@ def main(argv=None) -> int:
               "Keep text where the content really is a list.")
     else:
         print(f"  ok ({len(text_slides)} of {n_content} content slides use text layouts)")
+    two_point = [i for i, s_ in enumerate(prs.slides, start=1) if two_point_table(s_)]
+    if two_point:
+        print(f"  reminder: slide(s) {', '.join(map(str, two_point))} compare two periods per "
+              "item in a table — the change per item is a `slopegraph` (direction) or "
+              "`dumbbell` (gap); to keep the text columns, use composite[diagram:slopegraph "
+              "+ table].")
     series_tables = [i for i, s_ in enumerate(prs.slides, start=1) if period_table(s_)]
     if series_tables:
         print(f"  reminder: slide(s) {', '.join(map(str, series_tables))} show numbers by period "

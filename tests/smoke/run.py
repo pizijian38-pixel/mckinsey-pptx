@@ -58,7 +58,7 @@ def main() -> int:
                 continue
             line_s = line.strip()
             if not line_s or line_s in ("none", "ok") or line_s.startswith(
-                    ("a)", "b)", "c)", "not used:", "->")):
+                    ("a)", "b)", "c)", "not used:", "->", "also:", "ok, computed")):
                 continue
             if section == "[5]" and "(" in line_s and line_s.startswith("slide") and ":" in line_s \
                     and "vocabulary" not in line_s and line_s.split(":")[0].endswith(")"):
