@@ -1035,7 +1035,7 @@ def test_skill_md_is_slim_and_its_commands_exist():
     assert len(skill.encode("utf8")) <= 30000, len(skill.encode("utf8"))
     flags = set(re.findall(r"(?<![\w-])(--[a-z]+(?:-[a-z]+)*)", skill))
     known = {"--guide", "--options", "--focus", "--theme", "--spines", "--icons", "--plan",
-             "--source", "--env", "--no-render"}          # catalog.py and run_deck.py flags
+             "--source", "--env", "--no-render", "--attachment"}          # catalog.py and run_deck.py flags
     assert flags <= known, f"unknown flags in SKILL.md: {sorted(flags - known)}"
     for flag in ("--guide", "--options", "--focus", "--theme", "--spines", "--icons"):
         out = io.StringIO()
@@ -1090,14 +1090,14 @@ def test_long_titles_warn_at_build():
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             PresentationBuilder().add("card_rows", title=t, rows=[{"title": "A", "body": "b"}])
-        return "title is" in err.getvalue()
+        return "cut about" in err.getvalue()
     assert title_warns(long_t)
     assert not title_warns(ok_t)
     assert title_warns(zh_t)
     err = io.StringIO()
     with contextlib.redirect_stderr(err):
         PresentationBuilder().add("cover_slide", title=long_t)
-    assert "title is" not in err.getvalue()          # full-bleed pages are exempt
+    assert "cut about" not in err.getvalue()          # full-bleed pages are exempt
 
 
 def test_two_period_table_gets_a_slopegraph_hint():
@@ -1120,6 +1120,75 @@ def test_two_period_table_gets_a_slopegraph_hint():
         _, report = _check(deck)
     assert "slide(s) 2 compare two periods" in report, report[-800:]
     assert "slide(s) 2, 3" not in report
+
+
+def test_words_are_not_split_mid_word():
+    """Crest R3: "Explosio-n" / "Emergin-g" in a narrow table column and
+    "Ecosyste-m" in a hub circle. Tables widen such columns, fitted text steps
+    down until the longest word fits, and the checker reports what is left."""
+    b = PresentationBuilder(on_error="raise")
+    b.add("cover_slide", title="Probe")
+    b.add("data_table", title="Skinification shifts demand toward active ingredients",
+          columns=["Functional Segment", "Maturity", "2022-2025 Trend", "Key Tech"],
+          rows=[["Anti-sensitivity", "High Growth", "Surging due to spicy and cold diets", "Novamin, Potassium nitrate"],
+                ["Oral Micro-ecology", "Explosion", "Targets bad breath and flora balance", "Probiotics, Prebiotics"],
+                ["Enamel Repair", "Emerging", "High-end focus on remineralization", "Hydroxyapatite (HAP)"]],
+          col_widths=[1.2, 0.5, 2.5, 2.0], insight="Actives lead growth", source="", footnote="")
+    b.add("hub_spoke", title="Formats extend Crest into beauty routines", center="Oral Beauty Ecosystem",
+          spokes=[{"title": "Flash-White Pen"}, {"title": "Night Repair Serum"},
+                  {"title": "SPA-Grade Strips"}, {"title": "Lab Chic ID"}], source="", footnote="")
+    with tempfile.TemporaryDirectory() as d:
+        deck = Path(d) / "d.pptx"
+        b.save(str(deck))
+        prs = Presentation(str(deck))
+        assert [deck_check.broken_words(s) for s in prs.slides] == [[], [], []]
+        # the checker still sees a word that cannot fit
+        from pptx.util import Inches, Pt
+        s = prs.slides[1]
+        tb = s.shapes.add_textbox(Inches(1), Inches(6), Inches(0.6), Inches(0.4))
+        r = tb.text_frame.paragraphs[0].add_run()
+        r.text, r.font.size = "Explosion", Pt(14)
+        assert deck_check.broken_words(s) == [("Explosion", 14.0)]
+
+
+def test_dropped_source_table_text_is_reported():
+    """Crest R3 drew the price-tier shares as a slopegraph and lost the
+    "Trend Interpretation" column; the checker only counted numbers."""
+    src = ("| Price Range | 2023 | 2024 | Trend Interpretation |\n"
+           "| Low-end | 34% | 32% | Shrinking: Squeezed by inflation and upgrades. |\n"
+           "| High-end | 12% | 16% | Exploding: occupies minds with medical efficacy focus. |\n")
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "s.md"
+        p.write_text(src, encoding="utf8")
+        cells = deck_check.source_table_cells(p)
+        stems = {deck_check._stem(w) for w in deck_check._WORD.findall("Shrinking squeezed inflation upgrades")}
+        lost = deck_check.missing_table_text(cells, stems)
+        assert [t for _, t in lost] == ["Exploding: occupies minds with medical efficacy focus."], lost
+
+
+def test_read_source_saves_long_text_and_finds_the_attachment():
+    """Crest R3: read_source printed 8.2 KB and the host cut the first slides;
+    the agent then read its own 22 KB transcript to find the attachment path."""
+    import read_source
+    import os
+    with tempfile.TemporaryDirectory() as d:
+        cwd = os.getcwd()
+        os.chdir(d)
+        try:
+            up = Path(d) / "brain" / "abc" / ".user_uploaded"
+            up.mkdir(parents=True)
+            (up / "media_1.md").write_text("Slide 1: " + "word " * 2000, encoding="utf8")
+            read_source.UPLOADS, saved = Path(d) / "brain", read_source.UPLOADS
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                assert read_source.main(["--attachment"]) == 0
+            read_source.UPLOADS = saved
+            text = out.getvalue()
+            assert len(text) < 1000, len(text)
+            assert (Path(d) / "output" / "source_media_1.md").read_text(encoding="utf8").startswith("Slide 1:")
+            assert text.rstrip().splitlines()[-1].startswith("--source path: ") and "media_1.md" in text
+        finally:
+            os.chdir(cwd)
 
 
 def test_catalog_output_fits_a_tail_window():
@@ -1167,7 +1236,7 @@ def test_plan_table_is_parsed_and_checked():
     assert "diagram:venn cannot be drawn in a region" in joined, joined
 
 
-def test_catalog_plan_prints_only_the_entries_the_plan_uses():
+def test_catalog_plan_checks_without_reprinting_entries():
     import catalog
     with tempfile.TemporaryDirectory() as d:
         plan = Path(d) / "p.md"
@@ -1176,10 +1245,10 @@ def test_catalog_plan_prints_only_the_entries_the_plan_uses():
         with contextlib.redirect_stdout(out):
             code = catalog.main(["--plan", str(plan)])
         text = out.getvalue()
-        assert code == 0 and text.rstrip().splitlines()[-2] == "  no problems — build it", text[-400:]
-        for name in ("composite", "radar", "card_grid"):    # shown, or named as left out
-            assert f"(`{name}`" in text or (f"NOT shown" in text and name in text), name
-        assert "(`sankey`" not in text
+        assert code == 0 and "  no problems — build it" in text, text[-400:]
+        assert "## " not in text and len(text) < 1500, text      # no catalog entries
+        assert "composite" in text and "radar" in text and "card_grid" in text
+        assert "sankey" not in text
         plan.write_text(_PLAN.replace("card_grid", "card_gird"), encoding="utf-8")
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

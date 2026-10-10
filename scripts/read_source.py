@@ -1,6 +1,8 @@
 """Print a source file as plain text, tables kept as Markdown tables.
 
     python scripts/read_source.py <file> [<file> ...]
+    python scripts/read_source.py --attachment     # the newest file the user attached
+                                                   # in Google Antigravity
 
 Reads .docx .xlsx .pptx .pdf .md .txt .csv (PDF needs pypdf or PyMuPDF).
 Use it to read an attached outline instead of writing python -c snippets: every
@@ -132,6 +134,22 @@ def read_any(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
+# Some hosts (Google Antigravity) show only the last ~8,100 characters of a
+# command's output. A longer source is saved to a file the agent opens instead.
+BUDGET = 7000
+UPLOADS = Path.home() / ".gemini" / "antigravity" / "brain"
+
+
+def newest_attachment():
+    """(path, minutes ago) of the newest file in Antigravity's upload folders."""
+    files = [p for p in UPLOADS.glob("*/.user_uploaded/*") if p.is_file()]
+    if not files:
+        return None, None
+    p = max(files, key=lambda f: f.stat().st_mtime)
+    import time
+    return p, (time.time() - p.stat().st_mtime) / 60
+
+
 def main(argv) -> int:
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -140,7 +158,17 @@ def main(argv) -> int:
     if not argv:
         print(__doc__)
         return 1
+    found = None
+    if "--attachment" in argv:
+        found, age = newest_attachment()
+        argv = [a for a in argv if a != "--attachment"]
+        if found is None:
+            print(f"[read_source] no attachment found under {UPLOADS}. Ask the user for the "
+                  "file's path.")
+            return 1
+        argv = [str(found)] + argv
     status = 0
+    texts = []
     for a in argv:
         p = Path(a)
         if not p.exists():
@@ -154,8 +182,24 @@ def main(argv) -> int:
                   "install it once with pip, or ask the user for a .docx / .md copy.", file=sys.stderr)
             status = 1
             continue
-        print(f"===== {p.name} =====")
-        print(text)
+        texts.append((p, text))
+    body = "".join(f"===== {p.name} =====\n{t}\n" for p, t in texts)
+    if len(body) <= BUDGET:
+        print(body, end="")
+    else:
+        out = Path("output")
+        out.mkdir(exist_ok=True)
+        for p, t in texts:
+            dest = out / f"source_{p.stem}.md"
+            dest.write_text(t, encoding="utf-8")
+            n_tables = t.count("\n|---")
+            print(f"{p.name}: {len(t):,} characters, {n_tables} table(s) — too long to print "
+                  f"(the console shows only the end). Full text: {dest.resolve()} — open it with "
+                  "your file viewer; it is exactly what this command would print.")
+    for p, _ in texts:
+        note = (f" (newest upload, {age:.0f} min ago — check it is the file the user means)"
+                if found is not None and p == found else "")
+        print(f"--source path: {p.resolve()}{note}")
     return status
 
 

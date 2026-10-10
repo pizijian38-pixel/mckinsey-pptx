@@ -1,4 +1,6 @@
-"""Read the slide plan (output/<slug>_plan.md) and check it.
+"""AGENTS: you do not need to read this file — SKILL.md Step 3 describes the plan table; `catalog.py --plan` runs this check.
+
+Read the slide plan (output/<slug>_plan.md) and check it.
 
 Used by `catalog.py --plan` (before building: do the templates exist, is every
 text layout justified, which catalog entries are needed) and by

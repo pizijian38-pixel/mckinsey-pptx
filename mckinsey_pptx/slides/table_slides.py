@@ -48,6 +48,38 @@ def _auto_widths(columns, rows, n_cols):
     return weights
 
 
+def _no_split_words(widths_in, columns, rows, size):
+    """Widen any column whose longest word is wider than the column (PowerPoint
+    would break it mid-word: "Explosio-n"), taking the room from columns that
+    have spare width. Headers and first-column cells are bold."""
+    from ..metrics import text_width_pt
+    n = len(widths_in)
+    need = []
+    for ci in range(n):
+        words = []
+        for ri, r in enumerate([list(columns)] + [list(x) for x in rows]):
+            if ci < len(r):
+                bold = ri == 0 or ci == 0
+                words += [(w, bold) for w in plain(r[ci]).split()]
+        widest = max((text_width_pt(w, size, b) for w, b in words), default=0) / 72
+        need.append(widest + 0.16 + 0.06)          # cell margins + a little air
+    short = [i for i in range(n) if widths_in[i] < need[i]]
+    if not short:
+        return widths_in
+    lack = sum(need[i] - widths_in[i] for i in short)
+    donors = {i: widths_in[i] - need[i] for i in range(n) if i not in short and widths_in[i] > need[i]}
+    spare = sum(donors.values())
+    if spare <= 0:
+        return widths_in
+    take = min(lack, spare)
+    out = list(widths_in)
+    for i in short:
+        out[i] += (need[i] - widths_in[i]) * take / lack
+    for i, s in donors.items():
+        out[i] -= s * take / spare
+    return out
+
+
 def _fill(cell, rgb):
     cell.fill.solid()
     cell.fill.fore_color.rgb = rgb
@@ -79,6 +111,7 @@ def draw_table(slide, theme: Theme, left, top, table_w, avail_h, *,
             widths_in[i] = 0.85
         for i in rest:
             widths_in[i] -= spare * widths_in[i] / rest_total
+    widths_in = _no_split_words(widths_in, columns, rows, size)
 
     # Row height: share the available height so the table fills its box.
     avail = avail_h

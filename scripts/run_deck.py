@@ -351,8 +351,8 @@ def _run(args, script: Path, tee) -> int:
                         f"{len(warnings)} WARNING(s) — fix each (see above)"))
     if flagged:
         where = " · ".join(
-            f"{sec} slide{'s' if len(sl) > 1 else ''} {', '.join(map(str, sorted(sl)))}"
-            for sec, sl in deck_check.FINDINGS.items())
+            (f"{sec} slide{'s' if len(sl) > 1 else ''} {', '.join(map(str, sorted(sl)))}"
+             if sl else sec) for sec, sl in deck_check.FINDINGS.items())
         check_line = f"items to fix — {where}" if where else "items to fix — see the sections above"
     else:
         check_line = "clean"

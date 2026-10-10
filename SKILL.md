@@ -18,12 +18,12 @@ communicates**, and you can defend each choice.
    SKILL.md (don't search the disk for it); output goes to the workspace
    `output/`, never into `SKILL_DIR`. Write files with your file tool, view
    PNGs with your file viewer. Expect 6–10 commands for a whole deck.
-   - `python "SKILL_DIR/scripts/read_source.py" "<attachment path>"` — the
-     source as text, every table as a Markdown table (docx / xlsx / pptx /
-     pdf / md / csv).
+   - `python "SKILL_DIR/scripts/read_source.py" "<attachment path>"` (or
+     `--attachment`: the newest Antigravity upload) — the source as text,
+     tables as Markdown; a long one is saved to a file it names: open that.
    - `python "SKILL_DIR/scripts/catalog.py"` — index of all templates; then
      **one** call per need: `catalog.py --plan output/<slug>_plan.md` (checks
-     the plan, prints the entries it needs), or
+     the plan), or
      `catalog.py data_table fishbone --icons` for named templates; other
      flags: `--guide --options --focus --theme --spines`.
    - `python "SKILL_DIR/scripts/run_deck.py" output/build_<slug>.py --source "<path>" --plan output/<slug>_plan.md`
@@ -32,10 +32,9 @@ communicates**, and you can defend each choice.
      `python -m pip install -r "SKILL_DIR/requirements.txt"`.
    Use `python3` on macOS/Linux, `python` on Windows. One command per call:
    PowerShell 5 rejects `&&` and `||`.
-2. **Attachments are files on disk — read them, never retype them.** Find the
-   path in the conversation context (Antigravity: the attachment / media entry
-   of the request, a path like `…\brain\<id>\.user_uploaded\media_….docx`),
-   read it with `read_source.py`, and pass the same path to `--source`. **The
+2. **Attachments are files on disk — read them, never retype them.** Use the
+   path in the conversation context, or in Antigravity `read_source.py
+   --attachment` (it prints the path); pass that path to `--source`. **The
    attachment is the source even when a similar file already sits in the
    workspace** (an older copy, `source_outline.md`): a hand-typed copy loses
    tables and numbers, and the checker would compare against your copy. Can't
@@ -66,7 +65,7 @@ from this table (newest templates first). Get the API with `catalog.py <name>`.
 | A whole split two ways (segment × player, region × channel) | `marimekko` | a numeric `data_table` |
 | Volume moving through stages, splitting or merging | `sankey` | `process_flow`, `funnel` |
 | **Several players / segments over 3+ periods** (share, sales, price) | `chart` `line`, every series; `highlight={"series": <the one the title is about>}`; ≤ ~8 lines | the source table as a `data_table` |
-| Several items at two points in time — direction of change | `slopegraph` | before/after table |
+| Several items at two points in time — direction of change | `slopegraph`; with a text note per item → `composite[diagram:slopegraph + table]` | before/after table |
 | Several items — the gap between two values (now vs target, us vs best) | `dumbbell` | two-column text |
 | Rank order over 3–6 periods | `bump` | a table of ranks |
 | One measure over two categorical dimensions | `heatmap` | a numeric `data_table` |
@@ -222,13 +221,12 @@ If unsure: source mode whenever a document describes the deck's content.
 
 Run `catalog.py` once: the index lists every template with its *Use when*
 line. For each slide name the relationship (table above) and pick the
-template; two candidates → `catalog.py <a> <b> --guide`. Then write the plan
-(Step 3) and run `catalog.py --plan output/<slug>_plan.md`: it rejects unknown
-names, unjustified text layouts and unsupported composite regions, and prints
-the entries (arguments, *Don't use when*, example) of exactly the templates
-the plan uses — look a template up again only if the build reports an
-argument error. The catalog is the source of truth for names and arguments;
-never invent them, and don't page through `CATALOG.md` or grep it.
+template (two candidates → `catalog.py <a> <b> --guide`). Look up the chosen
+ones with `catalog.py <name> <name> ...`; it prints what fits and names the
+rest to ask for next. Write the plan (Step 3), then `catalog.py --plan
+output/<slug>_plan.md` rejects unknown names, unjustified text layouts and
+unsupported composite regions. Never invent names or arguments, and don't
+page through or grep `CATALOG.md`.
 
 ## Step 3 — Write the slide plan first
 
@@ -406,8 +404,8 @@ report line:
 - **[1] numbers not in the sources:** a sum or difference of two source
   numbers on the slide is accepted and listed — cite it in the report; delete
   or trace anything else. Brief mode: list as illustrative.
-- **[2] coverage:** aim ≥ 90% of source numbers used; for each unused one,
-  show it or say why it was left out. Never add numbers to raise it.
+- **[2] [2b] coverage:** aim ≥ 90% of source numbers; [2b] lists source table
+  text missing (a dropped column). Show it or say why; never pad to raise it.
 - **[5] content not in the sources:** apply rule 5's test to every point
   flagged; plain explanatory words are fine, new facts, features, places or
   behaviours are not.

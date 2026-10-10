@@ -189,8 +189,8 @@ def emit_entries(templates_found, tail: str = "", page: int = 1, budget: int = B
 
 
 def plan_report(path, templates) -> int:
-    """Check a slide plan, then print the catalog entries of exactly the
-    templates it uses. The problem list comes last (see BUDGET)."""
+    """Check a slide plan. Entries are not reprinted: in the Crest run the agent
+    had looked every template up already and --plan reprinted ~6.5 KB twice."""
     import plan_check
     try:
         rows = plan_check.parse_plan(Path(path).read_text(encoding="utf-8-sig"))
@@ -206,9 +206,13 @@ def plan_report(path, templates) -> int:
                      else f"  {level.upper():7s} {msg}")
     if not problems:
         lines.append("  no problems — build it")
-    lines.append("(Icon names, tones and markup: catalog.py --icons.)\n")
-    found = [t for name in plan_check.entries_needed(rows) for t in find(templates, name)]
-    emit_entries(found, tail="\n".join(lines))
+    names = [t["names"][0] for name in plan_check.entries_needed(rows)
+             for t in find(templates, name)]
+    if names:
+        lines.append(f"Templates in this plan: {', '.join(names)}.")
+        lines.append("Arguments for any you have not looked up yet: python scripts/catalog.py "
+                     + " ".join(names[:6]) + (" (then the rest)" if len(names) > 6 else ""))
+    print("\n".join(lines).lstrip("\n"))
     return 1 if errors else 0
 
 

@@ -1,4 +1,6 @@
-"""Check a generated deck against its source material.
+"""AGENTS: you do not need to read this file — SKILL.md Step 6 and each section of its report say what to do.
+
+Check a generated deck against its source material.
 
     python scripts/deck_check.py output/deck.pptx --source inputs/outline.docx [--source more.xlsx ...]
 
@@ -114,6 +116,55 @@ def _raw_source_text(path: Path) -> str:
     return path.read_text(encoding="utf8", errors="ignore")
 
 
+def source_table_cells(path: Path):
+    """[(table number, cell text)] for every table in a source file."""
+    ext = path.suffix.lower()
+    tables = []
+    try:
+        if ext == ".docx":
+            with zipfile.ZipFile(path) as z:
+                xml = z.read("word/document.xml").decode("utf8")
+            for tbl in re.findall(r"<w:tbl>.*?</w:tbl>", xml, re.S):
+                cells = [html.unescape(re.sub(r"<[^>]+>", " ", c))
+                         for c in re.findall(r"<w:tc>.*?</w:tc>", tbl, re.S)]
+                tables.append(cells)
+        elif ext == ".pptx":
+            for sl in Presentation(str(path)).slides:
+                for sh in _iter_shapes(sl.shapes):
+                    if getattr(sh, "has_table", False) and sh.has_table:
+                        tables.append([c.text for r in sh.table.rows for c in r.cells])
+        elif ext in (".csv", ".tsv"):
+            tables.append([c for line in _csv_text(path, "\t" if ext == ".tsv" else ",").splitlines()
+                           for c in line.split(" | ")])
+        elif ext in (".md", ".txt"):
+            cur = []
+            for line in path.read_text(encoding="utf8", errors="ignore").splitlines():
+                if line.strip().startswith("|"):
+                    cur += [c for c in line.strip().strip("|").split("|")
+                            if not re.fullmatch(r"\s*:?-{2,}:?\s*", c)]
+                elif cur:
+                    tables.append(cur)
+                    cur = []
+            if cur:
+                tables.append(cur)
+    except Exception:  # noqa: BLE001 - a source we cannot parse has no table check
+        return []
+    return [(n, re.sub(r"\s+", " ", c).strip()) for n, cells in enumerate(tables, start=1)
+            for c in cells]
+
+
+def missing_table_text(cells, deck_stems: set) -> list:
+    """Source table cells with real wording (3+ content words) of which fewer than
+    half the words appear anywhere in the deck: a text column that was dropped
+    (Crest run: a slopegraph kept the shares and lost "Trend Interpretation")."""
+    out = []
+    for n, text in cells:
+        words = {_stem(w) for w in _WORD.findall(text) if w.lower() not in _STOP}
+        if len(words) >= 3 and len(words & deck_stems) / len(words) < 0.5:
+            out.append((n, text))
+    return out
+
+
 def _csv_text(path: Path, delim: str) -> str:
     """One line per row, cells joined by ' | ': a delimiter comma is never read as
     a thousands separator ("APAC,980,1010" is 980 and 1010, not 9801010)."""
@@ -140,6 +191,42 @@ def _frames(slide):
             for row in sh.table.rows:
                 for ci, cell in enumerate(row.cells):
                     yield cell.text_frame, cols[ci].width
+
+
+def _split_word_frames(slide):
+    """(text_frame, inner width in points) for shapes and table cells."""
+    for sh in _iter_shapes(slide.shapes):
+        if sh.has_text_frame and sh.width:
+            tf = sh.text_frame
+            yield tf, (sh.width - (tf.margin_left or 0) - (tf.margin_right or 0)) / 12700
+        if getattr(sh, "has_table", False) and sh.has_table:
+            cols = sh.table.columns
+            for row in sh.table.rows:
+                for ci, cell in enumerate(row.cells):
+                    w = cols[ci].width - (cell.margin_left or 0) - (cell.margin_right or 0)
+                    yield cell.text_frame, w / 12700
+
+
+def broken_words(slide):
+    """Words wider than their box: PowerPoint splits them mid-word ("Explosio-n"
+    in a narrow table column, "Ecosyste-m" in a hub circle). [(word, size)]"""
+    try:
+        from mckinsey_pptx.metrics import text_width_pt
+    except Exception:  # checker still runs without the package
+        return []
+    out = []
+    for tf, inner in _split_word_frames(slide):
+        if inner <= 0:
+            continue
+        for p in tf.paragraphs:
+            for r in p.runs:
+                size = r.font.size.pt if r.font.size else None
+                if not size:
+                    continue
+                for w in re.findall(r"[A-Za-z][A-Za-z'’-]{4,}", r.text):
+                    if text_width_pt(w, size, bool(r.font.bold)) > inner * 1.02:
+                        out.append((w, size))
+    return out
 
 
 def _chart_text(slide) -> str:
@@ -609,7 +696,7 @@ def main(argv=None) -> int:
 
     print(f"Deck: {args.deck}  ({len(prs.slides)} slides)")
     deck_nums_all: set[str] = set()
-    sparse, leftovers, invented, computed = [], [], [], []
+    sparse, leftovers, invented, computed, split = [], [], [], [], []
     risky, quoted_new, novel, small, src_bad, restates = [], [], [], [], [], []
     en_labels = []
     templates, groups = [], []
@@ -652,6 +739,9 @@ def main(argv=None) -> int:
         floor = size_floor(slide)
         if bs is not None and bs < floor and i > 1:
             small.append((i, bs, floor))
+        bw = broken_words(slide)
+        if bw:
+            split.append((i, sorted({w for w, _ in bw})))
         if deck_is_cjk and _EN_LABELS:
             hits = sorted(english_labels(slide))
             if hits:
@@ -690,6 +780,23 @@ def main(argv=None) -> int:
             if cov < 0.9:
                 print("  -> aim for 90%: show each missing figure, or say in the report why it "
                       "was left out. Never add numbers just to raise this.")
+        deck_stems = {_stem(w) for s_ in prs.slides for w in _WORD.findall(slide_text(s_))}
+        lost = [hit for s in args.source for hit in missing_table_text(
+            source_table_cells(Path(s)), deck_stems)]
+        print("\n[2b] Source table text not in the deck (a dropped column or row):")
+        if lost:
+            flagged = True
+            _note("[2b]", [])
+            by_table = {}
+            for n, text in lost:
+                by_table.setdefault(n, []).append(text)
+            for n, texts in by_table.items():
+                shown = "; ".join(f"'{t[:55]}{'…' if len(t) > 55 else ''}'" for t in texts[:4])
+                print(f"  table {n}: {shown}" + (f" (+{len(texts) - 4} more)" if len(texts) > 4 else ""))
+            print("  -> put it on the slide (a table column, the cards, or composite[diagram + "
+                  "table]) or say in the report why it was left out.")
+        else:
+            print("  none")
 
     print(f"\n[3] Thin text slides (advisory; source mode, text templates, fill < {args.sparse:.0%}):")
     if sparse:
@@ -788,13 +895,16 @@ def main(argv=None) -> int:
         if not runs and not bad_groups and not (n_charts == 0 and numeric_tables):
             print(f"  ok ({n_charts} chart slide(s))")
 
-    print("\n[7] Small text (body < 12pt; diagram labels < 10pt):")
-    if small:
+    print("\n[7] Small text (body < 12pt; diagram labels < 10pt) and words split mid-word:")
+    if small or split:
         flagged = True
-        _note("[7]", [i for i, _, _ in small])
+        _note("[7]", sorted({i for i, _, _ in small} | {i for i, _ in split}))
         for i, bs, floor in small:
             print(f"  slide {i}: {bs:g}pt (min {floor}pt) — shorten bullets, drop "
                   "subtitle/insight, or split")
+        for i, ws in split:
+            print(f"  slide {i}: split mid-word: {', '.join(ws[:6])} — widen that column "
+                  "(col_widths=), use a shorter word, or give the shape more room")
     else:
         print("  none")
 

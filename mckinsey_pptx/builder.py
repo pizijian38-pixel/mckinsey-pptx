@@ -456,9 +456,12 @@ def _check_title_length(name, kw):
     if size < TITLE_MIN_PT:
         import sys
         fits = text_width_pt(plain(title), size, bold=True) / 72 <= width
-        print(f"[mckinsey_pptx] WARNING {name} \"{title[:40]}\": title is {len(title)} chars, "
-              + (f"shrinks to {size}pt" if fits else "wraps") + " — cut to ~75 (34 CJK), "
-              "rest to subtitle", file=sys.stderr)
+        # characters to cut so the title fits one line at TITLE_MIN_PT
+        over = text_width_pt(plain(title), TITLE_MIN_PT, bold=True) / 72 / (width * 0.95)
+        cut = max(1, int(len(title) * (1 - 1 / over)) + 1) if over > 1 else 1
+        print(f"[mckinsey_pptx] WARNING {name} \"{title[:40]}\": title "
+              + (f"shrinks to {size}pt" if fits else "wraps") + f" — cut about {cut} "
+              "characters (rest to the subtitle)", file=sys.stderr)
 
 
 def _check_title_focus(name, kw):

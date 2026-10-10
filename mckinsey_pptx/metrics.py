@@ -93,10 +93,22 @@ def text_height_in(paragraphs: Sequence[str], width_in: float, size: float,
     return (lines * size * line_spacing + gaps) / 72
 
 
+def longest_word_fits(paragraphs: Sequence[str], width_in: float, size: float,
+                      bold=False, indent_in=0.0) -> bool:
+    """False when one word is wider than the line: PowerPoint would split it
+    mid-word ("Ecosyste-m")."""
+    width_pt = (width_in - indent_in) * 72
+    words = [w for p in paragraphs for w in re.findall(r"[^\s\u2e80-\u9fff\uac00-\ud7af]+", plain(p))]
+    return all(text_width_pt(w, size, bold) <= width_pt for w in words)
+
+
 def fit_size(paragraphs: Sequence[str], width_in: float, height_in: float,
              max_size=16, min_size=10, **kw) -> int:
+    """Largest size at which the text fits the box with no word split mid-word."""
     for s in range(max_size, min_size - 1, -1):
-        if text_height_in(paragraphs, width_in, s, **kw) <= height_in:
+        if (text_height_in(paragraphs, width_in, s, **kw) <= height_in
+                and longest_word_fits(paragraphs, width_in, s, kw.get("bold", False),
+                                      kw.get("indent_in", 0.0))):
             return s
     return min_size
 
